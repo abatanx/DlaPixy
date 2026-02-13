@@ -562,7 +562,54 @@ export function App() {
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = cell;
         drawStateRef.current.moveStartOrigin = { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y };
-        setStatusText('貼り付け範囲を移動中');
+        setStatusText('選択範囲を移動中');
+        return;
+      }
+
+      if (tool === 'select' && selection && pointInSelection(cell, selection)) {
+        pushUndo();
+        const basePixels = clonePixels(pixels);
+        const selectedPixels = new Uint8ClampedArray(selection.w * selection.h * 4);
+        for (let y = 0; y < selection.h; y += 1) {
+          for (let x = 0; x < selection.w; x += 1) {
+            const srcIdx = ((selection.y + y) * canvasSize + (selection.x + x)) * 4;
+            const dstIdx = (y * selection.w + x) * 4;
+            selectedPixels[dstIdx] = pixels[srcIdx];
+            selectedPixels[dstIdx + 1] = pixels[srcIdx + 1];
+            selectedPixels[dstIdx + 2] = pixels[srcIdx + 2];
+            selectedPixels[dstIdx + 3] = pixels[srcIdx + 3];
+
+            basePixels[srcIdx] = 0;
+            basePixels[srcIdx + 1] = 0;
+            basePixels[srcIdx + 2] = 0;
+            basePixels[srcIdx + 3] = 0;
+          }
+        }
+
+        const composited = blitBlockOnCanvas(
+          basePixels,
+          canvasSize,
+          selectedPixels,
+          selection.w,
+          selection.h,
+          selection.x,
+          selection.y
+        );
+        setPixels(composited);
+        floatingPasteRef.current = {
+          x: selection.x,
+          y: selection.y,
+          width: selection.w,
+          height: selection.h,
+          pixels: selectedPixels,
+          basePixels
+        };
+        drawStateRef.current.active = true;
+        drawStateRef.current.selectionStart = null;
+        drawStateRef.current.lastDrawCell = null;
+        drawStateRef.current.moveStartCell = cell;
+        drawStateRef.current.moveStartOrigin = { x: selection.x, y: selection.y };
+        setStatusText('選択範囲を移動中');
         return;
       }
 
@@ -675,7 +722,7 @@ export function App() {
     drawStateRef.current.moveStartCell = null;
     drawStateRef.current.moveStartOrigin = null;
     if (wasMovingPaste) {
-      setStatusText('貼り付け範囲を配置しました');
+      setStatusText('選択範囲を配置しました');
     }
   }, [endPan]);
 
