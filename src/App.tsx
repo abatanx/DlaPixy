@@ -174,7 +174,7 @@ export function App() {
     if (!pctx) {
       return '';
     }
-    pctx.putImageData(new ImageData(new Uint8ClampedArray(pixels), canvasSize, canvasSize), 0, 0);
+    pctx.putImageData(new ImageData(pixels.slice(), canvasSize, canvasSize), 0, 0);
     return previewCanvas.toDataURL('image/png');
   }, [canvasSize, pixels]);
 
@@ -205,7 +205,7 @@ export function App() {
         return;
       }
 
-      tctx.putImageData(new ImageData(sourcePixels, canvasSize, canvasSize), 0, 0);
+      tctx.putImageData(new ImageData(sourcePixels.slice(), canvasSize, canvasSize), 0, 0);
 
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -864,7 +864,7 @@ export function App() {
       return;
     }
 
-    ctx.putImageData(new ImageData(pixels, canvasSize, canvasSize), 0, 0);
+    ctx.putImageData(new ImageData(pixels.slice(), canvasSize, canvasSize), 0, 0);
     const dataUrl = canvas.toDataURL('image/png');
     const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
 
