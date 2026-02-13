@@ -35,13 +35,20 @@ npm run dist
   - Delete selection
   - Paste selection
   - After paste: pasted block is draggable immediately (with Select tool)
+  - Selected pixels are draggable directly (same behavior as pasted floating block)
 - Undo
 - Save/Load PNG
 - 1x PNG preview panel
+- Selection 3x3 tile preview panel (under 1x preview)
+  - Uses current selection, or keeps showing last selection when selection is cleared
+  - Real-time updates while editing pixels
+  - Auto-fit to parent width (responsive scale)
 - Zoom controls
 - Space + drag pan behavior (Photoshop-like hand tool)
 - Page-level scroll disabled (only stage/internal scroll)
 - Right-side vertical toolbar with FontAwesome icons
+- TypeScript/ImageData compatibility fix:
+  - Use `slice()` before `new ImageData(...)` to avoid `ArrayBufferLike` overload mismatch (`TS2769`)
 
 ## 5. Shortcuts (Current)
 - Tool switch:
@@ -90,15 +97,16 @@ Current metadata shape:
 ## 8. Important Implementation Notes
 - Grid is **overlay spacing**, not canvas resolution.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
+- Selection drag-move also reuses `floatingPasteRef` flow:
+  - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.
 - Floating pasted state is cleared on destructive/reset flows:
   - canvas resize, clear, delete selection, load, undo.
+- Tile preview keeps last valid selection (`lastTilePreviewSelection`) so preview does not disappear when selection is cleared.
 - Fill tool uses flood-fill over contiguous same-color pixels (4-neighbor).
 
 ## 9. Known UX/Tech Debt (Next Candidates)
 - Paste finalize/cancel UX can be improved:
   - e.g. `Enter` to finalize, `Esc` to cancel.
-- Selection move currently targets pasted floating block specifically.
-  - General selection move/cut-paste workflow is not yet implemented.
 - Clipboard integration is hybrid:
   - Internal pixel clipboard for precise paste behavior
   - OS image clipboard write is also performed
