@@ -130,6 +130,22 @@ body {
   image-rendering: pixelated;
 }
 
+.tile-preview-wrap {
+  max-height: 180px;
+}
+
+.tile-preview-image {
+  width: 100%;
+  height: auto;
+  max-width: none;
+}
+
+.preview-placeholder {
+  font-size: 0.8rem;
+  color: #64748b;
+  padding: 0.5rem;
+}
+
 .pixel-canvas {
   display: block;
   flex: 0 0 auto;

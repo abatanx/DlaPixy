@@ -82,6 +82,23 @@ function pointInSelection(point: { x: number; y: number }, selection: Selection)
   );
 }
 
+function clampSelectionToCanvas(selection: Selection, canvasSize: number): Selection {
+  if (!selection) {
+    return null;
+  }
+  if (selection.x >= canvasSize || selection.y >= canvasSize) {
+    return null;
+  }
+
+  const w = Math.min(selection.w, canvasSize - selection.x);
+  const h = Math.min(selection.h, canvasSize - selection.y);
+  if (w <= 0 || h <= 0) {
+    return null;
+  }
+
+  return { x: selection.x, y: selection.y, w, h };
+}
+
 function blitBlockOnCanvas(
   basePixels: Uint8ClampedArray,
   canvasSize: number,
@@ -115,6 +132,7 @@ export function App() {
   const [selectedColor, setSelectedColor] = useState<string>(DEFAULT_PALETTE[0]);
   const [tool, setTool] = useState<Tool>('pencil');
   const [selection, setSelection] = useState<Selection>(null);
+  const [lastTilePreviewSelection, setLastTilePreviewSelection] = useState<Selection>(null);
   const [statusText, setStatusText] = useState<string>('準備OK');
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
@@ -177,6 +195,61 @@ export function App() {
     pctx.putImageData(new ImageData(pixels.slice(), canvasSize, canvasSize), 0, 0);
     return previewCanvas.toDataURL('image/png');
   }, [canvasSize, pixels]);
+  const tilePreviewSelection = useMemo(
+    () => clampSelectionToCanvas(selection ?? lastTilePreviewSelection, canvasSize),
+    [canvasSize, lastTilePreviewSelection, selection]
+  );
+
+  useEffect(() => {
+    if (!selection) {
+      return;
+    }
+    setLastTilePreviewSelection(selection);
+  }, [selection]);
+
+  const selectionTilePreviewDataUrl = useMemo(() => {
+    if (!tilePreviewSelection) {
+      return '';
+    }
+
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = tilePreviewSelection.w;
+    sourceCanvas.height = tilePreviewSelection.h;
+    const sctx = sourceCanvas.getContext('2d');
+    if (!sctx) {
+      return '';
+    }
+
+    const sourceImageData = sctx.createImageData(tilePreviewSelection.w, tilePreviewSelection.h);
+    for (let y = 0; y < tilePreviewSelection.h; y += 1) {
+      for (let x = 0; x < tilePreviewSelection.w; x += 1) {
+        const srcIdx = ((tilePreviewSelection.y + y) * canvasSize + (tilePreviewSelection.x + x)) * 4;
+        const dstIdx = (y * tilePreviewSelection.w + x) * 4;
+        sourceImageData.data[dstIdx] = pixels[srcIdx];
+        sourceImageData.data[dstIdx + 1] = pixels[srcIdx + 1];
+        sourceImageData.data[dstIdx + 2] = pixels[srcIdx + 2];
+        sourceImageData.data[dstIdx + 3] = pixels[srcIdx + 3];
+      }
+    }
+    sctx.putImageData(sourceImageData, 0, 0);
+
+    const tileCanvas = document.createElement('canvas');
+    tileCanvas.width = tilePreviewSelection.w * 3;
+    tileCanvas.height = tilePreviewSelection.h * 3;
+    const tctx = tileCanvas.getContext('2d');
+    if (!tctx) {
+      return '';
+    }
+
+    tctx.imageSmoothingEnabled = false;
+    for (let ty = 0; ty < 3; ty += 1) {
+      for (let tx = 0; tx < 3; tx += 1) {
+        tctx.drawImage(sourceCanvas, tx * tilePreviewSelection.w, ty * tilePreviewSelection.h);
+      }
+    }
+
+    return tileCanvas.toDataURL('image/png');
+  }, [canvasSize, pixels, tilePreviewSelection]);
 
   const pushUndo = useCallback(() => {
     undoStackRef.current.push(clonePixels(pixels));
@@ -983,6 +1056,23 @@ export function App() {
                   ) : null}
                 </div>
                 <div className="form-text">{canvasSize}x{canvasSize} (1x)</div>
+                <label className="form-label mt-2 mb-1">矩形選択 3x3タイルプレビュー</label>
+                <div className="preview-wrap tile-preview-wrap">
+                  {selectionTilePreviewDataUrl ? (
+                    <img
+                      src={selectionTilePreviewDataUrl}
+                      alt="Selection 3x3 Tile Preview"
+                      className="preview-image tile-preview-image"
+                    />
+                  ) : (
+                    <div className="preview-placeholder">矩形選択するとここに3x3タイル表示</div>
+                  )}
+                </div>
+                <div className="form-text">
+                  {tilePreviewSelection
+                    ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'}`
+                    : '選択範囲なし'}
+                </div>
               </div>
 
               <div className="mb-3">
