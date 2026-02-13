@@ -1,0 +1,172 @@
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 20% 20%, #fef3c7 0%, rgba(254, 243, 199, 0.25) 35%, transparent 55%),
+    radial-gradient(circle at 80% 0%, #dbeafe 0%, rgba(219, 234, 254, 0.3) 30%, transparent 60%),
+    #f8fafc;
+}
+
+.app-shell {
+  height: 100%;
+  overflow: hidden;
+}
+
+.canvas-stage {
+  overflow: auto;
+  width: 100%;
+  max-height: calc(100vh - 8rem);
+  align-items: flex-start;
+}
+
+.canvas-stage-with-toolbar {
+  padding-right: 4.25rem;
+}
+
+.canvas-stage.is-panning {
+  user-select: none;
+}
+
+.editor-card {
+  position: relative;
+}
+
+.editor-toolbar {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  z-index: 20;
+  padding: 0.35rem;
+  border-radius: 0.6rem;
+  border: 1px solid #dbe2ea;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(2px);
+}
+
+.editor-tool-btn {
+  width: 3.25rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.editor-btn-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.editor-shortcut {
+  font-size: 0.62rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+
+.editor-tool-btn.active .editor-shortcut {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.editor-tool-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.editor-tool-btn.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.editor-tool-btn:disabled {
+  opacity: 0.45;
+}
+
+.editor-toolbar-separator {
+  height: 1px;
+  background: #dbe2ea;
+  margin: 0.15rem 0;
+}
+
+.editor-zoom-label {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  line-height: 1;
+  padding-top: 0.2rem;
+}
+
+.preview-wrap {
+  overflow: auto;
+  max-height: 220px;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  padding: 0.25rem;
+}
+
+.preview-image {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.pixel-canvas {
+  display: block;
+  flex: 0 0 auto;
+  border: 1px solid #cbd5e1;
+  cursor: crosshair;
+  image-rendering: pixelated;
+  background-image:
+    linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+    linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+    linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.pixel-canvas.is-space-pan {
+  cursor: grab;
+}
+
+.pixel-canvas.is-panning {
+  cursor: grabbing;
+}
+
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.palette-item {
+  border: 2px solid #e2e8f0;
+  width: 100%;
+  padding-bottom: 100%;
+  border-radius: 4px;
+}
+
+.palette-item.active {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
+}
