@@ -143,12 +143,14 @@ export function App() {
   const drawStateRef = useRef<{
     active: boolean;
     selectionStart: { x: number; y: number } | null;
+    selectionMoved: boolean;
     lastDrawCell: { x: number; y: number } | null;
     moveStartCell: { x: number; y: number } | null;
     moveStartOrigin: { x: number; y: number } | null;
   }>({
     active: false,
     selectionStart: null,
+    selectionMoved: false,
     lastDrawCell: null,
     moveStartCell: null,
     moveStartOrigin: null
@@ -538,6 +540,17 @@ export function App() {
     return { x, y, w, h };
   }, []);
 
+  const resolveSingleTileSelection = useCallback(
+    (cell: { x: number; y: number }): Selection => {
+      const startX = Math.floor(cell.x / gridSpacing) * gridSpacing;
+      const startY = Math.floor(cell.y / gridSpacing) * gridSpacing;
+      const w = Math.min(gridSpacing, canvasSize - startX);
+      const h = Math.min(gridSpacing, canvasSize - startY);
+      return { x: startX, y: startY, w, h };
+    },
+    [canvasSize, gridSpacing]
+  );
+
   const clearFloatingPaste = useCallback(() => {
     floatingPasteRef.current = null;
     drawStateRef.current.moveStartCell = null;
@@ -559,6 +572,7 @@ export function App() {
       if (tool === 'select' && floatingPasteRef.current && pointInSelection(cell, selection)) {
         drawStateRef.current.active = true;
         drawStateRef.current.selectionStart = null;
+        drawStateRef.current.selectionMoved = false;
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = cell;
         drawStateRef.current.moveStartOrigin = { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y };
@@ -606,6 +620,7 @@ export function App() {
         };
         drawStateRef.current.active = true;
         drawStateRef.current.selectionStart = null;
+        drawStateRef.current.selectionMoved = false;
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = cell;
         drawStateRef.current.moveStartOrigin = { x: selection.x, y: selection.y };
@@ -623,6 +638,7 @@ export function App() {
         setSelection(null);
         drawStateRef.current.active = false;
         drawStateRef.current.selectionStart = null;
+        drawStateRef.current.selectionMoved = false;
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = null;
         drawStateRef.current.moveStartOrigin = null;
@@ -636,6 +652,7 @@ export function App() {
 
       if (tool === 'select') {
         drawStateRef.current.selectionStart = cell;
+        drawStateRef.current.selectionMoved = false;
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = null;
         drawStateRef.current.moveStartOrigin = null;
@@ -643,6 +660,7 @@ export function App() {
       } else {
         setSelection(null);
         applyStrokeSegment(cell, cell, tool === 'eraser');
+        drawStateRef.current.selectionMoved = false;
         drawStateRef.current.lastDrawCell = cell;
         drawStateRef.current.moveStartCell = null;
         drawStateRef.current.moveStartOrigin = null;
@@ -698,6 +716,9 @@ export function App() {
         if (!start) {
           return;
         }
+        if (cell.x !== start.x || cell.y !== start.y) {
+          drawStateRef.current.selectionMoved = true;
+        }
         setSelection(normalizeSelection(start.x, start.y, cell.x, cell.y));
         return;
       }
@@ -716,15 +737,22 @@ export function App() {
     }
 
     const wasMovingPaste = drawStateRef.current.moveStartCell !== null && floatingPasteRef.current !== null;
+    const selectStart = drawStateRef.current.selectionStart;
+    const shouldSelectSingleTile = tool === 'select' && selectStart !== null && !drawStateRef.current.selectionMoved;
+    if (shouldSelectSingleTile && selectStart) {
+      setSelection(resolveSingleTileSelection(selectStart));
+      setStatusText('1タイルを選択しました');
+    }
     drawStateRef.current.active = false;
     drawStateRef.current.selectionStart = null;
+    drawStateRef.current.selectionMoved = false;
     drawStateRef.current.lastDrawCell = null;
     drawStateRef.current.moveStartCell = null;
     drawStateRef.current.moveStartOrigin = null;
-    if (wasMovingPaste) {
+    if (wasMovingPaste && !shouldSelectSingleTile) {
       setStatusText('選択範囲を配置しました');
     }
-  }, [endPan]);
+  }, [endPan, resolveSingleTileSelection, tool]);
 
   const applyCanvasSize = useCallback(() => {
     const parsed = Number.parseInt(pendingCanvasSize, 10);
