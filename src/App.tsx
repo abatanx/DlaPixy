@@ -99,6 +99,13 @@ function clampSelectionToCanvas(selection: Selection, canvasSize: number): Selec
   return { x: selection.x, y: selection.y, w, h };
 }
 
+function cloneSelection(selection: Selection): Selection {
+  if (!selection) {
+    return null;
+  }
+  return { x: selection.x, y: selection.y, w: selection.w, h: selection.h };
+}
+
 function blitBlockOnCanvas(
   basePixels: Uint8ClampedArray,
   canvasSize: number,
@@ -180,6 +187,9 @@ export function App() {
     height: number;
     pixels: Uint8ClampedArray;
     basePixels: Uint8ClampedArray;
+    restorePixels: Uint8ClampedArray;
+    restoreSelection: Selection;
+    restoreTool: Tool;
   } | null>(null);
   const undoStackRef = useRef<Uint8ClampedArray[]>([]);
 
@@ -544,6 +554,26 @@ export function App() {
     drawStateRef.current.moveStartOrigin = null;
   }, []);
 
+  const finalizeFloatingPaste = useCallback(() => {
+    if (!floatingPasteRef.current) {
+      return;
+    }
+    clearFloatingPaste();
+    setStatusText('貼り付け移動を確定しました');
+  }, [clearFloatingPaste]);
+
+  const cancelFloatingPaste = useCallback(() => {
+    const floating = floatingPasteRef.current;
+    if (!floating) {
+      return;
+    }
+    setPixels(clonePixels(floating.restorePixels));
+    setSelection(cloneSelection(floating.restoreSelection));
+    setTool(floating.restoreTool);
+    clearFloatingPaste();
+    setStatusText('貼り付け移動をキャンセルしました');
+  }, [clearFloatingPaste]);
+
   const onMouseDown = useCallback(
     (event: React.MouseEvent<HTMLCanvasElement>) => {
       if (isSpacePressed) {
@@ -602,7 +632,10 @@ export function App() {
           width: selection.w,
           height: selection.h,
           pixels: selectedPixels,
-          basePixels
+          basePixels,
+          restorePixels: clonePixels(pixels),
+          restoreSelection: cloneSelection(selection),
+          restoreTool: tool
         };
         drawStateRef.current.active = true;
         drawStateRef.current.selectionStart = null;
@@ -887,12 +920,15 @@ export function App() {
       width: pasteWidth,
       height: pasteHeight,
       pixels: pastedPixels,
-      basePixels
+      basePixels,
+      restorePixels: clonePixels(pixels),
+      restoreSelection: cloneSelection(selection),
+      restoreTool: tool
     };
     setTool('select');
     setSelection({ x: pasteX, y: pasteY, w: pasteWidth, h: pasteHeight });
-    setStatusText(`選択範囲を貼り付けました (${pasteWidth}x${pasteHeight}) - ドラッグで移動できます`);
-  }, [canvasSize, pixels, pushUndo, selection]);
+    setStatusText(`選択範囲を貼り付けました (${pasteWidth}x${pasteHeight}) - Enterで確定 / Escでキャンセル`);
+  }, [canvasSize, pixels, pushUndo, selection, tool]);
 
   useEffect(() => {
     const isEditableElement = (target: EventTarget | null): boolean => {
@@ -930,6 +966,21 @@ export function App() {
       }
 
       switch (event.code) {
+        case 'Enter':
+        case 'NumpadEnter':
+          if (!floatingPasteRef.current) {
+            break;
+          }
+          event.preventDefault();
+          finalizeFloatingPaste();
+          break;
+        case 'Escape':
+          if (!floatingPasteRef.current) {
+            break;
+          }
+          event.preventDefault();
+          cancelFloatingPaste();
+          break;
         case 'KeyB':
           event.preventDefault();
           setTool('pencil');
@@ -969,7 +1020,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [copySelection, doUndo, pasteSelection, zoomIn, zoomOut]);
+  }, [cancelFloatingPaste, copySelection, doUndo, finalizeFloatingPaste, pasteSelection, zoomIn, zoomOut]);
 
   const addColorToPalette = useCallback((hex: string) => {
     setPalette((prev) => (prev.includes(hex) ? prev : [...prev, hex]));

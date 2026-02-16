@@ -35,6 +35,7 @@ npm run dist
   - Delete selection
   - Paste selection
   - After paste: pasted block is draggable immediately (with Select tool)
+  - Floating paste/move controls: `Enter` to finalize, `Esc` to cancel and restore pre-paste state
   - Selected pixels are draggable directly (same behavior as pasted floating block)
 - Undo
 - Save/Load PNG
@@ -63,6 +64,8 @@ npm run dist
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
+  - `Enter`: Finalize floating paste/move
+  - `Esc`: Cancel floating paste/move and restore previous state
 
 ## 6. PNG Metadata Contract
 Stored in PNG `tEXt` chunk keyword: `pixel-editor-meta`.
@@ -105,8 +108,6 @@ Current metadata shape:
 - Fill tool uses flood-fill over contiguous same-color pixels (4-neighbor).
 
 ## 9. Known UX/Tech Debt (Next Candidates)
-- Paste finalize/cancel UX can be improved:
-  - e.g. `Enter` to finalize, `Esc` to cancel.
 - Clipboard integration is hybrid:
   - Internal pixel clipboard for precise paste behavior
   - OS image clipboard write is also performed
@@ -121,3 +122,12 @@ Current metadata shape:
 - There is a stray root file named `+` in workspace (`/Users/abatan/Develop/PixelEditor/+`).
   - It is not used by app runtime.
   - Remove only if user confirms.
+
+## 12. GitHub Backlog (Created 2026-02-16)
+- Label policy:
+  - Use Japanese labels for GitHub issues in this repository.
+  - Preferred examples: `機能追加`, `仕様変更`, `高`, `中`, `低`.
+- #2 `feat: Paste finalize/cancel operations (Enter/Esc)`
+  - https://github.com/abatanx/DlaPixy/issues/2
+- #3 `refactor: Clipboard integration responsibility split`
+  - https://github.com/abatanx/DlaPixy/issues/3

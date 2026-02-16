@@ -35,6 +35,7 @@ npm run dist
   - 削除
   - 貼り付け
   - 貼り付け直後のドラッグ移動（Selectツール）
+  - 浮動貼り付け/移動の操作: `Enter` で確定、`Esc` でキャンセルして貼り付け前状態に復元
   - 矩形選択したピクセルのドラッグ移動（貼り付け移動と同じ挙動）
 - Undo
 - PNG保存/読込
@@ -64,6 +65,8 @@ npm run dist
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + C`: 選択範囲コピー
   - `Cmd/Ctrl + V`: 貼り付け
+  - `Enter`: 浮動貼り付け/移動を確定
+  - `Esc`: 浮動貼り付け/移動をキャンセルして元に戻す
 
 ## 6. PNGメタ情報仕様
 PNGの `tEXt` チャンクに、キーワード `pixel-editor-meta` で保存。
@@ -109,8 +112,6 @@ PNGの `tEXt` チャンクに、キーワード `pixel-editor-meta` で保存。
 - 塗りつぶしは4近傍の連結同色領域に対して実行。
 
 ## 9. 既知の改善候補
-- 貼り付け移動の確定/キャンセルUX改善
-  - 例: `Enter` 確定、`Esc` キャンセル
 - クリップボード連携はハイブリッド
   - 内部ピクセルクリップボード + OS画像クリップボード
 
@@ -125,3 +126,12 @@ PNGの `tEXt` チャンクに、キーワード `pixel-editor-meta` で保存。
 - ルートに `+` という未使用ファイルが存在（`/Users/abatan/Develop/PixelEditor/+`）
   - 実行には不要
   - 削除する場合はユーザー確認を取ること
+
+## 12. GitHubバックログ（2026-02-16作成）
+- ラベル運用ルール:
+  - このリポジトリのIssueラベルは日本語で統一する
+  - 推奨例: `機能追加`, `仕様変更`, `高`, `中`, `低`
+- #2 `feat: 貼り付け移動の確定/キャンセル操作を追加（Enter/Esc）`
+  - https://github.com/abatanx/DlaPixy/issues/2
+- #3 `refactor: クリップボード連携を整理（内部ピクセルとOSクリップボードの責務分離）`
+  - https://github.com/abatanx/DlaPixy/issues/3
