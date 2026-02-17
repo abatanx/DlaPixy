@@ -79,7 +79,6 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   version: number,
   canvasSize?: number,
   gridSpacing?: number,
-  grid?: number, // 旧データ互換
   palette: string[],
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
 }
@@ -133,7 +132,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 1. まず `DEVELOP.md` と `DEVELOP.ja.md` を読む
 2. 次に `src/App.tsx`、UI変更時は `src/components/EditorSidebar.tsx` と `src/components/EditorToolbar.tsx` を読む
 3. 大規模改修より、小さい差分で機能追加/修正する
-4. メタ情報の互換（`grid` 旧フィールド）を壊さない
+4. メタ情報のスキーマは `EditorMeta` 定義に合わせる
 5. 右端縦ツールバー + FontAwesome のUIルールを維持する
 
 ## 11. ワークスペースメモ

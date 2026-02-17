@@ -6,8 +6,6 @@ export type EditorMeta = {
   version: number;
   canvasSize?: number;
   gridSpacing?: number;
-  // legacy: older saves used `grid` for canvas size
-  grid?: number;
   palette: string[];
   lastTool: Tool;
 };

@@ -23,6 +23,7 @@ type EditorSidebarProps = {
   statusText: string;
 };
 
+// プレビュー・設定・保存読込・状態表示をまとめた左サイドパネル。
 export function EditorSidebar({
   canvasSize,
   previewDataUrl,

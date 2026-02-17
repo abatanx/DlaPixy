@@ -26,6 +26,7 @@ import {
   rgbaToHex
 } from './editor/utils';
 
+// エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
   // ---- UI / editor state ----
   const [canvasSize, setCanvasSize] = useState<number>(DEFAULT_CANVAS_SIZE);
@@ -1108,7 +1109,7 @@ export function App() {
 
     const fallbackSize = img.width === img.height ? img.width : DEFAULT_CANVAS_SIZE;
     const targetCanvasSize = clampCanvasSize(
-      result.metadata?.canvasSize ?? result.metadata?.grid ?? fallbackSize,
+      result.metadata?.canvasSize ?? fallbackSize,
       MIN_CANVAS_SIZE,
       MAX_CANVAS_SIZE
     );

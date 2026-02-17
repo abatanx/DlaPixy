@@ -4,7 +4,6 @@ type EditorMeta = {
   version: number;
   canvasSize?: number;
   gridSpacing?: number;
-  grid?: number;
   palette: string[];
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
 };

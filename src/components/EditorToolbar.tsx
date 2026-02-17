@@ -14,6 +14,7 @@ type EditorToolbarProps = {
   clearCanvas: () => void;
 };
 
+// ツール選択・ズーム・編集操作を集約した右側ツールバー。
 export function EditorToolbar({
   tool,
   setTool,

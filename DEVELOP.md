@@ -79,7 +79,6 @@ Current metadata shape:
   version: number,
   canvasSize?: number,
   gridSpacing?: number,
-  grid?: number, // legacy compatibility
   palette: string[],
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
 }
@@ -129,7 +128,7 @@ Current metadata shape:
 1. Read this file first, then inspect `src/App.tsx`.
 2. If touching UI blocks, check `src/components/EditorSidebar.tsx` and `src/components/EditorToolbar.tsx` first.
 3. Avoid rewriting full editor flow; prefer small, isolated diffs.
-4. Preserve metadata backward compatibility (`grid` legacy field).
+4. Keep metadata schema aligned with current `EditorMeta` definition.
 5. Keep UI consistency with right-side vertical toolbar and FontAwesome icon language.
 
 ## 11. Local Workspace Note

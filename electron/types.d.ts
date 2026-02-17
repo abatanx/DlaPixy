@@ -9,7 +9,6 @@ declare global {
           version: number;
           canvasSize?: number;
           gridSpacing?: number;
-          grid?: number;
           palette: string[];
           lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
         };
@@ -23,7 +22,6 @@ declare global {
           version: number;
           canvasSize?: number;
           gridSpacing?: number;
-          grid?: number;
           palette: string[];
           lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
         } | null;
