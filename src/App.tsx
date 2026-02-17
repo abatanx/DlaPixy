@@ -1102,12 +1102,17 @@ export function App() {
           finalizeFloatingPaste();
           break;
         case 'Escape':
-          // Current Esc responsibility: cancel floating paste/move only.
-          if (!floatingPasteRef.current) {
+          // Esc priority: cancel floating paste first, otherwise clear active selection.
+          if (floatingPasteRef.current) {
+            event.preventDefault();
+            cancelFloatingPaste();
             break;
           }
-          event.preventDefault();
-          cancelFloatingPaste();
+          if (selection) {
+            event.preventDefault();
+            setSelection(null);
+            setStatusText('選択を解除しました');
+          }
           break;
         case 'KeyB':
           event.preventDefault();
@@ -1148,7 +1153,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [cancelFloatingPaste, copySelection, doUndo, finalizeFloatingPaste, pasteSelection, zoomIn, zoomOut]);
+  }, [cancelFloatingPaste, copySelection, doUndo, finalizeFloatingPaste, pasteSelection, selection, zoomIn, zoomOut]);
 
   const addColorToPalette = useCallback((hex: string) => {
     setPalette((prev) => (prev.includes(hex) ? prev : [...prev, hex]));

@@ -68,7 +68,7 @@ npm run dist
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
   - `Enter`: Finalize floating paste/move
-  - `Esc`: Cancel floating paste/move and restore previous state
+  - `Esc`: Cancel floating paste/move (if active), otherwise clear current selection
 
 ## 6. PNG Metadata Contract
 Stored in PNG `tEXt` chunk keyword: `pixel-editor-meta`.
