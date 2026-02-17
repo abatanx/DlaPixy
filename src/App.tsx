@@ -1,133 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-type Tool = 'pencil' | 'eraser' | 'fill' | 'select';
-type Selection = { x: number; y: number; w: number; h: number } | null;
-
-type EditorMeta = {
-  version: number;
-  canvasSize?: number;
-  gridSpacing?: number;
-  // legacy: older saves used `grid` for canvas size
-  grid?: number;
-  palette: string[];
-  lastTool: Tool;
-};
-
-const GRID_SPACING_OPTIONS = [8, 16, 32] as const;
-const DEFAULT_GRID_SPACING = 16;
-const DEFAULT_CANVAS_SIZE = 256;
-const DEFAULT_ZOOM = 3;
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 12;
-const MAX_UNDO = 40;
-const MIN_CANVAS_SIZE = 8;
-const MAX_CANVAS_SIZE = 1024;
-
-const DEFAULT_PALETTE = ['#000000', '#ffffff', '#ef4444', '#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#0ea5e9'];
-
-function rgbaToHex(r: number, g: number, b: number): string {
-  return `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
-}
-
-function clampCanvasSize(size: number): number {
-  return Math.max(MIN_CANVAS_SIZE, Math.min(MAX_CANVAS_SIZE, size));
-}
-
-function createEmptyPixels(canvasSize: number): Uint8ClampedArray {
-  return new Uint8ClampedArray(canvasSize * canvasSize * 4);
-}
-
-function clonePixels(pixels: Uint8ClampedArray): Uint8ClampedArray {
-  return new Uint8ClampedArray(pixels);
-}
-
-function rasterLinePoints(x0: number, y0: number, x1: number, y1: number): Array<{ x: number; y: number }> {
-  const points: Array<{ x: number; y: number }> = [];
-  let cx = x0;
-  let cy = y0;
-  const dx = Math.abs(x1 - x0);
-  const dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
-
-  while (true) {
-    points.push({ x: cx, y: cy });
-    if (cx === x1 && cy === y1) {
-      break;
-    }
-    const e2 = err * 2;
-    if (e2 > -dy) {
-      err -= dy;
-      cx += sx;
-    }
-    if (e2 < dx) {
-      err += dx;
-      cy += sy;
-    }
-  }
-
-  return points;
-}
-
-function pointInSelection(point: { x: number; y: number }, selection: Selection): boolean {
-  if (!selection) {
-    return false;
-  }
-  return (
-    point.x >= selection.x &&
-    point.y >= selection.y &&
-    point.x < selection.x + selection.w &&
-    point.y < selection.y + selection.h
-  );
-}
-
-function clampSelectionToCanvas(selection: Selection, canvasSize: number): Selection {
-  if (!selection) {
-    return null;
-  }
-  if (selection.x >= canvasSize || selection.y >= canvasSize) {
-    return null;
-  }
-
-  const w = Math.min(selection.w, canvasSize - selection.x);
-  const h = Math.min(selection.h, canvasSize - selection.y);
-  if (w <= 0 || h <= 0) {
-    return null;
-  }
-
-  return { x: selection.x, y: selection.y, w, h };
-}
-
-function cloneSelection(selection: Selection): Selection {
-  if (!selection) {
-    return null;
-  }
-  return { x: selection.x, y: selection.y, w: selection.w, h: selection.h };
-}
-
-function blitBlockOnCanvas(
-  basePixels: Uint8ClampedArray,
-  canvasSize: number,
-  blockPixels: Uint8ClampedArray,
-  blockWidth: number,
-  blockHeight: number,
-  destX: number,
-  destY: number
-): Uint8ClampedArray {
-  const next = clonePixels(basePixels);
-  for (let y = 0; y < blockHeight; y += 1) {
-    for (let x = 0; x < blockWidth; x += 1) {
-      const srcIdx = (y * blockWidth + x) * 4;
-      const dstIdx = ((destY + y) * canvasSize + (destX + x)) * 4;
-      next[dstIdx] = blockPixels[srcIdx];
-      next[dstIdx + 1] = blockPixels[srcIdx + 1];
-      next[dstIdx + 2] = blockPixels[srcIdx + 2];
-      next[dstIdx + 3] = blockPixels[srcIdx + 3];
-    }
-  }
-  return next;
-}
+import { EditorSidebar } from './components/EditorSidebar';
+import { EditorToolbar } from './components/EditorToolbar';
+import {
+  DEFAULT_CANVAS_SIZE,
+  DEFAULT_GRID_SPACING,
+  DEFAULT_PALETTE,
+  DEFAULT_ZOOM,
+  GRID_SPACING_OPTIONS,
+  MAX_CANVAS_SIZE,
+  MAX_ZOOM,
+  MAX_UNDO,
+  MIN_CANVAS_SIZE,
+  MIN_ZOOM
+} from './editor/constants';
+import type { EditorMeta, Selection, Tool } from './editor/types';
+import {
+  blitBlockOnCanvas,
+  clampCanvasSize,
+  clampSelectionToCanvas,
+  clonePixels,
+  cloneSelection,
+  createEmptyPixels,
+  pointInSelection,
+  rasterLinePoints,
+  rgbaToHex
+} from './editor/utils';
 
 export function App() {
   // ---- UI / editor state ----
@@ -869,7 +766,7 @@ export function App() {
       return;
     }
 
-    const normalized = clampCanvasSize(parsed);
+    const normalized = clampCanvasSize(parsed, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     setCanvasSize(normalized);
     setPixels(createEmptyPixels(normalized));
     setSelection(null);
@@ -1210,7 +1107,11 @@ export function App() {
     });
 
     const fallbackSize = img.width === img.height ? img.width : DEFAULT_CANVAS_SIZE;
-    const targetCanvasSize = clampCanvasSize(result.metadata?.canvasSize ?? result.metadata?.grid ?? fallbackSize);
+    const targetCanvasSize = clampCanvasSize(
+      result.metadata?.canvasSize ?? result.metadata?.grid ?? fallbackSize,
+      MIN_CANVAS_SIZE,
+      MAX_CANVAS_SIZE
+    );
 
     const canvas = document.createElement('canvas');
     canvas.width = targetCanvasSize;
@@ -1268,122 +1169,27 @@ export function App() {
   return (
     <div className="container-fluid py-3 app-shell">
       <div className="row g-3">
-        <aside className="col-12 col-lg-4 col-xl-3">
-          <div className="card shadow-sm">
-            <div className="card-body">
-              <h1 className="h4 mb-3">DlaPixy</h1>
-
-              <div className="mb-3">
-                <label className="form-label">1x PNGプレビュー</label>
-                <div className="preview-wrap">
-                  {previewDataUrl ? (
-                    <img
-                      src={previewDataUrl}
-                      alt="PNG Preview"
-                      className="preview-image"
-                      width={canvasSize}
-                      height={canvasSize}
-                    />
-                  ) : null}
-                </div>
-                <div className="form-text">{canvasSize}x{canvasSize} (1x)</div>
-                <label className="form-label mt-2 mb-1">矩形選択 3x3タイルプレビュー</label>
-                <div className="preview-wrap tile-preview-wrap">
-                  {selectionTilePreviewDataUrl ? (
-                    <img
-                      src={selectionTilePreviewDataUrl}
-                      alt="Selection 3x3 Tile Preview"
-                      className="preview-image tile-preview-image"
-                    />
-                  ) : (
-                    <div className="preview-placeholder">矩形選択するとここに3x3タイル表示</div>
-                  )}
-                </div>
-                <div className="form-text">
-                  {tilePreviewSelection
-                    ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'}`
-                    : '選択範囲なし'}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">キャンバスサイズ (px)</label>
-                <div className="input-group">
-                  <input
-                    type="number"
-                    min={MIN_CANVAS_SIZE}
-                    max={MAX_CANVAS_SIZE}
-                    className="form-control"
-                    value={pendingCanvasSize}
-                    onChange={(e) => setPendingCanvasSize(e.target.value)}
-                  />
-                  <button type="button" className="btn btn-outline-primary" onClick={applyCanvasSize}>
-                    適用
-                  </button>
-                </div>
-                <div className="form-text">初期値は 256x256。範囲は {MIN_CANVAS_SIZE} - {MAX_CANVAS_SIZE}</div>
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">グリッド線の間隔</label>
-                <div className="btn-group w-100" role="group">
-                  {GRID_SPACING_OPTIONS.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={`btn ${gridSpacing === option ? 'btn-primary' : 'btn-outline-primary'}`}
-                      onClick={() => updateGridSpacing(option)}
-                    >
-                      {option}px
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label">色</label>
-                <input
-                  type="color"
-                  className="form-control form-control-color mb-2"
-                  value={selectedColor}
-                  onChange={(e) => {
-                    setSelectedColor(e.target.value);
-                    addColorToPalette(e.target.value);
-                  }}
-                />
-                <div className="palette-grid">
-                  {palette.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={`palette-item ${selectedColor === color ? 'active' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setSelectedColor(color)}
-                      title={color}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="d-grid gap-2">
-                <button type="button" className="btn btn-success" onClick={savePng}>
-                  保存 (PNG)
-                </button>
-                <button type="button" className="btn btn-primary" onClick={loadPng}>
-                  読み込み (PNG)
-                </button>
-              </div>
-
-              <div className="small text-muted mt-3">
-                <div>キャンバス: {canvasSize}x{canvasSize}</div>
-                <div>グリッド線: {gridSpacing}px 間隔</div>
-                <div>表示倍率: {zoom}x</div>
-                <div>現在ファイル: {currentFilePath ?? '未保存'}</div>
-                <div>状態: {statusText}</div>
-              </div>
-            </div>
-          </div>
-        </aside>
+        <EditorSidebar
+          canvasSize={canvasSize}
+          previewDataUrl={previewDataUrl}
+          selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
+          tilePreviewSelection={tilePreviewSelection}
+          selection={selection}
+          pendingCanvasSize={pendingCanvasSize}
+          setPendingCanvasSize={setPendingCanvasSize}
+          applyCanvasSize={applyCanvasSize}
+          gridSpacing={gridSpacing}
+          updateGridSpacing={updateGridSpacing}
+          selectedColor={selectedColor}
+          setSelectedColor={setSelectedColor}
+          addColorToPalette={addColorToPalette}
+          palette={palette}
+          savePng={savePng}
+          loadPng={loadPng}
+          zoom={zoom}
+          currentFilePath={currentFilePath}
+          statusText={statusText}
+        />
 
         <main className="col-12 col-lg-8 col-xl-9">
           <div className="card shadow-sm editor-card">
@@ -1402,101 +1208,18 @@ export function App() {
                 onMouseLeave={onMouseUp}
               />
             </div>
-            <div className="editor-toolbar" role="toolbar" aria-label="editor controls">
-              <button
-                type="button"
-                className={`btn btn-sm editor-tool-btn ${tool === 'pencil' ? 'active' : ''}`}
-                onClick={() => setTool('pencil')}
-                title="描画ツール"
-              >
-                <span className="editor-btn-inner">
-                  <i className="fa-solid fa-pencil" aria-hidden="true" />
-                  <span className="editor-shortcut">B</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm editor-tool-btn ${tool === 'eraser' ? 'active' : ''}`}
-                onClick={() => setTool('eraser')}
-                title="消しゴム"
-              >
-                <span className="editor-btn-inner">
-                  <i className="fa-solid fa-eraser" aria-hidden="true" />
-                  <span className="editor-shortcut">E</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm editor-tool-btn ${tool === 'fill' ? 'active' : ''}`}
-                onClick={() => setTool('fill')}
-                title="塗りつぶし"
-              >
-                <span className="editor-btn-inner">
-                  <i className="fa-solid fa-fill-drip" aria-hidden="true" />
-                  <span className="editor-shortcut">G</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm editor-tool-btn ${tool === 'select' ? 'active' : ''}`}
-                onClick={() => setTool('select')}
-                title="矩形選択"
-              >
-                <span className="editor-btn-inner">
-                  <i className="fa-regular fa-square" aria-hidden="true" />
-                  <span className="editor-shortcut">V</span>
-                </span>
-              </button>
-
-              <div className="editor-toolbar-separator" />
-
-              <button
-                type="button"
-                className="btn btn-sm editor-tool-btn"
-                onClick={zoomIn}
-                disabled={zoom >= MAX_ZOOM}
-                title="拡大 (+)"
-              >
-                <span className="editor-btn-inner">
-                  <i className="fa-solid fa-magnifying-glass-plus" aria-hidden="true" />
-                  <span className="editor-shortcut">+</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm editor-tool-btn"
-                onClick={zoomOut}
-                disabled={zoom <= MIN_ZOOM}
-                title="縮小 (-)"
-              >
-                <span className="editor-btn-inner">
-                  <i className="fa-solid fa-magnifying-glass-minus" aria-hidden="true" />
-                  <span className="editor-shortcut">-</span>
-                </span>
-              </button>
-              <div className="editor-zoom-label">{zoom}x</div>
-
-              <div className="editor-toolbar-separator" />
-
-              <button type="button" className="btn btn-sm editor-tool-btn" onClick={doUndo} title="Undo (Cmd/Ctrl+Z)">
-                <span className="editor-btn-inner">
-                  <i className="fa-solid fa-rotate-left" aria-hidden="true" />
-                  <span className="editor-shortcut">Z</span>
-                </span>
-              </button>
-              <button type="button" className="btn btn-sm editor-tool-btn" onClick={copySelection} title="選択範囲をコピー">
-                <i className="fa-regular fa-copy" aria-hidden="true" />
-              </button>
-              <button type="button" className="btn btn-sm editor-tool-btn" onClick={pasteSelection} title="貼り付け (Cmd/Ctrl+V)">
-                <i className="fa-regular fa-paste" aria-hidden="true" />
-              </button>
-              <button type="button" className="btn btn-sm editor-tool-btn" onClick={deleteSelection} title="選択範囲を削除">
-                <i className="fa-regular fa-trash-can" aria-hidden="true" />
-              </button>
-              <button type="button" className="btn btn-sm editor-tool-btn" onClick={clearCanvas} title="クリア">
-                <i className="fa-solid fa-broom" aria-hidden="true" />
-              </button>
-            </div>
+            <EditorToolbar
+              tool={tool}
+              setTool={setTool}
+              zoom={zoom}
+              zoomIn={zoomIn}
+              zoomOut={zoomOut}
+              doUndo={doUndo}
+              copySelection={copySelection}
+              pasteSelection={pasteSelection}
+              deleteSelection={deleteSelection}
+              clearCanvas={clearCanvas}
+            />
           </div>
         </main>
       </div>

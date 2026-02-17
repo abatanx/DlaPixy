@@ -87,8 +87,18 @@ Current metadata shape:
 
 ## 7. Key File Map
 - `src/App.tsx`
-  - Main editor state and behavior
-  - Canvas render, tools, selection, copy/paste, shortcuts, right toolbar
+  - Main editor state and behavior orchestration
+  - Canvas interaction handlers and keyboard shortcuts
+- `src/components/EditorSidebar.tsx`
+  - Left panel UI (preview, canvas/grid settings, palette, save/load, status)
+- `src/components/EditorToolbar.tsx`
+  - Right toolbar UI (tool switch, zoom, undo, copy/paste/delete/clear)
+- `src/editor/constants.ts`
+  - Editor constants (grid/canvas/zoom limits, default palette)
+- `src/editor/types.ts`
+  - Shared editor types (`Tool`, `Selection`, `EditorMeta`)
+- `src/editor/utils.ts`
+  - Pixel/selection utility functions used by `App.tsx`
 - `src/styles.css`
   - Layout, non-page-scroll, canvas stage, toolbar styling
 - `src/main.tsx`
@@ -117,9 +127,10 @@ Current metadata shape:
 
 ## 10. Notes for Next Codex Session
 1. Read this file first, then inspect `src/App.tsx`.
-2. Avoid rewriting full editor flow; prefer small, isolated diffs.
-3. Preserve metadata backward compatibility (`grid` legacy field).
-4. Keep UI consistency with right-side vertical toolbar and FontAwesome icon language.
+2. If touching UI blocks, check `src/components/EditorSidebar.tsx` and `src/components/EditorToolbar.tsx` first.
+3. Avoid rewriting full editor flow; prefer small, isolated diffs.
+4. Preserve metadata backward compatibility (`grid` legacy field).
+5. Keep UI consistency with right-side vertical toolbar and FontAwesome icon language.
 
 ## 11. Local Workspace Note
 - There is a stray root file named `+` in workspace (`/Users/abatan/Develop/DlaPixy/+`).
