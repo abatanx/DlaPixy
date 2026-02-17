@@ -87,7 +87,18 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 
 ## 7. 主要ファイル
 - `src/App.tsx`
-  - エディター本体（状態管理、描画、ツール、選択、コピー/貼り付け、ショートカット、右ツールバー）
+  - エディター本体の状態管理と処理オーケストレーション
+  - キャンバス操作ハンドラとキーボードショートカット
+- `src/components/EditorSidebar.tsx`
+  - 左サイドパネルUI（プレビュー、設定、パレット、保存/読込、状態表示）
+- `src/components/EditorToolbar.tsx`
+  - 右ツールバーUI（ツール切替、ズーム、Undo、コピー/貼り付け/削除/クリア）
+- `src/editor/constants.ts`
+  - グリッド/キャンバス/ズーム制約、デフォルトパレットなど定数
+- `src/editor/types.ts`
+  - 共通型定義（`Tool` / `Selection` / `EditorMeta`）
+- `src/editor/utils.ts`
+  - ピクセル処理・選択処理のユーティリティ
 - `src/styles.css`
   - レイアウト、スクロール制御、ツールバー見た目
 - `src/main.tsx`
@@ -120,7 +131,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 
 ## 10. 次セッションの推奨手順
 1. まず `DEVELOP.md` と `DEVELOP.ja.md` を読む
-2. 次に `src/App.tsx` を読む
+2. 次に `src/App.tsx`、UI変更時は `src/components/EditorSidebar.tsx` と `src/components/EditorToolbar.tsx` を読む
 3. 大規模改修より、小さい差分で機能追加/修正する
 4. メタ情報の互換（`grid` 旧フィールド）を壊さない
 5. 右端縦ツールバー + FontAwesome のUIルールを維持する
