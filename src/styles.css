@@ -11,6 +11,7 @@ body,
 
 body {
   margin: 0;
+  font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic UI', 'Yu Gothic', sans-serif;
   background:
     radial-gradient(circle at 20% 20%, #fef3c7 0%, rgba(254, 243, 199, 0.25) 35%, transparent 55%),
     radial-gradient(circle at 80% 0%, #dbeafe 0%, rgba(219, 234, 254, 0.3) 30%, transparent 60%),
