@@ -35,6 +35,7 @@ npm run dist
   - Delete selection
   - Paste selection
   - Click (without drag) with Select tool chooses one tile aligned to current grid spacing
+  - Selection is cleared only when clicking outside the selected area with Select tool; other tool operations keep selection
   - After paste: pasted block is draggable immediately (with Select tool)
   - Floating paste/move controls: `Enter` to finalize, `Esc` to cancel and restore pre-paste state
   - Selected pixels are draggable directly (same behavior as pasted floating block)

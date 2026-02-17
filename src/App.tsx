@@ -151,6 +151,7 @@ export function App() {
     active: boolean;
     selectionStart: { x: number; y: number } | null;
     selectionMoved: boolean;
+    clearSelectionOnMouseUp: boolean;
     lastDrawCell: { x: number; y: number } | null;
     moveStartCell: { x: number; y: number } | null;
     moveStartOrigin: { x: number; y: number } | null;
@@ -158,6 +159,7 @@ export function App() {
     active: false,
     selectionStart: null,
     selectionMoved: false,
+    clearSelectionOnMouseUp: false,
     lastDrawCell: null,
     moveStartCell: null,
     moveStartOrigin: null
@@ -603,6 +605,7 @@ export function App() {
         drawStateRef.current.active = true;
         drawStateRef.current.selectionStart = null;
         drawStateRef.current.selectionMoved = false;
+        drawStateRef.current.clearSelectionOnMouseUp = false;
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = cell;
         drawStateRef.current.moveStartOrigin = { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y };
@@ -654,6 +657,7 @@ export function App() {
         drawStateRef.current.active = true;
         drawStateRef.current.selectionStart = null;
         drawStateRef.current.selectionMoved = false;
+        drawStateRef.current.clearSelectionOnMouseUp = false;
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = cell;
         drawStateRef.current.moveStartOrigin = { x: selection.x, y: selection.y };
@@ -668,10 +672,10 @@ export function App() {
           setPixels(filled);
         }
         clearFloatingPaste();
-        setSelection(null);
         drawStateRef.current.active = false;
         drawStateRef.current.selectionStart = null;
         drawStateRef.current.selectionMoved = false;
+        drawStateRef.current.clearSelectionOnMouseUp = false;
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = null;
         drawStateRef.current.moveStartOrigin = null;
@@ -684,16 +688,21 @@ export function App() {
       drawStateRef.current.active = true;
 
       if (tool === 'select') {
+        const shouldClearOnClick =
+          selection !== null && !pointInSelection(cell, selection) && !floatingPasteRef.current;
         drawStateRef.current.selectionStart = cell;
         drawStateRef.current.selectionMoved = false;
+        drawStateRef.current.clearSelectionOnMouseUp = shouldClearOnClick;
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = null;
         drawStateRef.current.moveStartOrigin = null;
-        setSelection({ x: cell.x, y: cell.y, w: 1, h: 1 });
+        if (!shouldClearOnClick) {
+          setSelection({ x: cell.x, y: cell.y, w: 1, h: 1 });
+        }
       } else {
-        setSelection(null);
         applyStrokeSegment(cell, cell, tool === 'eraser');
         drawStateRef.current.selectionMoved = false;
+        drawStateRef.current.clearSelectionOnMouseUp = false;
         drawStateRef.current.lastDrawCell = cell;
         drawStateRef.current.moveStartCell = null;
         drawStateRef.current.moveStartOrigin = null;
@@ -751,6 +760,7 @@ export function App() {
         }
         if (cell.x !== start.x || cell.y !== start.y) {
           drawStateRef.current.selectionMoved = true;
+          drawStateRef.current.clearSelectionOnMouseUp = false;
         }
         setSelection(normalizeSelection(start.x, start.y, cell.x, cell.y));
         return;
@@ -771,7 +781,20 @@ export function App() {
 
     const wasMovingPaste = drawStateRef.current.moveStartCell !== null && floatingPasteRef.current !== null;
     const selectStart = drawStateRef.current.selectionStart;
-    const shouldSelectSingleTile = tool === 'select' && selectStart !== null && !drawStateRef.current.selectionMoved;
+    const shouldClearSelection =
+      tool === 'select' &&
+      drawStateRef.current.clearSelectionOnMouseUp &&
+      selectStart !== null &&
+      !drawStateRef.current.selectionMoved;
+    const shouldSelectSingleTile =
+      tool === 'select' &&
+      selectStart !== null &&
+      !drawStateRef.current.selectionMoved &&
+      !drawStateRef.current.clearSelectionOnMouseUp;
+    if (shouldClearSelection) {
+      setSelection(null);
+      setStatusText('選択を解除しました');
+    }
     if (shouldSelectSingleTile && selectStart) {
       setSelection(resolveSingleTileSelection(selectStart));
       setStatusText('1タイルを選択しました');
@@ -779,6 +802,7 @@ export function App() {
     drawStateRef.current.active = false;
     drawStateRef.current.selectionStart = null;
     drawStateRef.current.selectionMoved = false;
+    drawStateRef.current.clearSelectionOnMouseUp = false;
     drawStateRef.current.lastDrawCell = null;
     drawStateRef.current.moveStartCell = null;
     drawStateRef.current.moveStartOrigin = null;
