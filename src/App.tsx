@@ -448,28 +448,48 @@ export function App() {
       const points = rasterLinePoints(from.x, from.y, to.x, to.y);
       setPixels((prev) => {
         const next = clonePixels(prev);
+        let changed = false;
         for (const point of points) {
+          if (selection && !pointInSelection(point, selection)) {
+            continue;
+          }
           const idx = (point.y * canvasSize + point.x) * 4;
           if (erase) {
+            if (next[idx + 3] === 0) {
+              continue;
+            }
             next[idx] = 0;
             next[idx + 1] = 0;
             next[idx + 2] = 0;
             next[idx + 3] = 0;
+            changed = true;
+            continue;
+          }
+          if (
+            next[idx] === colorBytes.r &&
+            next[idx + 1] === colorBytes.g &&
+            next[idx + 2] === colorBytes.b &&
+            next[idx + 3] === 255
+          ) {
             continue;
           }
           next[idx] = colorBytes.r;
           next[idx + 1] = colorBytes.g;
           next[idx + 2] = colorBytes.b;
           next[idx + 3] = 255;
+          changed = true;
         }
-        return next;
+        return changed ? next : prev;
       });
     },
-    [canvasSize, colorBytes]
+    [canvasSize, colorBytes, selection]
   );
 
   const createFloodFillResult = useCallback(
     (source: Uint8ClampedArray, start: { x: number; y: number }): Uint8ClampedArray | null => {
+      if (selection && !pointInSelection(start, selection)) {
+        return null;
+      }
       const next = clonePixels(source);
       const startIdx = (start.y * canvasSize + start.x) * 4;
       const target = [
@@ -496,6 +516,9 @@ export function App() {
         if (!node) {
           continue;
         }
+        if (selection && !pointInSelection(node, selection)) {
+          continue;
+        }
         const idx = (node.y * canvasSize + node.x) * 4;
         if (
           next[idx] !== target[0] ||
@@ -512,23 +535,29 @@ export function App() {
         next[idx + 3] = replacement[3];
         changed = true;
 
-        if (node.x > 0) {
+        if (node.x > 0 && (!selection || pointInSelection({ x: node.x - 1, y: node.y }, selection))) {
           stack.push({ x: node.x - 1, y: node.y });
         }
-        if (node.x + 1 < canvasSize) {
+        if (
+          node.x + 1 < canvasSize &&
+          (!selection || pointInSelection({ x: node.x + 1, y: node.y }, selection))
+        ) {
           stack.push({ x: node.x + 1, y: node.y });
         }
-        if (node.y > 0) {
+        if (node.y > 0 && (!selection || pointInSelection({ x: node.x, y: node.y - 1 }, selection))) {
           stack.push({ x: node.x, y: node.y - 1 });
         }
-        if (node.y + 1 < canvasSize) {
+        if (
+          node.y + 1 < canvasSize &&
+          (!selection || pointInSelection({ x: node.x, y: node.y + 1 }, selection))
+        ) {
           stack.push({ x: node.x, y: node.y + 1 });
         }
       }
 
       return changed ? next : null;
     },
-    [canvasSize, colorBytes]
+    [canvasSize, colorBytes, selection]
   );
 
   const getCellFromEvent = useCallback(
@@ -852,11 +881,33 @@ export function App() {
 
   const clearCanvas = useCallback(() => {
     pushUndo();
-    setPixels(createEmptyPixels(canvasSize));
-    setSelection(null);
+    if (selection) {
+      setPixels((prev) => {
+        const next = clonePixels(prev);
+        let changed = false;
+        for (let y = selection.y; y < selection.y + selection.h; y += 1) {
+          for (let x = selection.x; x < selection.x + selection.w; x += 1) {
+            const idx = (y * canvasSize + x) * 4;
+            if (next[idx + 3] === 0) {
+              continue;
+            }
+            next[idx] = 0;
+            next[idx + 1] = 0;
+            next[idx + 2] = 0;
+            next[idx + 3] = 0;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+      setStatusText('選択範囲をクリアしました');
+    } else {
+      setPixels(createEmptyPixels(canvasSize));
+      setSelection(null);
+      setStatusText('キャンバスをクリアしました');
+    }
     clearFloatingPaste();
-    setStatusText('キャンバスをクリアしました');
-  }, [canvasSize, clearFloatingPaste, pushUndo]);
+  }, [canvasSize, clearFloatingPaste, pushUndo, selection]);
 
   const doUndo = useCallback(() => {
     const previous = undoStackRef.current.pop();
