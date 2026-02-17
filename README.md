@@ -1,4 +1,4 @@
-# PixelEditor (Electron + React + TypeScript)
+# DlaPixy (Electron + React + TypeScript)
 
 ## セットアップ
 
@@ -33,4 +33,4 @@ npm run dist
 - 選択範囲のコピー / 削除
 - Undo
 - PNG 保存 / 読込
-- PNG `tEXt` チャンクに編集メタ情報保存 (`pixel-editor-meta`)
+- PNG `tEXt` チャンクに編集メタ情報保存 (`dla-pixy-meta`)

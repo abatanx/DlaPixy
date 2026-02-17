@@ -1271,7 +1271,7 @@ export function App() {
         <aside className="col-12 col-lg-4 col-xl-3">
           <div className="card shadow-sm">
             <div className="card-body">
-              <h1 className="h4 mb-3">Pixel Editor</h1>
+              <h1 className="h4 mb-3">DlaPixy</h1>
 
               <div className="mb-3">
                 <label className="form-label">1x PNGプレビュー</label>

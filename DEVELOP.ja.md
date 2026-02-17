@@ -1,7 +1,7 @@
 # DEVELOP.ja.md
 
 ## 1. プロジェクト概要
-- プロジェクト: `PixelEditor`（Electronデスクトップアプリ）
+- プロジェクト: `DlaPixy`（Electronデスクトップアプリ）
 - 目的: macOS/Windows向けのPNGピクセルエディター（パレット、グリッド、選択、Undo、保存/読込、メタ情報埋め込み）
 - 現在の状態: コア機能は実装済みで実行可能
 
@@ -72,7 +72,7 @@ npm run dist
   - `Esc`: 浮動貼り付け/移動中はキャンセル、それ以外は選択範囲を解除
 
 ## 6. PNGメタ情報仕様
-PNGの `tEXt` チャンクに、キーワード `pixel-editor-meta` で保存。
+PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 
 ```ts
 {
@@ -126,7 +126,7 @@ PNGの `tEXt` チャンクに、キーワード `pixel-editor-meta` で保存。
 5. 右端縦ツールバー + FontAwesome のUIルールを維持する
 
 ## 11. ワークスペースメモ
-- ルートに `+` という未使用ファイルが存在（`/Users/abatan/Develop/PixelEditor/+`）
+- ルートに `+` という未使用ファイルが存在（`/Users/abatan/Develop/DlaPixy/+`）
   - 実行には不要
   - 削除する場合はユーザー確認を取ること
 

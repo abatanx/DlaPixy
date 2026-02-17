@@ -1,7 +1,7 @@
 # DEVELOP.md
 
 ## 1. Project Summary
-- Project: `PixelEditor` (Electron desktop app)
+- Project: `DlaPixy` (Electron desktop app)
 - Goal: PNG pixel editor for macOS/Windows with palette, grid, selection, undo, save/load, metadata embedding.
 - Current status: Core editor functions are implemented and runnable.
 
@@ -71,7 +71,7 @@ npm run dist
   - `Esc`: Cancel floating paste/move (if active), otherwise clear current selection
 
 ## 6. PNG Metadata Contract
-Stored in PNG `tEXt` chunk keyword: `pixel-editor-meta`.
+Stored in PNG `tEXt` chunk keyword: `dla-pixy-meta`.
 
 Current metadata shape:
 ```ts
@@ -122,7 +122,7 @@ Current metadata shape:
 4. Keep UI consistency with right-side vertical toolbar and FontAwesome icon language.
 
 ## 11. Local Workspace Note
-- There is a stray root file named `+` in workspace (`/Users/abatan/Develop/PixelEditor/+`).
+- There is a stray root file named `+` in workspace (`/Users/abatan/Develop/DlaPixy/+`).
   - It is not used by app runtime.
   - Remove only if user confirms.
 

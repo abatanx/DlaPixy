@@ -1,7 +1,7 @@
 {
-  "name": "pixel-editor",
+  "name": "dlapixy",
   "version": "0.1.0",
-  "description": "Electron Pixel Editor (React + TypeScript + Bootstrap 5.3)",
+  "description": "DlaPixy (Electron + React + TypeScript + Bootstrap 5.3)",
   "main": "dist-electron/main.js",
   "author": "",
   "license": "MIT",
@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit"
   },
   "build": {
-    "appId": "com.umekurage.pixeleditor",
-    "productName": "PixelEditor",
+    "appId": "com.umekurage.dlapixy",
+    "productName": "DlaPixy",
     "directories": {
       "buildResources": "build-resources"
     },

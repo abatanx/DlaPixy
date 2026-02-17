@@ -14,7 +14,7 @@ type EditorMeta = {
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
 };
 
-const META_KEYWORD = 'pixel-editor-meta';
+const META_KEYWORD = 'dla-pixy-meta';
 
 function createWindow(): void {
   // Main application window for renderer UI.
