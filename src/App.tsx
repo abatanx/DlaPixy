@@ -130,6 +130,7 @@ function blitBlockOnCanvas(
 }
 
 export function App() {
+  // ---- UI / editor state ----
   const [canvasSize, setCanvasSize] = useState<number>(DEFAULT_CANVAS_SIZE);
   const [pendingCanvasSize, setPendingCanvasSize] = useState<string>(String(DEFAULT_CANVAS_SIZE));
   const [gridSpacing, setGridSpacing] = useState<number>(DEFAULT_GRID_SPACING);
@@ -147,6 +148,7 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
+  // drawStateRef: pointer interaction state machine for draw/select/move.
   const drawStateRef = useRef<{
     active: boolean;
     selectionStart: { x: number; y: number } | null;
@@ -164,6 +166,7 @@ export function App() {
     moveStartCell: null,
     moveStartOrigin: null
   });
+  // panStateRef: remembers scroll origin while Space + drag panning.
   const panStateRef = useRef<{
     active: boolean;
     startX: number;
@@ -177,6 +180,7 @@ export function App() {
     startScrollLeft: 0,
     startScrollTop: 0
   });
+  // Internal clipboard for pixel-exact copy/paste behavior.
   const selectionClipboardRef = useRef<{
     width: number;
     height: number;
@@ -184,6 +188,7 @@ export function App() {
     sourceX: number;
     sourceY: number;
   } | null>(null);
+  // Floating block used by paste/selection move until user confirms or cancels.
   const floatingPasteRef = useRef<{
     x: number;
     y: number;
@@ -266,6 +271,7 @@ export function App() {
   }, [canvasSize, pixels, tilePreviewSelection]);
 
   const pushUndo = useCallback(() => {
+    // Keep immutable snapshots; cap history size to avoid unbounded memory growth.
     undoStackRef.current.push(clonePixels(pixels));
     if (undoStackRef.current.length > MAX_UNDO) {
       undoStackRef.current.shift();
@@ -298,6 +304,7 @@ export function App() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
 
+      // Grid is a visual overlay only (not a paint constraint).
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
       ctx.lineWidth = 1;
       for (let i = 0; i <= canvasSize; i += gridSpacing) {
@@ -314,6 +321,7 @@ export function App() {
       }
 
       if (maybeSelection) {
+        // Active selection border (red dashed rectangle).
         ctx.strokeStyle = 'rgba(255, 0, 0, 0.95)';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 3]);
@@ -445,11 +453,13 @@ export function App() {
 
   const applyStrokeSegment = useCallback(
     (from: { x: number; y: number }, to: { x: number; y: number }, erase = false) => {
+      // Interpolate pointer movement so fast drags don't leave gaps.
       const points = rasterLinePoints(from.x, from.y, to.x, to.y);
       setPixels((prev) => {
         const next = clonePixels(prev);
         let changed = false;
         for (const point of points) {
+          // When selection is active, draw/erase must stay inside selection bounds.
           if (selection && !pointInSelection(point, selection)) {
             continue;
           }
@@ -479,6 +489,7 @@ export function App() {
           next[idx + 3] = 255;
           changed = true;
         }
+        // Preserve previous reference when no change happened to avoid extra renders.
         return changed ? next : prev;
       });
     },
@@ -487,6 +498,7 @@ export function App() {
 
   const createFloodFillResult = useCallback(
     (source: Uint8ClampedArray, start: { x: number; y: number }): Uint8ClampedArray | null => {
+      // Selection-aware fill: ignore clicks that start outside current selection.
       if (selection && !pointInSelection(start, selection)) {
         return null;
       }
@@ -510,6 +522,7 @@ export function App() {
       }
 
       let changed = false;
+      // Iterative DFS stack (avoids recursive call depth issues on large fills).
       const stack: Array<{ x: number; y: number }> = [{ x: start.x, y: start.y }];
       while (stack.length > 0) {
         const node = stack.pop();
@@ -535,6 +548,7 @@ export function App() {
         next[idx + 3] = replacement[3];
         changed = true;
 
+        // Only enqueue neighbors that are still inside selection (if active).
         if (node.x > 0 && (!selection || pointInSelection({ x: node.x - 1, y: node.y }, selection))) {
           stack.push({ x: node.x - 1, y: node.y });
         }
@@ -631,6 +645,7 @@ export function App() {
       }
 
       if (tool === 'select' && floatingPasteRef.current && pointInSelection(cell, selection)) {
+        // Continue dragging an already-floating block.
         drawStateRef.current.active = true;
         drawStateRef.current.selectionStart = null;
         drawStateRef.current.selectionMoved = false;
@@ -643,6 +658,7 @@ export function App() {
       }
 
       if (tool === 'select' && selection && pointInSelection(cell, selection)) {
+        // Dragging existing selection converts it to floating block for move.
         pushUndo();
         const basePixels = clonePixels(pixels);
         const selectedPixels = new Uint8ClampedArray(selection.w * selection.h * 4);
@@ -695,6 +711,7 @@ export function App() {
       }
 
       if (tool === 'fill') {
+        // Fill executes immediately on mouse down (single action, not drag stream).
         const filled = createFloodFillResult(pixels, cell);
         if (filled) {
           pushUndo();
@@ -717,6 +734,7 @@ export function App() {
       drawStateRef.current.active = true;
 
       if (tool === 'select') {
+        // Only outside click clears selection; inside click/drag keeps selection state.
         const shouldClearOnClick =
           selection !== null && !pointInSelection(cell, selection) && !floatingPasteRef.current;
         drawStateRef.current.selectionStart = cell;
@@ -729,6 +747,7 @@ export function App() {
           setSelection({ x: cell.x, y: cell.y, w: 1, h: 1 });
         }
       } else {
+        // Pencil/Eraser start with an initial dot, then extend on mouse move.
         applyStrokeSegment(cell, cell, tool === 'eraser');
         drawStateRef.current.selectionMoved = false;
         drawStateRef.current.clearSelectionOnMouseUp = false;
@@ -757,6 +776,7 @@ export function App() {
       }
 
       if (drawStateRef.current.moveStartCell && drawStateRef.current.moveStartOrigin && floatingPasteRef.current) {
+        // Move floating block with clamped bounds inside canvas.
         const dx = cell.x - drawStateRef.current.moveStartCell.x;
         const dy = cell.y - drawStateRef.current.moveStartCell.y;
         const maxX = Math.max(0, canvasSize - floatingPasteRef.current.width);
@@ -783,6 +803,7 @@ export function App() {
       }
 
       if (tool === 'select') {
+        // Selection drag updates live rectangle preview.
         const start = drawStateRef.current.selectionStart;
         if (!start) {
           return;
@@ -820,6 +841,7 @@ export function App() {
       selectStart !== null &&
       !drawStateRef.current.selectionMoved &&
       !drawStateRef.current.clearSelectionOnMouseUp;
+    // Single click in Select tool creates grid-aligned tile selection.
     if (shouldClearSelection) {
       setSelection(null);
       setStatusText('選択を解除しました');
@@ -882,6 +904,7 @@ export function App() {
   const clearCanvas = useCallback(() => {
     pushUndo();
     if (selection) {
+      // With active selection, clear only selected pixels (not full canvas).
       setPixels((prev) => {
         const next = clonePixels(prev);
         let changed = false;
@@ -902,6 +925,7 @@ export function App() {
       });
       setStatusText('選択範囲をクリアしました');
     } else {
+      // Without selection, keep existing "clear all" behavior.
       setPixels(createEmptyPixels(canvasSize));
       setSelection(null);
       setStatusText('キャンバスをクリアしました');
@@ -1078,6 +1102,7 @@ export function App() {
           finalizeFloatingPaste();
           break;
         case 'Escape':
+          // Current Esc responsibility: cancel floating paste/move only.
           if (!floatingPasteRef.current) {
             break;
           }

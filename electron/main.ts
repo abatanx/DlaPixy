@@ -17,6 +17,7 @@ type EditorMeta = {
 const META_KEYWORD = 'pixel-editor-meta';
 
 function createWindow(): void {
+  // Main application window for renderer UI.
   const win = new BrowserWindow({
     width: 1240,
     height: 860,
@@ -39,6 +40,7 @@ function createWindow(): void {
 }
 
 function attachMetadataToPng(buffer: Buffer, metadata: EditorMeta): Buffer {
+  // Replace existing editor metadata chunk to avoid duplicates on re-save.
   const chunks = extractChunks(new Uint8Array(buffer));
   const filtered = chunks.filter((chunk) => {
     if (chunk.name !== 'tEXt') {
@@ -65,6 +67,7 @@ function attachMetadataToPng(buffer: Buffer, metadata: EditorMeta): Buffer {
 }
 
 function parseMetadataFromPng(buffer: Buffer): EditorMeta | null {
+  // Read first matching tEXt chunk and parse editor metadata.
   const chunks = extractChunks(new Uint8Array(buffer));
   for (const chunk of chunks) {
     if (chunk.name !== 'tEXt') {
@@ -99,6 +102,7 @@ app.on('window-all-closed', () => {
 });
 
 ipcMain.handle('png:save', async (_, args: { base64Png: string; metadata: EditorMeta; filePath?: string }) => {
+  // Renderer sends raw PNG bytes + metadata; main process writes file.
   const rawBuffer = Buffer.from(args.base64Png, 'base64');
   const bufferWithMetadata = attachMetadataToPng(rawBuffer, args.metadata);
 
@@ -119,6 +123,7 @@ ipcMain.handle('png:save', async (_, args: { base64Png: string; metadata: Editor
 });
 
 ipcMain.handle('png:open', async () => {
+  // Main process returns PNG bytes + embedded metadata to renderer.
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],
     filters: [{ name: 'PNG Image', extensions: ['png'] }]
@@ -141,6 +146,7 @@ ipcMain.handle('png:open', async () => {
 });
 
 ipcMain.handle('clipboard:writeImageDataUrl', async (_, dataUrl: string) => {
+  // OS clipboard write must run in Electron main process.
   const image = nativeImage.createFromDataURL(dataUrl);
   clipboard.writeImage(image);
   return { ok: true };

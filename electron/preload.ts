@@ -10,6 +10,7 @@ type EditorMeta = {
 };
 
 contextBridge.exposeInMainWorld('pixelApi', {
+  // Narrow bridge: expose only required IPC APIs to renderer.
   savePng: (args: { base64Png: string; metadata: EditorMeta; filePath?: string }) => ipcRenderer.invoke('png:save', args),
   openPng: () => ipcRenderer.invoke('png:open'),
   copyImageDataUrl: (dataUrl: string) => ipcRenderer.invoke('clipboard:writeImageDataUrl', dataUrl)
