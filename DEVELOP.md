@@ -23,6 +23,14 @@ npm run dist
 - Color conversion helpers:
   - `rgbaToHsva` (`RGBA 0-255` -> `HSVA H:0-360, S/V:0-100, A:0-1`)
   - `hsvaToRgba` (`HSVA` -> `RGBA 0-255`)
+- Hovered pixel color details in a single line below canvas:
+  - Displays `x,y`, `RGBA`, `#RRGGBBAA`, `HSVA`, and optional palette index
+  - Clears display when pointer leaves canvas
+- Reference color line below hover info:
+  - Press `F` while hovering to append the current pixel info as reference
+  - Repeated `F` at same coordinate ignores if same color, overwrites if color changed
+  - Layout is constrained to viewport height; as reference lines increase, canvas stage shrinks vertically
+  - Each data field in every reference line has its own small copy button
 - Canvas size is independent from grid:
   - Canvas: default `256x256` (user can change)
   - Grid overlay spacing: `8 / 16 / 32`
@@ -70,6 +78,7 @@ npm run dist
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
+  - `F`: Add/update hovered pixel in reference line
   - `Enter`: Finalize floating paste/move
   - `Esc`: Cancel floating paste/move (if active), otherwise clear current selection
 

@@ -46,9 +46,9 @@ export function EditorSidebar({
   statusText
 }: EditorSidebarProps) {
   return (
-    <aside className="col-12 col-lg-4 col-xl-3">
-      <div className="card shadow-sm">
-        <div className="card-body">
+    <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar">
+      <div className="card shadow-sm editor-sidebar-card">
+        <div className="card-body editor-sidebar-body">
           <h1 className="h4 mb-3">DlaPixy</h1>
 
           <div className="mb-3">

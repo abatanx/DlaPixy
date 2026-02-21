@@ -1,8 +1,15 @@
 import type { Selection } from './types';
 
-// RGBA値を16進カラー文字列（#rrggbb）に変換する。
+// RGB値を16進カラー文字列（#rrggbb）に変換する。
 export function rgbaToHex(r: number, g: number, b: number): string {
   return `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// RGBA値を16進カラー文字列（#rrggbbaa）に変換する。
+export function rgbaToHex8(r: number, g: number, b: number, a: number): string {
+  return `#${[r, g, b, a]
+    .map((n) => clamp(Math.round(n), 0, 255).toString(16).padStart(2, '0'))
+    .join('')}`;
 }
 
 // 数値を指定範囲に収める。

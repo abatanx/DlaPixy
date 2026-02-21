@@ -20,13 +20,40 @@ body {
 
 .app-shell {
   height: 100%;
+  box-sizing: border-box;
   overflow: hidden;
+}
+
+.app-main-row {
+  height: calc(100% - var(--bs-gutter-y));
+}
+
+.app-main-row > [class*='col-'] {
+  min-height: 0;
+}
+
+.editor-sidebar {
+  display: flex;
+}
+
+.editor-sidebar-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.editor-sidebar-body {
+  overflow: auto;
 }
 
 .canvas-stage {
   overflow: auto;
   width: 100%;
-  max-height: calc(100vh - 8rem);
+  flex: 1 1 auto;
+  min-height: 10rem;
+  max-height: none;
   align-items: flex-start;
 }
 
@@ -40,6 +67,128 @@ body {
 
 .editor-card {
   position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.canvas-hover-info {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  white-space: nowrap;
+  overflow-x: auto;
+  display: flex;
+  align-items: center;
+}
+
+.canvas-hover-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.9rem;
+}
+
+.canvas-hover-swatch {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 0.2rem;
+  border: 1px solid #94a3b8;
+  position: relative;
+  overflow: hidden;
+  background-image:
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+    linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  flex: 0 0 auto;
+}
+
+.canvas-hover-swatch-color {
+  position: absolute;
+  inset: 0;
+}
+
+.canvas-hover-text {
+  display: inline-block;
+  line-height: 1.2;
+}
+
+.canvas-data-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.canvas-reference-info {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  max-height: 45vh;
+  overflow: auto;
+}
+
+.canvas-reference-label {
+  color: #475569;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.canvas-reference-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 100%;
+}
+
+.canvas-reference-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.canvas-reference-swatch {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 0.2rem;
+  border: 1px solid #94a3b8;
+  position: relative;
+  overflow: hidden;
+  background-image:
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+    linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+}
+
+.canvas-reference-text,
+.canvas-reference-empty {
+  line-height: 1.2;
+}
+
+.canvas-copy-btn {
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  padding: 0.1rem 0.2rem;
+  font-size: 0.72rem;
+  line-height: 1;
+  border-radius: 0.2rem;
+}
+
+.canvas-copy-btn:hover {
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.12);
 }
 
 .editor-toolbar {
