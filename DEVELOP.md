@@ -30,6 +30,8 @@ npm run dist
   - Press `F` while hovering canvas pixel or left palette color to append reference
   - Repeated `F` at same coordinate ignores if same color, overwrites if color changed
   - Reference lines are reorderable with drag-and-drop
+  - Lines are auto-numbered from top (`1..9`), and lines after 9 show `-`
+  - `1..9` (top row/numpad) select the color of corresponding numbered reference line
   - Layout is constrained to viewport height; as reference lines increase, canvas stage shrinks vertically
   - Each data field in every reference line has its own small copy button
 - Canvas size is independent from grid:
@@ -80,6 +82,7 @@ npm run dist
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
   - `F`: Add/update hovered pixel in reference line
+  - `1..9`: Select color from numbered reference line
   - `Enter`: Finalize floating paste/move
   - `Esc`: Cancel floating paste/move (if active), otherwise clear current selection
 

@@ -586,6 +586,23 @@ export function App() {
     [copyTextToClipboard]
   );
 
+  const selectReferenceByNumber = useCallback(
+    (number: number): boolean => {
+      // Shortcut target is only 1-9. Lines after 9 are explicitly not selectable.
+      if (number < 1 || number > 9) {
+        return false;
+      }
+      const info = referencePixelInfos[number - 1];
+      if (!info) {
+        return false;
+      }
+      setSelectedColor(rgbaToHex(info.rgba.r, info.rgba.g, info.rgba.b));
+      setStatusText(`参照 ${number} の色を選択しました`);
+      return true;
+    },
+    [referencePixelInfos]
+  );
+
   const freezeHoveredPixelInfo = useCallback(() => {
     const infoFromPalette = (() => {
       if (!hoveredPaletteColor) {
@@ -1225,6 +1242,69 @@ export function App() {
       }
 
       switch (event.code) {
+        case 'Digit1':
+        case 'Numpad1':
+          event.preventDefault();
+          if (!selectReferenceByNumber(1)) {
+            setStatusText('参照 1 は未登録です');
+          }
+          break;
+        case 'Digit2':
+        case 'Numpad2':
+          event.preventDefault();
+          if (!selectReferenceByNumber(2)) {
+            setStatusText('参照 2 は未登録です');
+          }
+          break;
+        case 'Digit3':
+        case 'Numpad3':
+          event.preventDefault();
+          if (!selectReferenceByNumber(3)) {
+            setStatusText('参照 3 は未登録です');
+          }
+          break;
+        case 'Digit4':
+        case 'Numpad4':
+          event.preventDefault();
+          if (!selectReferenceByNumber(4)) {
+            setStatusText('参照 4 は未登録です');
+          }
+          break;
+        case 'Digit5':
+        case 'Numpad5':
+          event.preventDefault();
+          if (!selectReferenceByNumber(5)) {
+            setStatusText('参照 5 は未登録です');
+          }
+          break;
+        case 'Digit6':
+        case 'Numpad6':
+          event.preventDefault();
+          if (!selectReferenceByNumber(6)) {
+            setStatusText('参照 6 は未登録です');
+          }
+          break;
+        case 'Digit7':
+        case 'Numpad7':
+          event.preventDefault();
+          if (!selectReferenceByNumber(7)) {
+            setStatusText('参照 7 は未登録です');
+          }
+          break;
+        case 'Digit8':
+        case 'Numpad8':
+          event.preventDefault();
+          if (!selectReferenceByNumber(8)) {
+            setStatusText('参照 8 は未登録です');
+          }
+          break;
+        case 'Digit9':
+        case 'Numpad9':
+          event.preventDefault();
+          if (!selectReferenceByNumber(9)) {
+            setStatusText('参照 9 は未登録です');
+          }
+          break;
         case 'Enter':
         case 'NumpadEnter':
           if (!floatingPasteRef.current) {
@@ -1296,6 +1376,7 @@ export function App() {
     finalizeFloatingPaste,
     freezeHoveredPixelInfo,
     pasteSelection,
+    selectReferenceByNumber,
     selection,
     zoomIn,
     zoomOut
@@ -1514,9 +1595,10 @@ export function App() {
               </div>
               {referencePixelInfos.length > 0 ? (
                 <div className="canvas-reference-list">
-                  {referencePixelInfos.map((info) => {
+                  {referencePixelInfos.map((info, index) => {
                     const fields = getPixelInfoFields(info);
                     const referenceKey = getReferenceKey(info);
+                    const lineNumber = index < 9 ? String(index + 1) : '-';
                     return (
                       <div
                         key={referenceKey}
@@ -1528,6 +1610,7 @@ export function App() {
                         onDragOver={onReferenceDragOver}
                         onDrop={(event) => onReferenceDrop(event, referenceKey)}
                       >
+                        <span className="canvas-reference-number">{lineNumber}</span>
                         <span className="canvas-reference-swatch">
                           <span
                             className="canvas-hover-swatch-color"
