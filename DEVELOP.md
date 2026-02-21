@@ -27,8 +27,9 @@ npm run dist
   - Displays `x,y`, `RGBA`, `#RRGGBBAA`, `HSVA`, and optional palette index
   - Clears display when pointer leaves canvas
 - Reference color line below hover info:
-  - Press `F` while hovering to append the current pixel info as reference
+  - Press `F` while hovering canvas pixel or left palette color to append reference
   - Repeated `F` at same coordinate ignores if same color, overwrites if color changed
+  - Reference lines are reorderable with drag-and-drop
   - Layout is constrained to viewport height; as reference lines increase, canvas stage shrinks vertically
   - Each data field in every reference line has its own small copy button
 - Canvas size is independent from grid:

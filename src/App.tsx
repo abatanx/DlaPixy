@@ -43,7 +43,9 @@ export function App() {
   const [lastTilePreviewSelection, setLastTilePreviewSelection] = useState<Selection>(null);
   const [statusText, setStatusText] = useState<string>('準備OK');
   const [hoveredPixelInfo, setHoveredPixelInfo] = useState<HoveredPixelInfo>(null);
+  const [hoveredPaletteColor, setHoveredPaletteColor] = useState<{ hex: string; index: number } | null>(null);
   const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
+  const [draggingReferenceKey, setDraggingReferenceKey] = useState<string | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
@@ -585,32 +587,154 @@ export function App() {
   );
 
   const freezeHoveredPixelInfo = useCallback(() => {
-    if (!hoveredPixelInfo) {
-      setStatusText('参照追加: キャンバス上にマウスを置いてから F を押してください');
+    const infoFromPalette = (() => {
+      if (!hoveredPaletteColor) {
+        return null;
+      }
+      const rgb = hoveredPaletteColor.hex.replace('#', '');
+      const r = Number.parseInt(rgb.slice(0, 2), 16);
+      const g = Number.parseInt(rgb.slice(2, 4), 16);
+      const b = Number.parseInt(rgb.slice(4, 6), 16);
+      const a = 255;
+      return {
+        x: -1,
+        y: hoveredPaletteColor.index,
+        rgba: { r, g, b, a },
+        hex8: rgbaToHex8(r, g, b, a).toUpperCase(),
+        hsva: rgbaToHsva(r, g, b, a),
+        paletteIndex: hoveredPaletteColor.index
+      } satisfies NonNullable<HoveredPixelInfo>;
+    })();
+
+    const activeInfo = hoveredPixelInfo ?? infoFromPalette;
+    if (!activeInfo) {
+      setStatusText('参照追加: キャンバスまたはパレット上にマウスを置いてから F を押してください');
       return;
     }
 
-    const existingIndex = referencePixelInfos.findIndex(
-      (info) => info.x === hoveredPixelInfo.x && info.y === hoveredPixelInfo.y
+    const hasSameInfoIgnoringCoordinate = referencePixelInfos.some(
+      (info) =>
+        info.rgba.r === activeInfo.rgba.r &&
+        info.rgba.g === activeInfo.rgba.g &&
+        info.rgba.b === activeInfo.rgba.b &&
+        info.rgba.a === activeInfo.rgba.a &&
+        info.hex8 === activeInfo.hex8 &&
+        info.hsva.h === activeInfo.hsva.h &&
+        info.hsva.s === activeInfo.hsva.s &&
+        info.hsva.v === activeInfo.hsva.v &&
+        info.hsva.a === activeInfo.hsva.a &&
+        info.paletteIndex === activeInfo.paletteIndex &&
+        !(info.x === activeInfo.x && info.y === activeInfo.y)
     );
-    if (existingIndex < 0) {
-      setReferencePixelInfos((prev) => [...prev, hoveredPixelInfo]);
-      setStatusText(`参照追加: (${hoveredPixelInfo.x}, ${hoveredPixelInfo.y}) ${hoveredPixelInfo.hex8}`);
+    if (hasSameInfoIgnoringCoordinate) {
+      setStatusText('参照追加: 同じ色情報がすでに登録済みです');
       return;
     }
 
-    if (referencePixelInfos[existingIndex].hex8 === hoveredPixelInfo.hex8) {
-      setStatusText(`参照維持: (${hoveredPixelInfo.x}, ${hoveredPixelInfo.y}) は同じ色です`);
+    const existingIndex = referencePixelInfos.findIndex((info) => info.x === activeInfo.x && info.y === activeInfo.y);
+    if (existingIndex < 0) {
+      setReferencePixelInfos((prev) => [...prev, activeInfo]);
+      if (activeInfo.x >= 0) {
+        setStatusText(`参照追加: (${activeInfo.x}, ${activeInfo.y}) ${activeInfo.hex8}`);
+      } else {
+        setStatusText(`参照追加: パレット[${activeInfo.paletteIndex}] ${activeInfo.hex8}`);
+      }
+      return;
+    }
+
+    if (referencePixelInfos[existingIndex].hex8 === activeInfo.hex8) {
+      if (activeInfo.x >= 0) {
+        setStatusText(`参照維持: (${activeInfo.x}, ${activeInfo.y}) は同じ色です`);
+      } else {
+        setStatusText(`参照維持: パレット[${activeInfo.paletteIndex}] は同じ色です`);
+      }
       return;
     }
 
     setReferencePixelInfos((prev) => {
       const next = [...prev];
-      next[existingIndex] = hoveredPixelInfo;
+      next[existingIndex] = activeInfo;
       return next;
     });
-    setStatusText(`参照更新: (${hoveredPixelInfo.x}, ${hoveredPixelInfo.y}) -> ${hoveredPixelInfo.hex8}`);
-  }, [hoveredPixelInfo, referencePixelInfos]);
+    if (activeInfo.x >= 0) {
+      setStatusText(`参照更新: (${activeInfo.x}, ${activeInfo.y}) -> ${activeInfo.hex8}`);
+    } else {
+      setStatusText(`参照更新: パレット[${activeInfo.paletteIndex}] -> ${activeInfo.hex8}`);
+    }
+  }, [hoveredPaletteColor, hoveredPixelInfo, referencePixelInfos]);
+
+  const clearReferencePixelInfos = useCallback(() => {
+    if (referencePixelInfos.length === 0) {
+      setStatusText('参照はすでに空です');
+      return;
+    }
+    setReferencePixelInfos([]);
+    setStatusText('参照ラインをクリアしました');
+  }, [referencePixelInfos.length]);
+
+  const removeReferencePixelInfo = useCallback((x: number, y: number) => {
+    let removed = false;
+    setReferencePixelInfos((prev) => {
+      const next = prev.filter((info) => {
+        const isTarget = info.x === x && info.y === y;
+        if (isTarget) {
+          removed = true;
+        }
+        return !isTarget;
+      });
+      return next.length === prev.length ? prev : next;
+    });
+    if (removed) {
+      setStatusText(`参照を削除しました: (${x}, ${y})`);
+    }
+  }, []);
+
+  const getReferenceKey = useCallback((info: NonNullable<HoveredPixelInfo>): string => `${info.x}:${info.y}`, []);
+
+  const onReferenceDragStart = useCallback((event: React.DragEvent<HTMLDivElement>, sourceKey: string) => {
+    setDraggingReferenceKey(sourceKey);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', sourceKey);
+  }, []);
+
+  const onReferenceDragEnd = useCallback(() => {
+    setDraggingReferenceKey(null);
+  }, []);
+
+  const onReferenceDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onReferenceDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>, targetKey: string) => {
+      event.preventDefault();
+      const sourceKey = draggingReferenceKey ?? event.dataTransfer.getData('text/plain');
+      setDraggingReferenceKey(null);
+      if (!sourceKey || sourceKey === targetKey) {
+        return;
+      }
+
+      let moved = false;
+      setReferencePixelInfos((prev) => {
+        const sourceIndex = prev.findIndex((info) => getReferenceKey(info) === sourceKey);
+        const targetIndex = prev.findIndex((info) => getReferenceKey(info) === targetKey);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+          return prev;
+        }
+
+        const next = [...prev];
+        const [movedItem] = next.splice(sourceIndex, 1);
+        next.splice(targetIndex, 0, movedItem);
+        moved = true;
+        return next;
+      });
+      if (moved) {
+        setStatusText('参照ラインの順序を変更しました');
+      }
+    },
+    [draggingReferenceKey, getReferenceKey]
+  );
 
   const finalizeFloatingPaste = useCallback(() => {
     if (!floatingPasteRef.current) {
@@ -1309,6 +1433,7 @@ export function App() {
           setSelectedColor={setSelectedColor}
           addColorToPalette={addColorToPalette}
           palette={palette}
+          setHoveredPaletteColor={setHoveredPaletteColor}
           savePng={savePng}
           loadPng={loadPng}
           zoom={zoom}
@@ -1364,17 +1489,45 @@ export function App() {
                   );
                 })()
               ) : (
-                'x,y: - | RGBA: - | HEX8: - | HSVA: - | PaletteIndex: -'
+                <span className="canvas-hover-row">
+                  <span className="canvas-hover-swatch" aria-hidden="true" />
+                  <span className="canvas-hover-text">x,y: -</span>
+                  <span className="canvas-data-field">RGBA: -</span>
+                  <span className="canvas-data-field">HEX8: -</span>
+                  <span className="canvas-data-field">HSVA: -</span>
+                  <span className="canvas-data-field">PaletteIndex: -</span>
+                </span>
               )}
             </div>
             <div className="canvas-reference-info px-3 py-2 border-top">
-              <span className="canvas-reference-label">参照 (F):</span>
+              <div className="canvas-reference-header">
+                <span className="canvas-reference-label">参照 (F):</span>
+                <button
+                  type="button"
+                  className="canvas-copy-btn"
+                  onClick={clearReferencePixelInfos}
+                  title="参照をクリア"
+                  aria-label="参照をクリア"
+                >
+                  <i className="fa-solid fa-trash-can" aria-hidden="true" />
+                </button>
+              </div>
               {referencePixelInfos.length > 0 ? (
                 <div className="canvas-reference-list">
                   {referencePixelInfos.map((info) => {
                     const fields = getPixelInfoFields(info);
+                    const referenceKey = getReferenceKey(info);
                     return (
-                      <div key={`${info.x}-${info.y}`} className="canvas-reference-line" title={info.hex8}>
+                      <div
+                        key={referenceKey}
+                        className={`canvas-reference-line ${draggingReferenceKey === referenceKey ? 'is-dragging' : ''}`}
+                        title={info.hex8}
+                        draggable
+                        onDragStart={(event) => onReferenceDragStart(event, referenceKey)}
+                        onDragEnd={onReferenceDragEnd}
+                        onDragOver={onReferenceDragOver}
+                        onDrop={(event) => onReferenceDrop(event, referenceKey)}
+                      >
                         <span className="canvas-reference-swatch">
                           <span
                             className="canvas-hover-swatch-color"
@@ -1429,6 +1582,15 @@ export function App() {
                             <i className="fa-regular fa-copy" aria-hidden="true" />
                           </button>
                         </span>
+                        <button
+                          type="button"
+                          className="canvas-copy-btn"
+                          onClick={() => removeReferencePixelInfo(info.x, info.y)}
+                          title="この参照を削除"
+                          aria-label="この参照を削除"
+                        >
+                          <i className="fa-solid fa-xmark" aria-hidden="true" />
+                        </button>
                       </div>
                     );
                   })}

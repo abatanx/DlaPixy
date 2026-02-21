@@ -16,6 +16,7 @@ type EditorSidebarProps = {
   setSelectedColor: (value: string) => void;
   addColorToPalette: (hex: string) => void;
   palette: string[];
+  setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
   savePng: () => Promise<void>;
   loadPng: () => Promise<void>;
   zoom: number;
@@ -39,6 +40,7 @@ export function EditorSidebar({
   setSelectedColor,
   addColorToPalette,
   palette,
+  setHoveredPaletteColor,
   savePng,
   loadPng,
   zoom,
@@ -130,13 +132,15 @@ export function EditorSidebar({
               }}
             />
             <div className="palette-grid">
-              {palette.map((color) => (
+              {palette.map((color, index) => (
                 <button
-                  key={color}
+                  key={`${color}-${index}`}
                   type="button"
                   className={`palette-item ${selectedColor === color ? 'active' : ''}`}
                   style={{ backgroundColor: color }}
                   onClick={() => setSelectedColor(color)}
+                  onMouseEnter={() => setHoveredPaletteColor({ hex: color, index })}
+                  onMouseLeave={() => setHoveredPaletteColor(null)}
                   title={color}
                 />
               ))}
