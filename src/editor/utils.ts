@@ -5,6 +5,100 @@ export function rgbaToHex(r: number, g: number, b: number): string {
   return `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// 数値を指定範囲に収める。
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+// RGBA(0-255)をHSVA(H:0-360, S/V:0-100, A:0-1)へ変換する。
+export function rgbaToHsva(
+  r: number,
+  g: number,
+  b: number,
+  a: number
+): { h: number; s: number; v: number; a: number } {
+  const rn = clamp(r, 0, 255) / 255;
+  const gn = clamp(g, 0, 255) / 255;
+  const bn = clamp(b, 0, 255) / 255;
+  const an = clamp(a, 0, 255) / 255;
+
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const delta = max - min;
+
+  let h = 0;
+  if (delta !== 0) {
+    if (max === rn) {
+      h = 60 * (((gn - bn) / delta) % 6);
+    } else if (max === gn) {
+      h = 60 * ((bn - rn) / delta + 2);
+    } else {
+      h = 60 * ((rn - gn) / delta + 4);
+    }
+  }
+  if (h < 0) {
+    h += 360;
+  }
+
+  const s = max === 0 ? 0 : (delta / max) * 100;
+  const v = max * 100;
+
+  return {
+    h,
+    s,
+    v,
+    a: an
+  };
+}
+
+// HSVA(H:0-360, S/V:0-100, A:0-1)をRGBA(0-255)へ変換する。
+export function hsvaToRgba(
+  h: number,
+  s: number,
+  v: number,
+  a: number
+): { r: number; g: number; b: number; a: number } {
+  const hn = ((h % 360) + 360) % 360;
+  const sn = clamp(s, 0, 100) / 100;
+  const vn = clamp(v, 0, 100) / 100;
+  const an = clamp(a, 0, 1);
+
+  const c = vn * sn;
+  const x = c * (1 - Math.abs(((hn / 60) % 2) - 1));
+  const m = vn - c;
+
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
+
+  if (hn < 60) {
+    r1 = c;
+    g1 = x;
+  } else if (hn < 120) {
+    r1 = x;
+    g1 = c;
+  } else if (hn < 180) {
+    g1 = c;
+    b1 = x;
+  } else if (hn < 240) {
+    g1 = x;
+    b1 = c;
+  } else if (hn < 300) {
+    r1 = x;
+    b1 = c;
+  } else {
+    r1 = c;
+    b1 = x;
+  }
+
+  return {
+    r: Math.round((r1 + m) * 255),
+    g: Math.round((g1 + m) * 255),
+    b: Math.round((b1 + m) * 255),
+    a: Math.round(an * 255)
+  };
+}
+
 // キャンバスサイズを最小値〜最大値の範囲に丸める。
 export function clampCanvasSize(size: number, minCanvasSize: number, maxCanvasSize: number): number {
   return Math.max(minCanvasSize, Math.min(maxCanvasSize, size));

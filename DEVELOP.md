@@ -20,6 +20,9 @@ npm run dist
 ```
 
 ## 4. Implemented Features
+- Color conversion helpers:
+  - `rgbaToHsva` (`RGBA 0-255` -> `HSVA H:0-360, S/V:0-100, A:0-1`)
+  - `hsvaToRgba` (`HSVA` -> `RGBA 0-255`)
 - Canvas size is independent from grid:
   - Canvas: default `256x256` (user can change)
   - Grid overlay spacing: `8 / 16 / 32`
