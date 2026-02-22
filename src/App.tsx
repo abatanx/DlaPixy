@@ -231,19 +231,21 @@ export function App() {
       ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
 
       // Grid is a visual overlay only (not a paint constraint).
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i <= canvasSize; i += gridSpacing) {
-        const p = i * zoom + 0.5;
-        ctx.beginPath();
-        ctx.moveTo(p, 0);
-        ctx.lineTo(p, canvas.height);
-        ctx.stroke();
+      if (gridSpacing > 0) {
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= canvasSize; i += gridSpacing) {
+          const p = i * zoom + 0.5;
+          ctx.beginPath();
+          ctx.moveTo(p, 0);
+          ctx.lineTo(p, canvas.height);
+          ctx.stroke();
 
-        ctx.beginPath();
-        ctx.moveTo(0, p);
-        ctx.lineTo(canvas.width, p);
-        ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(0, p);
+          ctx.lineTo(canvas.width, p);
+          ctx.stroke();
+        }
       }
 
       if (maybeSelection) {
@@ -538,10 +540,11 @@ export function App() {
 
   const resolveSingleTileSelection = useCallback(
     (cell: { x: number; y: number }): Selection => {
-      const startX = Math.floor(cell.x / gridSpacing) * gridSpacing;
-      const startY = Math.floor(cell.y / gridSpacing) * gridSpacing;
-      const w = Math.min(gridSpacing, canvasSize - startX);
-      const h = Math.min(gridSpacing, canvasSize - startY);
+      const tileSize = gridSpacing > 0 ? gridSpacing : 1;
+      const startX = Math.floor(cell.x / tileSize) * tileSize;
+      const startY = Math.floor(cell.y / tileSize) * tileSize;
+      const w = Math.min(tileSize, canvasSize - startX);
+      const h = Math.min(tileSize, canvasSize - startY);
       return { x: startX, y: startY, w, h };
     },
     [canvasSize, gridSpacing]
@@ -923,7 +926,7 @@ export function App() {
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = null;
         drawStateRef.current.moveStartOrigin = null;
-        if (!shouldClearOnClick) {
+        if (!shouldClearOnClick && gridSpacing > 0) {
           setSelection({ x: cell.x, y: cell.y, w: 1, h: 1 });
         }
       } else {
@@ -936,7 +939,19 @@ export function App() {
         drawStateRef.current.moveStartOrigin = null;
       }
     },
-    [applyStrokeSegment, beginPan, clearFloatingPaste, createFloodFillResult, getCellFromEvent, isSpacePressed, pixels, pushUndo, selection, tool]
+    [
+      applyStrokeSegment,
+      beginPan,
+      clearFloatingPaste,
+      createFloodFillResult,
+      getCellFromEvent,
+      gridSpacing,
+      isSpacePressed,
+      pixels,
+      pushUndo,
+      selection,
+      tool
+    ]
   );
 
   const onMouseMove = useCallback(
@@ -1030,8 +1045,12 @@ export function App() {
       setStatusText('選択を解除しました', 'success');
     }
     if (shouldSelectSingleTile && selectStart) {
-      setSelection(resolveSingleTileSelection(selectStart));
-      setStatusText('1タイルを選択しました', 'success');
+      if (gridSpacing > 0) {
+        setSelection(resolveSingleTileSelection(selectStart));
+        setStatusText('1タイルを選択しました', 'success');
+      } else {
+        setStatusText('グリッド線が「なし」のため、シングルクリック選択はできません', 'warning');
+      }
     }
     drawStateRef.current.active = false;
     drawStateRef.current.selectionStart = null;
@@ -1043,7 +1062,7 @@ export function App() {
     if (wasMovingPaste && !shouldSelectSingleTile) {
       setStatusText('選択範囲を配置しました', 'success');
     }
-  }, [endPan, resolveSingleTileSelection, tool]);
+  }, [endPan, gridSpacing, resolveSingleTileSelection, tool]);
 
   const onMouseLeaveCanvas = useCallback(() => {
     onMouseUp();
@@ -1071,7 +1090,7 @@ export function App() {
   const updateGridSpacing = useCallback((value: number) => {
     setGridSpacing(value);
     setHasUnsavedChanges(true);
-    setStatusText(`補助グリッドを ${value}px 間隔に変更しました`, 'success');
+    setStatusText(value === 0 ? '補助グリッドを非表示にしました' : `補助グリッドを ${value}px 間隔に変更しました`, 'success');
   }, []);
 
   const zoomIn = useCallback(() => {

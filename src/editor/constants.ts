@@ -1,7 +1,7 @@
-// グリッド線の選択肢（ピクセル間隔）。
-export const GRID_SPACING_OPTIONS = [8, 16, 32] as const;
-// 初期グリッド間隔。
-export const DEFAULT_GRID_SPACING = 16;
+// グリッド線の選択肢（ピクセル間隔）。0 は「なし」を表す。
+export const GRID_SPACING_OPTIONS = [0, 8, 16, 32] as const;
+// 初期グリッド間隔（なし）。
+export const DEFAULT_GRID_SPACING = 0;
 // 初期キャンバスサイズ（正方形）。
 export const DEFAULT_CANVAS_SIZE = 256;
 // 初期表示倍率。
