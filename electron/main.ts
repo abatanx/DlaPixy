@@ -1,4 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage } from 'electron';
+import type { MessageBoxOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import extractChunks from 'png-chunks-extract';
@@ -100,16 +101,18 @@ app.on('window-all-closed', () => {
   }
 });
 
-ipcMain.handle('png:save', async (_, args: { base64Png: string; metadata: EditorMeta; filePath?: string }) => {
+ipcMain.handle(
+  'png:save',
+  async (_, args: { base64Png: string; metadata: EditorMeta; filePath?: string; saveAs?: boolean }) => {
   // Renderer sends raw PNG bytes + metadata; main process writes file.
   const rawBuffer = Buffer.from(args.base64Png, 'base64');
   const bufferWithMetadata = attachMetadataToPng(rawBuffer, args.metadata);
 
   let outputPath = args.filePath;
-  if (!outputPath) {
+  if (!outputPath || args.saveAs) {
     const result = await dialog.showSaveDialog({
       filters: [{ name: 'PNG Image', extensions: ['png'] }],
-      defaultPath: 'pixel-art.png'
+      defaultPath: outputPath ?? 'pixel-art.png'
     });
     if (result.canceled || !result.filePath) {
       return { canceled: true };
@@ -142,6 +145,30 @@ ipcMain.handle('png:open', async () => {
     base64Png: fileBuffer.toString('base64'),
     metadata
   };
+});
+
+ipcMain.handle('dialog:confirmOpenWithUnsaved', async () => {
+  const focusedWindow = BrowserWindow.getFocusedWindow();
+  const options: MessageBoxOptions = {
+    type: 'warning',
+    title: '未保存の変更があります',
+    message: '未保存の変更があります。読み込み前にどうしますか？',
+    buttons: ['保存して開く', '破棄して開く', 'キャンセル'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true
+  };
+  const result = focusedWindow
+    ? await dialog.showMessageBox(focusedWindow, options)
+    : await dialog.showMessageBox(options);
+
+  if (result.response === 0) {
+    return { action: 'save-open' as const };
+  }
+  if (result.response === 1) {
+    return { action: 'discard-open' as const };
+  }
+  return { action: 'cancel' as const };
 });
 
 ipcMain.handle('clipboard:writeImageDataUrl', async (_, dataUrl: string) => {
