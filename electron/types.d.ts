@@ -1,5 +1,12 @@
 export {};
 
+type FileMenuAction =
+  | { type: 'new' }
+  | { type: 'open' }
+  | { type: 'save' }
+  | { type: 'save-as' }
+  | { type: 'open-recent'; filePath: string };
+
 declare global {
   interface Window {
     pixelApi: {
@@ -15,10 +22,11 @@ declare global {
         filePath?: string;
         saveAs?: boolean;
       }) => Promise<{ canceled: boolean; filePath?: string }>;
-      openPng: () => Promise<{
+      openPng: (args?: { filePath?: string }) => Promise<{
         canceled: boolean;
         filePath?: string;
         base64Png?: string;
+        error?: 'not-found' | 'read-failed';
         metadata?: {
           version: number;
           canvasSize?: number;
@@ -29,6 +37,7 @@ declare global {
       }>;
       copyImageDataUrl: (dataUrl: string) => Promise<{ ok: boolean }>;
       confirmOpenWithUnsaved: () => Promise<{ action: 'save-open' | 'discard-open' | 'cancel' }>;
+      onMenuFileAction: (handler: (action: FileMenuAction) => void) => () => void;
     };
   }
 }

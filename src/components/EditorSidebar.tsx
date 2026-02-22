@@ -17,15 +17,12 @@ type EditorSidebarProps = {
   addColorToPalette: (hex: string) => void;
   palette: string[];
   setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
-  savePng: () => Promise<void>;
-  saveAsPng: () => Promise<void>;
-  loadPng: () => Promise<void>;
   zoom: number;
   currentFilePath?: string;
   hasUnsavedChanges: boolean;
 };
 
-// プレビュー・設定・保存読込をまとめた左サイドパネル。
+// プレビューと編集設定をまとめた左サイドパネル。
 export function EditorSidebar({
   canvasSize,
   previewDataUrl,
@@ -42,9 +39,6 @@ export function EditorSidebar({
   addColorToPalette,
   palette,
   setHoveredPaletteColor,
-  savePng,
-  saveAsPng,
-  loadPng,
   zoom,
   currentFilePath,
   hasUnsavedChanges
@@ -147,18 +141,6 @@ export function EditorSidebar({
                 />
               ))}
             </div>
-          </div>
-
-          <div className="d-grid gap-2">
-            <button type="button" className="btn btn-success" onClick={() => void savePng()}>
-              Save (PNG)
-            </button>
-            <button type="button" className="btn btn-outline-success" onClick={() => void saveAsPng()}>
-              Save As (PNG)
-            </button>
-            <button type="button" className="btn btn-primary" onClick={() => void loadPng()}>
-              読み込み (PNG)
-            </button>
           </div>
 
           <div className="small text-muted mt-3">

@@ -60,6 +60,9 @@ npm run dist
   - Selected pixels are draggable directly (same behavior as pasted floating block)
 - Undo
 - Save/Load PNG
+  - File operations are now centered in native File menu (`New / Open / Save / Save As / Recent Files`)
+  - Last-used directory is persisted and reused as dialog initial directory (fallback: home directory)
+  - Recent files are capped, deduplicated, and missing paths are removed on selection
 - 1x PNG preview panel
 - Selection 3x3 tile preview panel (under 1x preview)
   - Uses current selection, or keeps showing last selection when selection is cleared
@@ -109,7 +112,7 @@ Current metadata shape:
   - Main editor state and behavior orchestration
   - Canvas interaction handlers and keyboard shortcuts
 - `src/components/EditorSidebar.tsx`
-  - Left panel UI (preview, canvas/grid settings, palette, save/load, status)
+  - Left panel UI (preview, canvas/grid settings, palette)
 - `src/components/EditorToolbar.tsx`
   - Right toolbar UI (tool switch, zoom, undo, copy/paste/delete/clear)
 - `src/editor/constants.ts`

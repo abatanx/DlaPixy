@@ -29,6 +29,12 @@ import {
 } from './editor/utils';
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
+type FileMenuAction =
+  | { type: 'new' }
+  | { type: 'open' }
+  | { type: 'save' }
+  | { type: 'save-as' }
+  | { type: 'open-recent'; filePath: string };
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
@@ -1498,31 +1504,73 @@ export function App() {
     await performSave({ saveAs: true });
   }, [performSave]);
 
-  const loadPng = useCallback(async () => {
+  const confirmBeforeOpen = useCallback(async (): Promise<boolean> => {
     if (hasUnsavedChanges) {
       const confirmResult = await window.pixelApi.confirmOpenWithUnsaved();
       if (confirmResult.action === 'cancel') {
         setStatusText('読み込みをキャンセルしました', 'warning');
-        return;
+        return false;
       }
       if (confirmResult.action === 'save-open') {
         const saveResult = await performSave({ saveAs: false, suppressCancelToast: true });
         if (saveResult === 'saved') {
-          // Continue loading.
+          return true;
         } else if (saveResult === 'canceled') {
           setStatusText('保存がキャンセルされたため、読み込みを中止しました', 'warning');
-          return;
+          return false;
         } else {
           setStatusText('保存に失敗したため、読み込みを中止しました', 'error');
-          return;
+          return false;
         }
+      }
+    }
+    return true;
+  }, [hasUnsavedChanges, performSave]);
+
+  const createNewDocument = useCallback(async () => {
+    const canProceed = await confirmBeforeOpen();
+    if (!canProceed) {
+      return;
+    }
+
+    setCanvasSize(DEFAULT_CANVAS_SIZE);
+    setPendingCanvasSize(String(DEFAULT_CANVAS_SIZE));
+    setPixels(createEmptyPixels(DEFAULT_CANVAS_SIZE));
+    setSelection(null);
+    setLastTilePreviewSelection(null);
+    setHoveredPixelInfo(null);
+    setReferencePixelInfos([]);
+    clearFloatingPaste();
+    undoStackRef.current = [];
+    setPalette(DEFAULT_PALETTE);
+    setSelectedColor(DEFAULT_PALETTE[0]);
+    setTool('pencil');
+    setGridSpacing(DEFAULT_GRID_SPACING);
+    setCurrentFilePath(undefined);
+    setHasUnsavedChanges(false);
+    setStatusText('新規キャンバスを作成しました', 'success');
+  }, [clearFloatingPaste, confirmBeforeOpen]);
+
+  const loadPng = useCallback(async (options?: { filePath?: string; bypassUnsavedCheck?: boolean }) => {
+    if (!options?.bypassUnsavedCheck) {
+      const canProceed = await confirmBeforeOpen();
+      if (!canProceed) {
+        return;
       }
     }
 
     try {
-      const result = await window.pixelApi.openPng();
+      const result = await window.pixelApi.openPng(options?.filePath ? { filePath: options.filePath } : undefined);
       if (result.canceled || !result.base64Png) {
         setStatusText('読み込みをキャンセルしました', 'warning');
+        return;
+      }
+      if (result.error === 'not-found') {
+        setStatusText(`ファイルが見つかりません: ${result.filePath ?? options?.filePath ?? '-'}`, 'error');
+        return;
+      }
+      if (result.error === 'read-failed') {
+        setStatusText(`読み込みに失敗しました: ${result.filePath ?? options?.filePath ?? '-'}`, 'error');
         return;
       }
 
@@ -1598,7 +1646,78 @@ export function App() {
       const message = error instanceof Error ? error.message : '不明なエラー';
       setStatusText(`読み込みに失敗しました: ${message}`, 'error');
     }
-  }, [clearFloatingPaste, hasUnsavedChanges, performSave]);
+  }, [clearFloatingPaste, confirmBeforeOpen]);
+
+  useEffect(() => {
+    const isEditableElement = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+      const tag = target.tagName;
+      return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.metaKey && !event.ctrlKey) {
+        return;
+      }
+      if (isEditableElement(event.target)) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === 's') {
+        event.preventDefault();
+        if (event.shiftKey) {
+          void saveAsPng();
+        } else {
+          void savePng();
+        }
+        return;
+      }
+      if (key === 'o') {
+        event.preventDefault();
+        void loadPng();
+        return;
+      }
+      if (key === 'n') {
+        event.preventDefault();
+        void createNewDocument();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [createNewDocument, loadPng, saveAsPng, savePng]);
+
+  useEffect(() => {
+    const unsubscribe = window.pixelApi.onMenuFileAction((action: FileMenuAction) => {
+      switch (action.type) {
+        case 'new':
+          void createNewDocument();
+          break;
+        case 'open':
+          void loadPng();
+          break;
+        case 'save':
+          void savePng();
+          break;
+        case 'save-as':
+          void saveAsPng();
+          break;
+        case 'open-recent':
+          void loadPng({ filePath: action.filePath });
+          break;
+        default:
+          break;
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [createNewDocument, loadPng, saveAsPng, savePng]);
 
   return (
     <div className="container-fluid py-3 app-shell">
@@ -1619,9 +1738,6 @@ export function App() {
           addColorToPalette={addColorToPalette}
           palette={palette}
           setHoveredPaletteColor={setHoveredPaletteColor}
-          savePng={savePng}
-          saveAsPng={saveAsPng}
-          loadPng={loadPng}
           zoom={zoom}
           currentFilePath={currentFilePath}
           hasUnsavedChanges={hasUnsavedChanges}
