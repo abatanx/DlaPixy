@@ -9,7 +9,6 @@ type EditorMeta = {
 };
 
 type FileMenuAction =
-  | { type: 'new' }
   | { type: 'open' }
   | { type: 'save' }
   | { type: 'save-as' }
