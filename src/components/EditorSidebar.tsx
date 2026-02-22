@@ -110,7 +110,7 @@ export function EditorSidebar({
                   className={`btn ${gridSpacing === option ? 'btn-primary' : 'btn-outline-primary'}`}
                   onClick={() => updateGridSpacing(option)}
                 >
-                  {option}px
+                  {option === 0 ? 'なし' : `${option}px`}
                 </button>
               ))}
             </div>
@@ -145,7 +145,7 @@ export function EditorSidebar({
 
           <div className="small text-muted mt-3">
             <div>キャンバス: {canvasSize}x{canvasSize}</div>
-            <div>グリッド線: {gridSpacing}px 間隔</div>
+            <div>グリッド線: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px 間隔`}</div>
             <div>表示倍率: {zoom}x</div>
             <div>
               現在ファイル: {currentFilePath ?? '未保存'}
