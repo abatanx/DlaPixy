@@ -1,7 +1,9 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage } from 'electron';
+/// <reference path="./png-modules.d.ts" />
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage } from 'electron';
 import type { MessageBoxOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
 import * as pngText from 'png-chunk-text';
@@ -15,10 +17,160 @@ type EditorMeta = {
 };
 
 const META_KEYWORD = 'dla-pixy-meta';
+const RECENT_MAX = 10;
+const PREFERENCES_FILE = 'preferences.json';
+
+type FileMenuAction =
+  | { type: 'new' }
+  | { type: 'open' }
+  | { type: 'save' }
+  | { type: 'save-as' }
+  | { type: 'open-recent'; filePath: string };
+
+type AppPreferences = {
+  recentFiles: string[];
+  lastDirectory: string | null;
+};
+
+let mainWindow: BrowserWindow | null = null;
+let preferences: AppPreferences = {
+  recentFiles: [],
+  lastDirectory: null
+};
+
+function getPreferencesPath(): string {
+  return path.join(app.getPath('userData'), PREFERENCES_FILE);
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveInitialDirectory(): Promise<string> {
+  if (preferences.lastDirectory && (await pathExists(preferences.lastDirectory))) {
+    return preferences.lastDirectory;
+  }
+  return os.homedir();
+}
+
+async function savePreferences(): Promise<void> {
+  try {
+    await fs.writeFile(getPreferencesPath(), JSON.stringify(preferences, null, 2), 'utf8');
+  } catch {
+    // ignore persistence failure
+  }
+}
+
+async function loadPreferences(): Promise<void> {
+  try {
+    const raw = await fs.readFile(getPreferencesPath(), 'utf8');
+    const parsed = JSON.parse(raw) as Partial<AppPreferences>;
+    const recentFiles = Array.isArray(parsed.recentFiles)
+      ? parsed.recentFiles.filter((item): item is string => typeof item === 'string')
+      : [];
+    const lastDirectory = typeof parsed.lastDirectory === 'string' ? parsed.lastDirectory : null;
+    preferences = {
+      recentFiles: recentFiles.slice(0, RECENT_MAX),
+      lastDirectory
+    };
+  } catch {
+    preferences = { recentFiles: [], lastDirectory: null };
+  }
+}
+
+function sendMenuFileAction(action: FileMenuAction): void {
+  const targetWindow = BrowserWindow.getFocusedWindow() ?? mainWindow;
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return;
+  }
+  targetWindow.webContents.send('menu:file-action', action);
+}
+
+function removeRecentFile(filePath: string): void {
+  const before = preferences.recentFiles.length;
+  preferences.recentFiles = preferences.recentFiles.filter((item) => item !== filePath);
+  if (preferences.recentFiles.length !== before) {
+    void savePreferences();
+    buildApplicationMenu();
+  }
+}
+
+function addRecentFile(filePath: string): void {
+  preferences.recentFiles = [filePath, ...preferences.recentFiles.filter((item) => item !== filePath)].slice(0, RECENT_MAX);
+  preferences.lastDirectory = path.dirname(filePath);
+  void savePreferences();
+  buildApplicationMenu();
+}
+
+function buildFileMenuTemplate() {
+  const recentSubmenu =
+    preferences.recentFiles.length === 0
+      ? [{ label: '履歴なし', enabled: false }]
+      : preferences.recentFiles.map((filePath) => ({
+          label: path.basename(filePath),
+          sublabel: filePath,
+          click: () => sendMenuFileAction({ type: 'open-recent', filePath })
+        }));
+
+  return {
+    label: 'File',
+    submenu: [
+      {
+        label: '新規',
+        accelerator: 'CmdOrCtrl+N',
+        click: () => sendMenuFileAction({ type: 'new' })
+      },
+      {
+        label: '開く...',
+        accelerator: 'CmdOrCtrl+O',
+        click: () => sendMenuFileAction({ type: 'open' })
+      },
+      { type: 'separator' as const },
+      {
+        label: '保存',
+        accelerator: 'CmdOrCtrl+S',
+        click: () => sendMenuFileAction({ type: 'save' })
+      },
+      {
+        label: '別名で保存...',
+        accelerator: 'Shift+CmdOrCtrl+S',
+        click: () => sendMenuFileAction({ type: 'save-as' })
+      },
+      { type: 'separator' as const },
+      {
+        label: '最近使ったファイル',
+        submenu: recentSubmenu
+      },
+      { type: 'separator' as const },
+      ...(process.platform === 'darwin'
+        ? [{ role: 'close' as const }]
+        : [{ role: 'quit' as const }])
+    ]
+  };
+}
+
+function buildApplicationMenu(): void {
+  const fileMenu = buildFileMenuTemplate();
+  const template = process.platform === 'darwin'
+    ? [
+        { role: 'appMenu' as const },
+        fileMenu,
+        { role: 'editMenu' as const },
+        { role: 'viewMenu' as const },
+        { role: 'windowMenu' as const }
+      ]
+    : [fileMenu, { role: 'editMenu' as const }, { role: 'viewMenu' as const }, { role: 'windowMenu' as const }];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 function createWindow(): void {
   // Main application window for renderer UI.
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1240,
     height: 860,
     minWidth: 980,
@@ -32,11 +184,15 @@ function createWindow(): void {
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
-    win.loadURL(devServerUrl);
-    win.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.loadURL(devServerUrl);
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
 function attachMetadataToPng(buffer: Buffer, metadata: EditorMeta): Buffer {
@@ -85,12 +241,15 @@ function parseMetadataFromPng(buffer: Buffer): EditorMeta | null {
   return null;
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await loadPreferences();
   createWindow();
+  buildApplicationMenu();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      buildApplicationMenu();
     }
   });
 });
@@ -110,9 +269,10 @@ ipcMain.handle(
 
   let outputPath = args.filePath;
   if (!outputPath || args.saveAs) {
+    const initialDir = await resolveInitialDirectory();
     const result = await dialog.showSaveDialog({
       filters: [{ name: 'PNG Image', extensions: ['png'] }],
-      defaultPath: outputPath ?? 'pixel-art.png'
+      defaultPath: outputPath ?? path.join(initialDir, 'pixel-art.png')
     });
     if (result.canceled || !result.filePath) {
       return { canceled: true };
@@ -121,23 +281,39 @@ ipcMain.handle(
   }
 
   await fs.writeFile(outputPath, bufferWithMetadata);
+  addRecentFile(outputPath);
   return { canceled: false, filePath: outputPath };
 });
 
-ipcMain.handle('png:open', async () => {
+ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
   // Main process returns PNG bytes + embedded metadata to renderer.
-  const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [{ name: 'PNG Image', extensions: ['png'] }]
-  });
+  let filePath = args?.filePath;
+  if (!filePath) {
+    const initialDir = await resolveInitialDirectory();
+    const result = await dialog.showOpenDialog({
+      defaultPath: initialDir,
+      properties: ['openFile'],
+      filters: [{ name: 'PNG Image', extensions: ['png'] }]
+    });
 
-  if (result.canceled || result.filePaths.length === 0) {
-    return { canceled: true };
+    if (result.canceled || result.filePaths.length === 0) {
+      return { canceled: true };
+    }
+    filePath = result.filePaths[0];
   }
 
-  const filePath = result.filePaths[0];
-  const fileBuffer = await fs.readFile(filePath);
+  let fileBuffer: Buffer;
+  try {
+    fileBuffer = await fs.readFile(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      removeRecentFile(filePath);
+      return { canceled: false, error: 'not-found' as const, filePath };
+    }
+    return { canceled: false, error: 'read-failed' as const, filePath };
+  }
   const metadata = parseMetadataFromPng(fileBuffer);
+  addRecentFile(filePath);
 
   return {
     canceled: false,
