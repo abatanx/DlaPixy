@@ -18,9 +18,11 @@ type EditorSidebarProps = {
   palette: string[];
   setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
   savePng: () => Promise<void>;
+  saveAsPng: () => Promise<void>;
   loadPng: () => Promise<void>;
   zoom: number;
   currentFilePath?: string;
+  hasUnsavedChanges: boolean;
 };
 
 // プレビュー・設定・保存読込をまとめた左サイドパネル。
@@ -41,9 +43,11 @@ export function EditorSidebar({
   palette,
   setHoveredPaletteColor,
   savePng,
+  saveAsPng,
   loadPng,
   zoom,
-  currentFilePath
+  currentFilePath,
+  hasUnsavedChanges
 }: EditorSidebarProps) {
   return (
     <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar">
@@ -147,7 +151,10 @@ export function EditorSidebar({
 
           <div className="d-grid gap-2">
             <button type="button" className="btn btn-success" onClick={() => void savePng()}>
-              保存 (PNG)
+              Save (PNG)
+            </button>
+            <button type="button" className="btn btn-outline-success" onClick={() => void saveAsPng()}>
+              Save As (PNG)
             </button>
             <button type="button" className="btn btn-primary" onClick={() => void loadPng()}>
               読み込み (PNG)
@@ -158,7 +165,10 @@ export function EditorSidebar({
             <div>キャンバス: {canvasSize}x{canvasSize}</div>
             <div>グリッド線: {gridSpacing}px 間隔</div>
             <div>表示倍率: {zoom}x</div>
-            <div>現在ファイル: {currentFilePath ?? '未保存'}</div>
+            <div>
+              現在ファイル: {currentFilePath ?? '未保存'}
+              {hasUnsavedChanges ? ' *' : ''}
+            </div>
           </div>
         </div>
       </div>

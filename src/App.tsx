@@ -52,6 +52,7 @@ export function App() {
   const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
   const [draggingReferenceKey, setDraggingReferenceKey] = useState<string | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
 
@@ -64,6 +65,10 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    document.title = `DlaPixy${hasUnsavedChanges ? ' *' : ''}`;
+  }, [hasUnsavedChanges]);
   // drawStateRef: pointer interaction state machine for draw/select/move.
   const drawStateRef = useRef<{
     active: boolean;
@@ -381,6 +386,7 @@ export function App() {
     (from: { x: number; y: number }, to: { x: number; y: number }, erase = false) => {
       // Interpolate pointer movement so fast drags don't leave gaps.
       const points = rasterLinePoints(from.x, from.y, to.x, to.y);
+      let changedInStroke = false;
       setPixels((prev) => {
         const next = clonePixels(prev);
         let changed = false;
@@ -416,8 +422,12 @@ export function App() {
           changed = true;
         }
         // Preserve previous reference when no change happened to avoid extra renders.
+        changedInStroke = changed;
         return changed ? next : prev;
       });
+      if (changedInStroke) {
+        setHasUnsavedChanges(true);
+      }
     },
     [canvasSize, colorBytes, selection]
   );
@@ -780,6 +790,7 @@ export function App() {
       return;
     }
     clearFloatingPaste();
+    setHasUnsavedChanges(true);
     setStatusText('貼り付け移動を確定しました', 'success');
   }, [clearFloatingPaste]);
 
@@ -879,6 +890,7 @@ export function App() {
         if (filled) {
           pushUndo();
           setPixels(filled);
+          setHasUnsavedChanges(true);
         }
         clearFloatingPaste();
         drawStateRef.current.active = false;
@@ -1046,13 +1058,14 @@ export function App() {
     setSelection(null);
     clearFloatingPaste();
     setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
-    setCurrentFilePath(undefined);
+    setHasUnsavedChanges(true);
     setPendingCanvasSize(String(normalized));
     undoStackRef.current = [];
   }, [clearFloatingPaste, pendingCanvasSize]);
 
   const updateGridSpacing = useCallback((value: number) => {
     setGridSpacing(value);
+    setHasUnsavedChanges(true);
     setStatusText(`補助グリッドを ${value}px 間隔に変更しました`, 'success');
   }, []);
 
@@ -1094,11 +1107,13 @@ export function App() {
         }
         return changed ? next : prev;
       });
+      setHasUnsavedChanges(true);
       setStatusText('選択範囲をクリアしました', 'success');
     } else {
       // Without selection, keep existing "clear all" behavior.
       setPixels(createEmptyPixels(canvasSize));
       setSelection(null);
+      setHasUnsavedChanges(true);
       setStatusText('キャンバスをクリアしました', 'success');
     }
     clearFloatingPaste();
@@ -1112,6 +1127,7 @@ export function App() {
     }
     setPixels(previous);
     clearFloatingPaste();
+    setHasUnsavedChanges(true);
     setStatusText('1手戻しました', 'success');
   }, [clearFloatingPaste]);
 
@@ -1136,6 +1152,7 @@ export function App() {
       }
       return next;
     });
+    setHasUnsavedChanges(true);
     setStatusText('選択範囲を削除しました', 'success');
   }, [canvasSize, clearFloatingPaste, pushUndo, selection]);
 
@@ -1405,21 +1422,27 @@ export function App() {
   ]);
 
   const addColorToPalette = useCallback((hex: string) => {
-    setPalette((prev) => (prev.includes(hex) ? prev : [...prev, hex]));
+    setPalette((prev) => {
+      if (prev.includes(hex)) {
+        return prev;
+      }
+      setHasUnsavedChanges(true);
+      return [...prev, hex];
+    });
   }, []);
 
-  const savePng = useCallback(async () => {
+  const createSavePayload = useCallback(() => {
     const canvas = document.createElement('canvas');
     canvas.width = canvasSize;
     canvas.height = canvasSize;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      return;
+      return null;
     }
 
     ctx.putImageData(new ImageData(pixels.slice(), canvasSize, canvasSize), 0, 0);
     const dataUrl = canvas.toDataURL('image/png');
-    const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+    const base64Png = dataUrl.replace(/^data:image\/png;base64,/, '');
 
     const metadata: EditorMeta = {
       version: 2,
@@ -1429,94 +1452,153 @@ export function App() {
       lastTool: tool
     };
 
-    const result = await window.pixelApi.savePng({
-      base64Png: base64,
-      metadata,
-      filePath: currentFilePath
-    });
+    return { base64Png, metadata };
+  }, [canvasSize, gridSpacing, palette, pixels, tool]);
 
-    if (result.canceled) {
-      setStatusText('保存をキャンセルしました', 'warning');
-      return;
-    }
+  const performSave = useCallback(
+    async (options: { saveAs: boolean; suppressCancelToast?: boolean }): Promise<'saved' | 'canceled' | 'failed'> => {
+      const payload = createSavePayload();
+      if (!payload) {
+        setStatusText('保存に失敗しました: キャンバスの初期化に失敗しました', 'error');
+        return 'failed';
+      }
 
-    setCurrentFilePath(result.filePath);
-    setStatusText(`保存しました: ${result.filePath}`, 'success');
-  }, [canvasSize, currentFilePath, gridSpacing, palette, pixels, tool]);
+      try {
+        const result = await window.pixelApi.savePng({
+          ...payload,
+          filePath: currentFilePath,
+          saveAs: options.saveAs
+        });
+
+        if (result.canceled || !result.filePath) {
+          if (!options.suppressCancelToast) {
+            setStatusText('保存をキャンセルしました', 'warning');
+          }
+          return 'canceled';
+        }
+
+        setCurrentFilePath(result.filePath);
+        setHasUnsavedChanges(false);
+        setStatusText(`保存しました: ${result.filePath}`, 'success');
+        return 'saved';
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '不明なエラー';
+        setStatusText(`保存に失敗しました: ${message}`, 'error');
+        return 'failed';
+      }
+    },
+    [createSavePayload, currentFilePath]
+  );
+
+  const savePng = useCallback(async () => {
+    await performSave({ saveAs: false });
+  }, [performSave]);
+
+  const saveAsPng = useCallback(async () => {
+    await performSave({ saveAs: true });
+  }, [performSave]);
 
   const loadPng = useCallback(async () => {
-    const result = await window.pixelApi.openPng();
-    if (result.canceled || !result.base64Png) {
-      setStatusText('読み込みをキャンセルしました', 'warning');
-      return;
-    }
-
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('PNG画像の読み込みに失敗'));
-      img.src = `data:image/png;base64,${result.base64Png}`;
-    });
-
-    const fallbackSize = img.width === img.height ? img.width : DEFAULT_CANVAS_SIZE;
-    const targetCanvasSize = clampCanvasSize(
-      result.metadata?.canvasSize ?? fallbackSize,
-      MIN_CANVAS_SIZE,
-      MAX_CANVAS_SIZE
-    );
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetCanvasSize;
-    canvas.height = targetCanvasSize;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return;
-    }
-
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, targetCanvasSize, targetCanvasSize);
-    ctx.drawImage(img, 0, 0, targetCanvasSize, targetCanvasSize);
-
-    const imageData = ctx.getImageData(0, 0, targetCanvasSize, targetCanvasSize);
-
-    const detected = new Set<string>();
-    for (let i = 0; i < imageData.data.length; i += 4) {
-      const a = imageData.data[i + 3];
-      if (a === 0) {
-        continue;
+    if (hasUnsavedChanges) {
+      const confirmResult = await window.pixelApi.confirmOpenWithUnsaved();
+      if (confirmResult.action === 'cancel') {
+        setStatusText('読み込みをキャンセルしました', 'warning');
+        return;
       }
-      detected.add(rgbaToHex(imageData.data[i], imageData.data[i + 1], imageData.data[i + 2]));
-      if (detected.size > 128) {
-        break;
+      if (confirmResult.action === 'save-open') {
+        const saveResult = await performSave({ saveAs: false, suppressCancelToast: true });
+        if (saveResult === 'saved') {
+          // Continue loading.
+        } else if (saveResult === 'canceled') {
+          setStatusText('保存がキャンセルされたため、読み込みを中止しました', 'warning');
+          return;
+        } else {
+          setStatusText('保存に失敗したため、読み込みを中止しました', 'error');
+          return;
+        }
       }
     }
 
-    setCanvasSize(targetCanvasSize);
-    setPendingCanvasSize(String(targetCanvasSize));
-    setPixels(new Uint8ClampedArray(imageData.data));
-    setSelection(null);
-    clearFloatingPaste();
-    undoStackRef.current = [];
-    setCurrentFilePath(result.filePath);
+    try {
+      const result = await window.pixelApi.openPng();
+      if (result.canceled || !result.base64Png) {
+        setStatusText('読み込みをキャンセルしました', 'warning');
+        return;
+      }
 
-    if (result.metadata?.palette?.length) {
-      setPalette(result.metadata.palette);
-    } else if (detected.size > 0) {
-      setPalette(Array.from(detected).slice(0, 64));
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('PNG画像の読み込みに失敗'));
+        img.src = `data:image/png;base64,${result.base64Png}`;
+      });
+
+      const fallbackSize = img.width === img.height ? img.width : DEFAULT_CANVAS_SIZE;
+      const targetCanvasSize = clampCanvasSize(
+        result.metadata?.canvasSize ?? fallbackSize,
+        MIN_CANVAS_SIZE,
+        MAX_CANVAS_SIZE
+      );
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetCanvasSize;
+      canvas.height = targetCanvasSize;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setStatusText('読み込みに失敗しました: キャンバスの初期化に失敗しました', 'error');
+        return;
+      }
+
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, targetCanvasSize, targetCanvasSize);
+      ctx.drawImage(img, 0, 0, targetCanvasSize, targetCanvasSize);
+
+      const imageData = ctx.getImageData(0, 0, targetCanvasSize, targetCanvasSize);
+
+      const detected = new Set<string>();
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const a = imageData.data[i + 3];
+        if (a === 0) {
+          continue;
+        }
+        detected.add(rgbaToHex(imageData.data[i], imageData.data[i + 1], imageData.data[i + 2]));
+        if (detected.size > 128) {
+          break;
+        }
+      }
+
+      setCanvasSize(targetCanvasSize);
+      setPendingCanvasSize(String(targetCanvasSize));
+      setPixels(new Uint8ClampedArray(imageData.data));
+      setSelection(null);
+      clearFloatingPaste();
+      undoStackRef.current = [];
+      setCurrentFilePath(result.filePath);
+
+      if (result.metadata?.palette?.length) {
+        setPalette(result.metadata.palette);
+      } else if (detected.size > 0) {
+        setPalette(Array.from(detected).slice(0, 64));
+      }
+
+      if (result.metadata?.lastTool) {
+        setTool(result.metadata.lastTool);
+      }
+
+      const loadedGridSpacing = result.metadata?.gridSpacing ?? DEFAULT_GRID_SPACING;
+      if (GRID_SPACING_OPTIONS.includes(loadedGridSpacing as (typeof GRID_SPACING_OPTIONS)[number])) {
+        setGridSpacing(loadedGridSpacing);
+      }
+
+      setHasUnsavedChanges(false);
+
+      const nonSquareNote = img.width !== img.height ? ' / 非正方形PNGは正方形キャンバスに合わせて変換' : '';
+      setStatusText(`読み込みました: ${result.filePath} (${img.width}x${img.height})${nonSquareNote}`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '不明なエラー';
+      setStatusText(`読み込みに失敗しました: ${message}`, 'error');
     }
-
-    if (result.metadata?.lastTool) {
-      setTool(result.metadata.lastTool);
-    }
-
-    const loadedGridSpacing = result.metadata?.gridSpacing ?? DEFAULT_GRID_SPACING;
-    if (GRID_SPACING_OPTIONS.includes(loadedGridSpacing as (typeof GRID_SPACING_OPTIONS)[number])) {
-      setGridSpacing(loadedGridSpacing);
-    }
-
-    const nonSquareNote = img.width !== img.height ? ' / 非正方形PNGは正方形キャンバスに合わせて変換' : '';
-    setStatusText(`読み込みました: ${result.filePath} (${img.width}x${img.height})${nonSquareNote}`, 'success');
-  }, [clearFloatingPaste]);
+  }, [clearFloatingPaste, hasUnsavedChanges, performSave]);
 
   return (
     <div className="container-fluid py-3 app-shell">
@@ -1538,9 +1620,11 @@ export function App() {
           palette={palette}
           setHoveredPaletteColor={setHoveredPaletteColor}
           savePng={savePng}
+          saveAsPng={saveAsPng}
           loadPng={loadPng}
           zoom={zoom}
           currentFilePath={currentFilePath}
+          hasUnsavedChanges={hasUnsavedChanges}
         />
 
         <main className="col-12 col-lg-8 col-xl-9 d-flex">
