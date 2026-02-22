@@ -21,7 +21,6 @@ const RECENT_MAX = 10;
 const PREFERENCES_FILE = 'preferences.json';
 
 type FileMenuAction =
-  | { type: 'new' }
   | { type: 'open' }
   | { type: 'save' }
   | { type: 'save-as' }
@@ -123,7 +122,7 @@ function buildFileMenuTemplate() {
       {
         label: '新規',
         accelerator: 'CmdOrCtrl+N',
-        click: () => sendMenuFileAction({ type: 'new' })
+        click: () => createWindow()
       },
       {
         label: '開く...',

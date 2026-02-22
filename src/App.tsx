@@ -30,7 +30,6 @@ import {
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
 type FileMenuAction =
-  | { type: 'new' }
   | { type: 'open' }
   | { type: 'save' }
   | { type: 'save-as' }
@@ -1527,30 +1526,6 @@ export function App() {
     return true;
   }, [hasUnsavedChanges, performSave]);
 
-  const createNewDocument = useCallback(async () => {
-    const canProceed = await confirmBeforeOpen();
-    if (!canProceed) {
-      return;
-    }
-
-    setCanvasSize(DEFAULT_CANVAS_SIZE);
-    setPendingCanvasSize(String(DEFAULT_CANVAS_SIZE));
-    setPixels(createEmptyPixels(DEFAULT_CANVAS_SIZE));
-    setSelection(null);
-    setLastTilePreviewSelection(null);
-    setHoveredPixelInfo(null);
-    setReferencePixelInfos([]);
-    clearFloatingPaste();
-    undoStackRef.current = [];
-    setPalette(DEFAULT_PALETTE);
-    setSelectedColor(DEFAULT_PALETTE[0]);
-    setTool('pencil');
-    setGridSpacing(DEFAULT_GRID_SPACING);
-    setCurrentFilePath(undefined);
-    setHasUnsavedChanges(false);
-    setStatusText('新規キャンバスを作成しました', 'success');
-  }, [clearFloatingPaste, confirmBeforeOpen]);
-
   const loadPng = useCallback(async (options?: { filePath?: string; bypassUnsavedCheck?: boolean }) => {
     if (!options?.bypassUnsavedCheck) {
       const canProceed = await confirmBeforeOpen();
@@ -1678,11 +1653,6 @@ export function App() {
       if (key === 'o') {
         event.preventDefault();
         void loadPng();
-        return;
-      }
-      if (key === 'n') {
-        event.preventDefault();
-        void createNewDocument();
       }
     };
 
@@ -1690,14 +1660,11 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [createNewDocument, loadPng, saveAsPng, savePng]);
+  }, [loadPng, saveAsPng, savePng]);
 
   useEffect(() => {
     const unsubscribe = window.pixelApi.onMenuFileAction((action: FileMenuAction) => {
       switch (action.type) {
-        case 'new':
-          void createNewDocument();
-          break;
         case 'open':
           void loadPng();
           break;
@@ -1717,7 +1684,7 @@ export function App() {
     return () => {
       unsubscribe();
     };
-  }, [createNewDocument, loadPng, saveAsPng, savePng]);
+  }, [loadPng, saveAsPng, savePng]);
 
   return (
     <div className="container-fluid py-3 app-shell">
