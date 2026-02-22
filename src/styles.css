@@ -222,7 +222,6 @@ body {
 .status-toast {
   position: fixed;
   left: 50%;
-  transform: translate(-50%, 10px);
   bottom: 1rem;
   max-width: min(36rem, calc(100vw - 2rem));
   padding: 0.65rem 0.8rem;
@@ -234,7 +233,7 @@ body {
   line-height: 1.35;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
   opacity: 0;
-  transform: translateY(10px);
+  transform: translate(-50%, 10px);
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
   z-index: 60;
