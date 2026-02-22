@@ -22,6 +22,7 @@ body {
   height: 100%;
   box-sizing: border-box;
   overflow: hidden;
+  position: relative;
 }
 
 .app-main-row {
@@ -216,6 +217,48 @@ body {
 .canvas-copy-btn:hover {
   color: #64748b;
   background: rgba(148, 163, 184, 0.12);
+}
+
+.status-toast {
+  position: fixed;
+  left: 50%;
+  transform: translate(-50%, 10px);
+  bottom: 1rem;
+  max-width: min(36rem, calc(100vw - 2rem));
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.55rem;
+  border: 1px solid #cbd5e1;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 60;
+}
+
+.status-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.status-toast.success {
+  border-color: #16a34a;
+}
+
+.status-toast.warning {
+  border-color: #f59e0b;
+}
+
+.status-toast.error {
+  border-color: #ef4444;
+}
+
+.status-toast.info {
+  border-color: #3b82f6;
 }
 
 .editor-toolbar {

@@ -34,6 +34,10 @@ npm run dist
   - `1..9` (top row/numpad) select the color of corresponding numbered reference line
   - Layout is constrained to viewport height; as reference lines increase, canvas stage shrinks vertically
   - Each data field in every reference line has its own small copy button
+- `setStatusText` messages are shown as toast notifications:
+  - Auto-hide after ~3 seconds
+  - Type-aware border color (`success`/`warning`/`error`/`info`)
+  - Sidebar fixed status row removed
 - Canvas size is independent from grid:
   - Canvas: default `256x256` (user can change)
   - Grid overlay spacing: `8 / 16 / 32`

@@ -28,6 +28,8 @@ import {
   rgbaToHsva
 } from './editor/utils';
 
+type ToastType = 'success' | 'warning' | 'error' | 'info';
+
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
   // ---- UI / editor state ----
@@ -41,7 +43,10 @@ export function App() {
   const [tool, setTool] = useState<Tool>('pencil');
   const [selection, setSelection] = useState<Selection>(null);
   const [lastTilePreviewSelection, setLastTilePreviewSelection] = useState<Selection>(null);
-  const [statusText, setStatusText] = useState<string>('準備OK');
+  const [statusText, setStatusTextRaw] = useState<string>('準備OK');
+  const [toastType, setToastType] = useState<ToastType>('info');
+  const [isToastVisible, setIsToastVisible] = useState<boolean>(false);
+  const [toastSequence, setToastSequence] = useState<number>(0);
   const [hoveredPixelInfo, setHoveredPixelInfo] = useState<HoveredPixelInfo>(null);
   const [hoveredPaletteColor, setHoveredPaletteColor] = useState<{ hex: string; index: number } | null>(null);
   const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
@@ -49,6 +54,13 @@ export function App() {
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
+
+  const setStatusText = useCallback((text: string, type: ToastType) => {
+    setStatusTextRaw(text);
+    setToastType(type);
+    setIsToastVisible(true);
+    setToastSequence((prev) => prev + 1);
+  }, []);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
@@ -346,6 +358,16 @@ export function App() {
     };
   }, [isPanning, updatePan, endPan]);
 
+  useEffect(() => {
+    if (!isToastVisible) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setIsToastVisible(false);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [isToastVisible, toastSequence]);
+
   const colorBytes = useMemo(() => {
     const rgb = selectedColor.replace('#', '');
     return {
@@ -581,7 +603,7 @@ export function App() {
   const copyPixelField = useCallback(
     async (label: string, value: string) => {
       const copied = await copyTextToClipboard(value);
-      setStatusText(copied ? `${label}をコピーしました` : `${label}のコピーに失敗しました`);
+      setStatusText(copied ? `${label}をコピーしました` : `${label}のコピーに失敗しました`, copied ? 'success' : 'error');
     },
     [copyTextToClipboard]
   );
@@ -597,7 +619,7 @@ export function App() {
         return false;
       }
       setSelectedColor(rgbaToHex(info.rgba.r, info.rgba.g, info.rgba.b));
-      setStatusText(`参照 ${number} の色を選択しました`);
+      setStatusText(`参照 ${number} の色を選択しました`, 'success');
       return true;
     },
     [referencePixelInfos]
@@ -625,7 +647,7 @@ export function App() {
 
     const activeInfo = hoveredPixelInfo ?? infoFromPalette;
     if (!activeInfo) {
-      setStatusText('参照追加: キャンバスまたはパレット上にマウスを置いてから F を押してください');
+      setStatusText('参照追加: キャンバスまたはパレット上にマウスを置いてから F を押してください', 'warning');
       return;
     }
 
@@ -644,7 +666,7 @@ export function App() {
         !(info.x === activeInfo.x && info.y === activeInfo.y)
     );
     if (hasSameInfoIgnoringCoordinate) {
-      setStatusText('参照追加: 同じ色情報がすでに登録済みです');
+      setStatusText('参照追加: 同じ色情報がすでに登録済みです', 'warning');
       return;
     }
 
@@ -652,18 +674,18 @@ export function App() {
     if (existingIndex < 0) {
       setReferencePixelInfos((prev) => [...prev, activeInfo]);
       if (activeInfo.x >= 0) {
-        setStatusText(`参照追加: (${activeInfo.x}, ${activeInfo.y}) ${activeInfo.hex8}`);
+        setStatusText(`参照追加: (${activeInfo.x}, ${activeInfo.y}) ${activeInfo.hex8}`, 'success');
       } else {
-        setStatusText(`参照追加: パレット[${activeInfo.paletteIndex}] ${activeInfo.hex8}`);
+        setStatusText(`参照追加: パレット[${activeInfo.paletteIndex}] ${activeInfo.hex8}`, 'success');
       }
       return;
     }
 
     if (referencePixelInfos[existingIndex].hex8 === activeInfo.hex8) {
       if (activeInfo.x >= 0) {
-        setStatusText(`参照維持: (${activeInfo.x}, ${activeInfo.y}) は同じ色です`);
+        setStatusText(`参照維持: (${activeInfo.x}, ${activeInfo.y}) は同じ色です`, 'warning');
       } else {
-        setStatusText(`参照維持: パレット[${activeInfo.paletteIndex}] は同じ色です`);
+        setStatusText(`参照維持: パレット[${activeInfo.paletteIndex}] は同じ色です`, 'warning');
       }
       return;
     }
@@ -674,19 +696,19 @@ export function App() {
       return next;
     });
     if (activeInfo.x >= 0) {
-      setStatusText(`参照更新: (${activeInfo.x}, ${activeInfo.y}) -> ${activeInfo.hex8}`);
+      setStatusText(`参照更新: (${activeInfo.x}, ${activeInfo.y}) -> ${activeInfo.hex8}`, 'success');
     } else {
-      setStatusText(`参照更新: パレット[${activeInfo.paletteIndex}] -> ${activeInfo.hex8}`);
+      setStatusText(`参照更新: パレット[${activeInfo.paletteIndex}] -> ${activeInfo.hex8}`, 'success');
     }
   }, [hoveredPaletteColor, hoveredPixelInfo, referencePixelInfos]);
 
   const clearReferencePixelInfos = useCallback(() => {
     if (referencePixelInfos.length === 0) {
-      setStatusText('参照はすでに空です');
+      setStatusText('参照はすでに空です', 'warning');
       return;
     }
     setReferencePixelInfos([]);
-    setStatusText('参照ラインをクリアしました');
+    setStatusText('参照ラインをクリアしました', 'success');
   }, [referencePixelInfos.length]);
 
   const removeReferencePixelInfo = useCallback((x: number, y: number) => {
@@ -702,7 +724,7 @@ export function App() {
       return next.length === prev.length ? prev : next;
     });
     if (removed) {
-      setStatusText(`参照を削除しました: (${x}, ${y})`);
+      setStatusText(`参照を削除しました: (${x}, ${y})`, 'success');
     }
   }, []);
 
@@ -747,7 +769,7 @@ export function App() {
         return next;
       });
       if (moved) {
-        setStatusText('参照ラインの順序を変更しました');
+        setStatusText('参照ラインの順序を変更しました', 'success');
       }
     },
     [draggingReferenceKey, getReferenceKey]
@@ -758,7 +780,7 @@ export function App() {
       return;
     }
     clearFloatingPaste();
-    setStatusText('貼り付け移動を確定しました');
+    setStatusText('貼り付け移動を確定しました', 'success');
   }, [clearFloatingPaste]);
 
   const cancelFloatingPaste = useCallback(() => {
@@ -770,7 +792,7 @@ export function App() {
     setSelection(cloneSelection(floating.restoreSelection));
     setTool(floating.restoreTool);
     clearFloatingPaste();
-    setStatusText('貼り付け移動をキャンセルしました');
+    setStatusText('貼り付け移動をキャンセルしました', 'warning');
   }, [clearFloatingPaste]);
 
   const onMouseDown = useCallback(
@@ -794,7 +816,7 @@ export function App() {
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = cell;
         drawStateRef.current.moveStartOrigin = { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y };
-        setStatusText('選択範囲を移動中');
+        setStatusText('選択範囲を移動中', 'info');
         return;
       }
 
@@ -847,7 +869,7 @@ export function App() {
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = cell;
         drawStateRef.current.moveStartOrigin = { x: selection.x, y: selection.y };
-        setStatusText('選択範囲を移動中');
+        setStatusText('選択範囲を移動中', 'info');
         return;
       }
 
@@ -866,7 +888,7 @@ export function App() {
         drawStateRef.current.lastDrawCell = null;
         drawStateRef.current.moveStartCell = null;
         drawStateRef.current.moveStartOrigin = null;
-        setStatusText(filled ? '塗りつぶしました' : '塗りつぶし対象がありません');
+        setStatusText(filled ? '塗りつぶしました' : '塗りつぶし対象がありません', filled ? 'success' : 'warning');
         return;
       }
 
@@ -988,11 +1010,11 @@ export function App() {
     // Single click in Select tool creates grid-aligned tile selection.
     if (shouldClearSelection) {
       setSelection(null);
-      setStatusText('選択を解除しました');
+      setStatusText('選択を解除しました', 'success');
     }
     if (shouldSelectSingleTile && selectStart) {
       setSelection(resolveSingleTileSelection(selectStart));
-      setStatusText('1タイルを選択しました');
+      setStatusText('1タイルを選択しました', 'success');
     }
     drawStateRef.current.active = false;
     drawStateRef.current.selectionStart = null;
@@ -1002,7 +1024,7 @@ export function App() {
     drawStateRef.current.moveStartCell = null;
     drawStateRef.current.moveStartOrigin = null;
     if (wasMovingPaste && !shouldSelectSingleTile) {
-      setStatusText('選択範囲を配置しました');
+      setStatusText('選択範囲を配置しました', 'success');
     }
   }, [endPan, resolveSingleTileSelection, tool]);
 
@@ -1014,7 +1036,7 @@ export function App() {
   const applyCanvasSize = useCallback(() => {
     const parsed = Number.parseInt(pendingCanvasSize, 10);
     if (!Number.isFinite(parsed)) {
-      setStatusText('キャンバスサイズは数値で指定してください');
+      setStatusText('キャンバスサイズは数値で指定してください', 'warning');
       return;
     }
 
@@ -1023,7 +1045,7 @@ export function App() {
     setPixels(createEmptyPixels(normalized));
     setSelection(null);
     clearFloatingPaste();
-    setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`);
+    setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
     setCurrentFilePath(undefined);
     setPendingCanvasSize(String(normalized));
     undoStackRef.current = [];
@@ -1031,13 +1053,13 @@ export function App() {
 
   const updateGridSpacing = useCallback((value: number) => {
     setGridSpacing(value);
-    setStatusText(`補助グリッドを ${value}px 間隔に変更しました`);
+    setStatusText(`補助グリッドを ${value}px 間隔に変更しました`, 'success');
   }, []);
 
   const zoomIn = useCallback(() => {
     setZoom((prev) => {
       const next = Math.min(MAX_ZOOM, prev + 1);
-      setStatusText(`表示倍率: ${next}x`);
+      setStatusText(`表示倍率: ${next}x`, 'success');
       return next;
     });
   }, []);
@@ -1045,7 +1067,7 @@ export function App() {
   const zoomOut = useCallback(() => {
     setZoom((prev) => {
       const next = Math.max(MIN_ZOOM, prev - 1);
-      setStatusText(`表示倍率: ${next}x`);
+      setStatusText(`表示倍率: ${next}x`, 'success');
       return next;
     });
   }, []);
@@ -1072,12 +1094,12 @@ export function App() {
         }
         return changed ? next : prev;
       });
-      setStatusText('選択範囲をクリアしました');
+      setStatusText('選択範囲をクリアしました', 'success');
     } else {
       // Without selection, keep existing "clear all" behavior.
       setPixels(createEmptyPixels(canvasSize));
       setSelection(null);
-      setStatusText('キャンバスをクリアしました');
+      setStatusText('キャンバスをクリアしました', 'success');
     }
     clearFloatingPaste();
   }, [canvasSize, clearFloatingPaste, pushUndo, selection]);
@@ -1085,17 +1107,17 @@ export function App() {
   const doUndo = useCallback(() => {
     const previous = undoStackRef.current.pop();
     if (!previous) {
-      setStatusText('Undo履歴がありません');
+      setStatusText('Undo履歴がありません', 'warning');
       return;
     }
     setPixels(previous);
     clearFloatingPaste();
-    setStatusText('1手戻しました');
+    setStatusText('1手戻しました', 'success');
   }, [clearFloatingPaste]);
 
   const deleteSelection = useCallback(() => {
     if (!selection) {
-      setStatusText('選択範囲がありません');
+      setStatusText('選択範囲がありません', 'warning');
       return;
     }
 
@@ -1114,12 +1136,12 @@ export function App() {
       }
       return next;
     });
-    setStatusText('選択範囲を削除しました');
+    setStatusText('選択範囲を削除しました', 'success');
   }, [canvasSize, clearFloatingPaste, pushUndo, selection]);
 
   const copySelection = useCallback(async () => {
     if (!selection) {
-      setStatusText('選択範囲がありません');
+      setStatusText('選択範囲がありません', 'warning');
       return;
     }
 
@@ -1152,13 +1174,13 @@ export function App() {
     };
 
     await window.pixelApi.copyImageDataUrl(canvas.toDataURL('image/png'));
-    setStatusText('選択範囲をクリップボードにコピーしました');
+    setStatusText('選択範囲をクリップボードにコピーしました', 'success');
   }, [canvasSize, pixels, selection]);
 
   const pasteSelection = useCallback(() => {
     const clip = selectionClipboardRef.current;
     if (!clip) {
-      setStatusText('貼り付けできる選択コピーがありません');
+      setStatusText('貼り付けできる選択コピーがありません', 'warning');
       return;
     }
 
@@ -1170,7 +1192,7 @@ export function App() {
     const pasteHeight = Math.max(0, Math.min(clip.height, canvasSize - pasteY));
 
     if (pasteWidth === 0 || pasteHeight === 0) {
-      setStatusText('貼り付け先がキャンバス外です');
+      setStatusText('貼り付け先がキャンバス外です', 'warning');
       return;
     }
 
@@ -1203,7 +1225,7 @@ export function App() {
     };
     setTool('select');
     setSelection({ x: pasteX, y: pasteY, w: pasteWidth, h: pasteHeight });
-    setStatusText(`選択範囲を貼り付けました (${pasteWidth}x${pasteHeight}) - Enterで確定 / Escでキャンセル`);
+    setStatusText(`選択範囲を貼り付けました (${pasteWidth}x${pasteHeight}) - Enterで確定 / Escでキャンセル`, 'success');
   }, [canvasSize, pixels, pushUndo, selection, tool]);
 
   useEffect(() => {
@@ -1246,63 +1268,63 @@ export function App() {
         case 'Numpad1':
           event.preventDefault();
           if (!selectReferenceByNumber(1)) {
-            setStatusText('参照 1 は未登録です');
+            setStatusText('参照 1 は未登録です', 'warning');
           }
           break;
         case 'Digit2':
         case 'Numpad2':
           event.preventDefault();
           if (!selectReferenceByNumber(2)) {
-            setStatusText('参照 2 は未登録です');
+            setStatusText('参照 2 は未登録です', 'warning');
           }
           break;
         case 'Digit3':
         case 'Numpad3':
           event.preventDefault();
           if (!selectReferenceByNumber(3)) {
-            setStatusText('参照 3 は未登録です');
+            setStatusText('参照 3 は未登録です', 'warning');
           }
           break;
         case 'Digit4':
         case 'Numpad4':
           event.preventDefault();
           if (!selectReferenceByNumber(4)) {
-            setStatusText('参照 4 は未登録です');
+            setStatusText('参照 4 は未登録です', 'warning');
           }
           break;
         case 'Digit5':
         case 'Numpad5':
           event.preventDefault();
           if (!selectReferenceByNumber(5)) {
-            setStatusText('参照 5 は未登録です');
+            setStatusText('参照 5 は未登録です', 'warning');
           }
           break;
         case 'Digit6':
         case 'Numpad6':
           event.preventDefault();
           if (!selectReferenceByNumber(6)) {
-            setStatusText('参照 6 は未登録です');
+            setStatusText('参照 6 は未登録です', 'warning');
           }
           break;
         case 'Digit7':
         case 'Numpad7':
           event.preventDefault();
           if (!selectReferenceByNumber(7)) {
-            setStatusText('参照 7 は未登録です');
+            setStatusText('参照 7 は未登録です', 'warning');
           }
           break;
         case 'Digit8':
         case 'Numpad8':
           event.preventDefault();
           if (!selectReferenceByNumber(8)) {
-            setStatusText('参照 8 は未登録です');
+            setStatusText('参照 8 は未登録です', 'warning');
           }
           break;
         case 'Digit9':
         case 'Numpad9':
           event.preventDefault();
           if (!selectReferenceByNumber(9)) {
-            setStatusText('参照 9 は未登録です');
+            setStatusText('参照 9 は未登録です', 'warning');
           }
           break;
         case 'Enter':
@@ -1323,28 +1345,28 @@ export function App() {
           if (selection) {
             event.preventDefault();
             setSelection(null);
-            setStatusText('選択を解除しました');
+            setStatusText('選択を解除しました', 'success');
           }
           break;
         case 'KeyB':
           event.preventDefault();
           setTool('pencil');
-          setStatusText('ツール: 描画');
+          setStatusText('ツール: 描画', 'info');
           break;
         case 'KeyE':
           event.preventDefault();
           setTool('eraser');
-          setStatusText('ツール: 消しゴム');
+          setStatusText('ツール: 消しゴム', 'info');
           break;
         case 'KeyG':
           event.preventDefault();
           setTool('fill');
-          setStatusText('ツール: 塗りつぶし');
+          setStatusText('ツール: 塗りつぶし', 'info');
           break;
         case 'KeyV':
           event.preventDefault();
           setTool('select');
-          setStatusText('ツール: 矩形選択');
+          setStatusText('ツール: 矩形選択', 'info');
           break;
         case 'KeyF':
           event.preventDefault();
@@ -1414,18 +1436,18 @@ export function App() {
     });
 
     if (result.canceled) {
-      setStatusText('保存をキャンセルしました');
+      setStatusText('保存をキャンセルしました', 'warning');
       return;
     }
 
     setCurrentFilePath(result.filePath);
-    setStatusText(`保存しました: ${result.filePath}`);
+    setStatusText(`保存しました: ${result.filePath}`, 'success');
   }, [canvasSize, currentFilePath, gridSpacing, palette, pixels, tool]);
 
   const loadPng = useCallback(async () => {
     const result = await window.pixelApi.openPng();
     if (result.canceled || !result.base64Png) {
-      setStatusText('読み込みをキャンセルしました');
+      setStatusText('読み込みをキャンセルしました', 'warning');
       return;
     }
 
@@ -1493,7 +1515,7 @@ export function App() {
     }
 
     const nonSquareNote = img.width !== img.height ? ' / 非正方形PNGは正方形キャンバスに合わせて変換' : '';
-    setStatusText(`読み込みました: ${result.filePath} (${img.width}x${img.height})${nonSquareNote}`);
+    setStatusText(`読み込みました: ${result.filePath} (${img.width}x${img.height})${nonSquareNote}`, 'success');
   }, [clearFloatingPaste]);
 
   return (
@@ -1519,7 +1541,6 @@ export function App() {
           loadPng={loadPng}
           zoom={zoom}
           currentFilePath={currentFilePath}
-          statusText={statusText}
         />
 
         <main className="col-12 col-lg-8 col-xl-9 d-flex">
@@ -1696,6 +1717,9 @@ export function App() {
             />
           </div>
         </main>
+      </div>
+      <div className={`status-toast ${isToastVisible ? 'show' : ''} ${toastType}`} role="status" aria-live="polite">
+        {statusText}
       </div>
     </div>
   );

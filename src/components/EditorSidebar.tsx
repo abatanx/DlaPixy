@@ -21,10 +21,9 @@ type EditorSidebarProps = {
   loadPng: () => Promise<void>;
   zoom: number;
   currentFilePath?: string;
-  statusText: string;
 };
 
-// プレビュー・設定・保存読込・状態表示をまとめた左サイドパネル。
+// プレビュー・設定・保存読込をまとめた左サイドパネル。
 export function EditorSidebar({
   canvasSize,
   previewDataUrl,
@@ -44,8 +43,7 @@ export function EditorSidebar({
   savePng,
   loadPng,
   zoom,
-  currentFilePath,
-  statusText
+  currentFilePath
 }: EditorSidebarProps) {
   return (
     <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar">
@@ -161,7 +159,6 @@ export function EditorSidebar({
             <div>グリッド線: {gridSpacing}px 間隔</div>
             <div>表示倍率: {zoom}x</div>
             <div>現在ファイル: {currentFilePath ?? '未保存'}</div>
-            <div>状態: {statusText}</div>
           </div>
         </div>
       </div>
