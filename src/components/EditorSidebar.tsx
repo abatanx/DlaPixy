@@ -1,4 +1,4 @@
-import { GRID_SPACING_OPTIONS, MAX_CANVAS_SIZE, MIN_CANVAS_SIZE } from '../editor/constants';
+import { GRID_SPACING_OPTIONS } from '../editor/constants';
 import type { Selection } from '../editor/types';
 
 type EditorSidebarProps = {
@@ -7,9 +7,6 @@ type EditorSidebarProps = {
   selectionTilePreviewDataUrl: string;
   tilePreviewSelection: Selection;
   selection: Selection;
-  pendingCanvasSize: string;
-  setPendingCanvasSize: (value: string) => void;
-  applyCanvasSize: () => void;
   gridSpacing: number;
   updateGridSpacing: (value: number) => void;
   selectedColor: string;
@@ -29,9 +26,6 @@ export function EditorSidebar({
   selectionTilePreviewDataUrl,
   tilePreviewSelection,
   selection,
-  pendingCanvasSize,
-  setPendingCanvasSize,
-  applyCanvasSize,
   gridSpacing,
   updateGridSpacing,
   selectedColor,
@@ -80,24 +74,6 @@ export function EditorSidebar({
                 ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'}`
                 : '選択範囲なし'}
             </div>
-          </div>
-
-          <div className="mb-3">
-            <label className="form-label">キャンバスサイズ (px)</label>
-            <div className="input-group">
-              <input
-                type="number"
-                min={MIN_CANVAS_SIZE}
-                max={MAX_CANVAS_SIZE}
-                className="form-control"
-                value={pendingCanvasSize}
-                onChange={(e) => setPendingCanvasSize(e.target.value)}
-              />
-              <button type="button" className="btn btn-outline-primary" onClick={applyCanvasSize}>
-                適用
-              </button>
-            </div>
-            <div className="form-text">初期値は 256x256。範囲は {MIN_CANVAS_SIZE} - {MAX_CANVAS_SIZE}</div>
           </div>
 
           <div className="mb-3">

@@ -39,7 +39,7 @@ npm run dist
   - 種別（`success`/`warning`/`error`/`info`）で見た目を区別
   - 左サイドの固定「状態」表示は廃止
 - キャンバスサイズとグリッドを分離
-  - キャンバス: 初期 `256x256`（変更可）
+  - キャンバス: 初期 `256x256`（変更はネイティブ `Canvas` メニューのモーダルから）
   - グリッド線間隔: `8 / 16 / 32`
 - ツール
   - 描画（Pencil）
@@ -63,6 +63,9 @@ npm run dist
   - ファイル操作はOS標準の File メニュー中心（新規/開く/保存/別名保存/最近使ったファイル）
   - ダイアログ初期ディレクトリは最終利用ディレクトリを永続利用（無効時はホーム）
   - Recent Files は上限管理・重複排除・存在しないパスの自動除外に対応
+- ネイティブ Canvas メニュー
+  - `Canvas -> キャンバスサイズ変更...` でモーダルを開く
+  - サイドバーの常設キャンバスサイズ入力UIは廃止
 - 1x PNGプレビュー
 - 選択範囲 3x3 タイルプレビュー（1xプレビュー下）
   - 現在の選択範囲を表示
@@ -112,7 +115,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - エディター本体の状態管理と処理オーケストレーション
   - キャンバス操作ハンドラとキーボードショートカット
 - `src/components/EditorSidebar.tsx`
-  - 左サイドパネルUI（プレビュー、設定、パレット）
+  - 左サイドパネルUI（プレビュー、グリッド設定、パレット）
 - `src/components/EditorToolbar.tsx`
   - 右ツールバーUI（ツール切替、ズーム、Undo、コピー/貼り付け/削除/クリア）
 - `src/editor/constants.ts`
@@ -127,6 +130,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - Bootstrap / FontAwesomeのCSS読込
 - `electron/main.ts`
   - Electronウィンドウ、IPC、PNG保存/読込、メタ埋め込み
+- `electron/menu.ts`
+  - ネイティブ File/Canvas メニュー構築とメニューアクション配線
 - `electron/preload.ts`
   - `window.pixelApi` ブリッジ
 - `electron/types.d.ts`
@@ -134,6 +139,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 
 ## 8. 実装上の重要ポイント
 - グリッドは「線間隔」であり、キャンバス解像度ではない。
+- キャンバスサイズ変更はネイティブ `Canvas` メニューから開く renderer モーダルで行う。
 - 貼り付けは内部クリップボード（`selectionClipboardRef`）を使う。
 - 貼り付け直後の移動は `floatingPasteRef` により実現。
 - 選択範囲のドラッグ移動も `floatingPasteRef` の同じ経路を再利用

@@ -1,10 +1,5 @@
+import type { MenuAction } from './menu';
 export {};
-
-type FileMenuAction =
-  | { type: 'open' }
-  | { type: 'save' }
-  | { type: 'save-as' }
-  | { type: 'open-recent'; filePath: string };
 
 declare global {
   interface Window {
@@ -36,7 +31,7 @@ declare global {
       }>;
       copyImageDataUrl: (dataUrl: string) => Promise<{ ok: boolean }>;
       confirmOpenWithUnsaved: () => Promise<{ action: 'save-open' | 'discard-open' | 'cancel' }>;
-      onMenuFileAction: (handler: (action: FileMenuAction) => void) => () => void;
+      onMenuAction: (handler: (action: MenuAction) => void) => () => void;
     };
   }
 }
