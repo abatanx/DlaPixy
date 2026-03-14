@@ -7,7 +7,8 @@ export type MenuAction =
   | { type: 'save' }
   | { type: 'save-as' }
   | { type: 'open-recent'; filePath: string }
-  | { type: 'canvas-size' };
+  | { type: 'canvas-size' }
+  | { type: 'grid-spacing' };
 
 export type AppPreferences = {
   recentFiles: string[];
@@ -78,6 +79,10 @@ function buildCanvasMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): 
       {
         label: 'キャンバスサイズ変更...',
         click: () => sendMenuAction({ type: 'canvas-size' })
+      },
+      {
+        label: 'グリッド線間隔変更...',
+        click: () => sendMenuAction({ type: 'grid-spacing' })
       }
     ]
   };

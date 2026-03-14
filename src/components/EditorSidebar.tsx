@@ -1,4 +1,3 @@
-import { GRID_SPACING_OPTIONS } from '../editor/constants';
 import type { Selection } from '../editor/types';
 
 type EditorSidebarProps = {
@@ -8,7 +7,6 @@ type EditorSidebarProps = {
   tilePreviewSelection: Selection;
   selection: Selection;
   gridSpacing: number;
-  updateGridSpacing: (value: number) => void;
   selectedColor: string;
   setSelectedColor: (value: string) => void;
   addColorToPalette: (hex: string) => void;
@@ -27,7 +25,6 @@ export function EditorSidebar({
   tilePreviewSelection,
   selection,
   gridSpacing,
-  updateGridSpacing,
   selectedColor,
   setSelectedColor,
   addColorToPalette,
@@ -73,22 +70,6 @@ export function EditorSidebar({
               {tilePreviewSelection
                 ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'}`
                 : '選択範囲なし'}
-            </div>
-          </div>
-
-          <div className="mb-3">
-            <label className="form-label">グリッド線の間隔</label>
-            <div className="btn-group w-100" role="group">
-              {GRID_SPACING_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={`btn ${gridSpacing === option ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => updateGridSpacing(option)}
-                >
-                  {option === 0 ? 'なし' : `${option}px`}
-                </button>
-              ))}
             </div>
           </div>
 

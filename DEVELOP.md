@@ -40,7 +40,7 @@ npm run dist
   - Sidebar fixed status row removed
 - Canvas size is independent from grid:
   - Canvas: default `256x256` (change from native `Canvas` menu modal)
-  - Grid overlay spacing: `8 / 16 / 32`
+  - Grid overlay spacing: `none / 8 / 16 / 32 / custom`
 - Tools:
   - Pencil
   - Eraser
@@ -65,7 +65,8 @@ npm run dist
   - Recent files are capped, deduplicated, and missing paths are removed on selection
 - Native Canvas menu
   - `Canvas -> Change Canvas Size...` opens modal dialog in renderer
-  - Sidebar no longer shows persistent canvas size input
+  - `Canvas -> Change Grid Spacing...` opens modal dialog in renderer
+  - Sidebar no longer shows persistent canvas size / grid spacing inputs
 - 1x PNG preview panel
 - Selection 3x3 tile preview panel (under 1x preview)
   - Uses current selection, or keeps showing last selection when selection is cleared
@@ -140,6 +141,7 @@ Current metadata shape:
 ## 8. Important Implementation Notes
 - Grid is **overlay spacing**, not canvas resolution.
 - Canvas size change is opened from native `Canvas` menu and edited in renderer modal.
+- Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
 - Selection drag-move also reuses `floatingPasteRef` flow:
   - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.
