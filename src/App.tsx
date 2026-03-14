@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Modal from 'bootstrap/js/dist/modal';
 import { EditorSidebar } from './components/EditorSidebar';
 import { EditorToolbar } from './components/EditorToolbar';
 import {
@@ -33,7 +34,8 @@ type FileMenuAction =
   | { type: 'open' }
   | { type: 'save' }
   | { type: 'save-as' }
-  | { type: 'open-recent'; filePath: string };
+  | { type: 'open-recent'; filePath: string }
+  | { type: 'canvas-size' };
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
@@ -70,10 +72,44 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
+  const canvasSizeModalRef = useRef<HTMLDivElement | null>(null);
+  const canvasSizeModalInputRef = useRef<HTMLInputElement | null>(null);
+  const canvasSizeModalInstanceRef = useRef<Modal | null>(null);
 
   useEffect(() => {
     document.title = `DlaPixy${hasUnsavedChanges ? ' *' : ''}`;
   }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    const modalElement = canvasSizeModalRef.current;
+    if (!modalElement) {
+      return;
+    }
+
+    const instance = new Modal(modalElement, {
+      backdrop: 'static',
+      keyboard: false
+    });
+    canvasSizeModalInstanceRef.current = instance;
+
+    const onShown = () => {
+      canvasSizeModalInputRef.current?.focus();
+      canvasSizeModalInputRef.current?.select();
+    };
+    const onHidden = () => {
+      setPendingCanvasSize(String(canvasSize));
+    };
+
+    modalElement.addEventListener('shown.bs.modal', onShown);
+    modalElement.addEventListener('hidden.bs.modal', onHidden);
+
+    return () => {
+      modalElement.removeEventListener('shown.bs.modal', onShown);
+      modalElement.removeEventListener('hidden.bs.modal', onHidden);
+      instance.dispose();
+      canvasSizeModalInstanceRef.current = null;
+    };
+  }, [canvasSize]);
   // drawStateRef: pointer interaction state machine for draw/select/move.
   const drawStateRef = useRef<{
     active: boolean;
@@ -1069,14 +1105,17 @@ export function App() {
     setHoveredPixelInfo(null);
   }, [onMouseUp]);
 
-  const applyCanvasSize = useCallback(() => {
+  const resolveCanvasSizeInput = useCallback(() => {
     const parsed = Number.parseInt(pendingCanvasSize, 10);
     if (!Number.isFinite(parsed)) {
       setStatusText('キャンバスサイズは数値で指定してください', 'warning');
-      return;
+      return null;
     }
 
-    const normalized = clampCanvasSize(parsed, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    return clampCanvasSize(parsed, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+  }, [pendingCanvasSize, setStatusText]);
+
+  const applyCanvasSize = useCallback((normalized: number) => {
     setCanvasSize(normalized);
     setPixels(createEmptyPixels(normalized));
     setSelection(null);
@@ -1085,7 +1124,42 @@ export function App() {
     setHasUnsavedChanges(true);
     setPendingCanvasSize(String(normalized));
     undoStackRef.current = [];
-  }, [clearFloatingPaste, pendingCanvasSize]);
+  }, [clearFloatingPaste, setStatusText]);
+
+  const openCanvasSizeModal = useCallback(() => {
+    setPendingCanvasSize(String(canvasSize));
+    canvasSizeModalInstanceRef.current?.show();
+  }, [canvasSize]);
+
+  const closeCanvasSizeModal = useCallback(() => {
+    canvasSizeModalInstanceRef.current?.hide();
+  }, []);
+
+  const submitCanvasSizeModal = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const normalized = resolveCanvasSizeInput();
+      if (normalized === null) {
+        return;
+      }
+
+      const modalElement = canvasSizeModalRef.current;
+      const modalInstance = canvasSizeModalInstanceRef.current;
+      if (!modalElement || !modalInstance) {
+        applyCanvasSize(normalized);
+        return;
+      }
+
+      const onHidden = () => {
+        modalElement.removeEventListener('hidden.bs.modal', onHidden);
+        applyCanvasSize(normalized);
+      };
+
+      modalElement.addEventListener('hidden.bs.modal', onHidden);
+      modalInstance.hide();
+    },
+    [applyCanvasSize, resolveCanvasSizeInput]
+  );
 
   const updateGridSpacing = useCallback((value: number) => {
     setGridSpacing(value);
@@ -1682,7 +1756,7 @@ export function App() {
   }, [loadPng, saveAsPng, savePng]);
 
   useEffect(() => {
-    const unsubscribe = window.pixelApi.onMenuFileAction((action: FileMenuAction) => {
+    const unsubscribe = window.pixelApi.onMenuAction((action: FileMenuAction) => {
       switch (action.type) {
         case 'open':
           void loadPng();
@@ -1696,6 +1770,9 @@ export function App() {
         case 'open-recent':
           void loadPng({ filePath: action.filePath });
           break;
+        case 'canvas-size':
+          openCanvasSizeModal();
+          break;
         default:
           break;
       }
@@ -1703,7 +1780,7 @@ export function App() {
     return () => {
       unsubscribe();
     };
-  }, [loadPng, saveAsPng, savePng]);
+  }, [loadPng, openCanvasSizeModal, saveAsPng, savePng]);
 
   return (
     <div className="container-fluid py-3 app-shell">
@@ -1714,9 +1791,6 @@ export function App() {
           selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
           tilePreviewSelection={tilePreviewSelection}
           selection={selection}
-          pendingCanvasSize={pendingCanvasSize}
-          setPendingCanvasSize={setPendingCanvasSize}
-          applyCanvasSize={applyCanvasSize}
           gridSpacing={gridSpacing}
           updateGridSpacing={updateGridSpacing}
           selectedColor={selectedColor}
@@ -1906,6 +1980,63 @@ export function App() {
       </div>
       <div className={`status-toast ${isToastVisible ? 'show' : ''} ${toastType}`} role="status" aria-live="polite">
         {statusText}
+      </div>
+      <div
+        ref={canvasSizeModalRef}
+        className="modal fade"
+        tabIndex={-1}
+        aria-labelledby="canvas-size-modal-title"
+        aria-hidden="true"
+      >
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content shadow">
+            <form onSubmit={submitCanvasSizeModal}>
+              <div className="modal-header">
+                <div>
+                  <h2 id="canvas-size-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
+                    <span>キャンバスサイズ変更</span>
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  aria-label="閉じる"
+                  onClick={closeCanvasSizeModal}
+                />
+              </div>
+              <div className="modal-body py-4">
+                <label htmlFor="canvas-size-input" className="form-label">正方形キャンバスサイズ (px)</label>
+                <input
+                  ref={canvasSizeModalInputRef}
+                  id="canvas-size-input"
+                  type="number"
+                  min={MIN_CANVAS_SIZE}
+                  max={MAX_CANVAS_SIZE}
+                  className="form-control"
+                  value={pendingCanvasSize}
+                  onChange={(event) => setPendingCanvasSize(event.target.value)}
+                />
+                <div className="form-text">
+                  現在値: {canvasSize}x{canvasSize} / 範囲: {MIN_CANVAS_SIZE} - {MAX_CANVAS_SIZE}
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline-secondary" onClick={closeCanvasSizeModal}>
+                  <span className="d-inline-flex align-items-center gap-2">
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
+                    <span>キャンセル</span>
+                  </span>
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <span className="d-inline-flex align-items-center gap-2">
+                    <i className="fa-solid fa-check" aria-hidden="true" />
+                    <span>適用</span>
+                  </span>
+                </button>
+              </div>
+            </form>
+            </div>
+          </div>
       </div>
     </div>
   );

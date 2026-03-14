@@ -39,7 +39,7 @@ npm run dist
   - Type-aware border color (`success`/`warning`/`error`/`info`)
   - Sidebar fixed status row removed
 - Canvas size is independent from grid:
-  - Canvas: default `256x256` (user can change)
+  - Canvas: default `256x256` (change from native `Canvas` menu modal)
   - Grid overlay spacing: `8 / 16 / 32`
 - Tools:
   - Pencil
@@ -63,6 +63,9 @@ npm run dist
   - File operations are now centered in native File menu (`New / Open / Save / Save As / Recent Files`)
   - Last-used directory is persisted and reused as dialog initial directory (fallback: home directory)
   - Recent files are capped, deduplicated, and missing paths are removed on selection
+- Native Canvas menu
+  - `Canvas -> Change Canvas Size...` opens modal dialog in renderer
+  - Sidebar no longer shows persistent canvas size input
 - 1x PNG preview panel
 - Selection 3x3 tile preview panel (under 1x preview)
   - Uses current selection, or keeps showing last selection when selection is cleared
@@ -112,7 +115,7 @@ Current metadata shape:
   - Main editor state and behavior orchestration
   - Canvas interaction handlers and keyboard shortcuts
 - `src/components/EditorSidebar.tsx`
-  - Left panel UI (preview, canvas/grid settings, palette)
+  - Left panel UI (preview, grid settings, palette)
 - `src/components/EditorToolbar.tsx`
   - Right toolbar UI (tool switch, zoom, undo, copy/paste/delete/clear)
 - `src/editor/constants.ts`
@@ -127,6 +130,8 @@ Current metadata shape:
   - Bootstrap + FontAwesome CSS import
 - `electron/main.ts`
   - Electron window, IPC, PNG save/load, metadata embedding
+- `electron/menu.ts`
+  - Native File/Canvas menu construction and menu action wiring
 - `electron/preload.ts`
   - `window.pixelApi` bridge
 - `electron/types.d.ts`
@@ -134,6 +139,7 @@ Current metadata shape:
 
 ## 8. Important Implementation Notes
 - Grid is **overlay spacing**, not canvas resolution.
+- Canvas size change is opened from native `Canvas` menu and edited in renderer modal.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
 - Selection drag-move also reuses `floatingPasteRef` flow:
   - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.

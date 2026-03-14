@@ -1,5 +1,5 @@
 /// <reference path="./png-modules.d.ts" />
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage } from 'electron';
 import type { MessageBoxOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
@@ -7,6 +7,7 @@ import os from 'node:os';
 import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
 import * as pngText from 'png-chunk-text';
+import { buildApplicationMenu, type AppPreferences, type MenuAction } from './menu';
 
 type EditorMeta = {
   version: number;
@@ -19,17 +20,6 @@ type EditorMeta = {
 const META_KEYWORD = 'dla-pixy-meta';
 const RECENT_MAX = 10;
 const PREFERENCES_FILE = 'preferences.json';
-
-type FileMenuAction =
-  | { type: 'open' }
-  | { type: 'save' }
-  | { type: 'save-as' }
-  | { type: 'open-recent'; filePath: string };
-
-type AppPreferences = {
-  recentFiles: string[];
-  lastDirectory: string | null;
-};
 
 let mainWindow: BrowserWindow | null = null;
 let preferences: AppPreferences = {
@@ -82,7 +72,7 @@ async function loadPreferences(): Promise<void> {
   }
 }
 
-function sendMenuFileAction(action: FileMenuAction): void {
+function sendMenuAction(action: MenuAction): void {
   const targetWindow = BrowserWindow.getFocusedWindow() ?? mainWindow;
   if (!targetWindow || targetWindow.isDestroyed()) {
     return;
@@ -95,7 +85,7 @@ function removeRecentFile(filePath: string): void {
   preferences.recentFiles = preferences.recentFiles.filter((item) => item !== filePath);
   if (preferences.recentFiles.length !== before) {
     void savePreferences();
-    buildApplicationMenu();
+    rebuildApplicationMenu();
   }
 }
 
@@ -103,68 +93,15 @@ function addRecentFile(filePath: string): void {
   preferences.recentFiles = [filePath, ...preferences.recentFiles.filter((item) => item !== filePath)].slice(0, RECENT_MAX);
   preferences.lastDirectory = path.dirname(filePath);
   void savePreferences();
-  buildApplicationMenu();
+  rebuildApplicationMenu();
 }
 
-function buildFileMenuTemplate() {
-  const recentSubmenu =
-    preferences.recentFiles.length === 0
-      ? [{ label: '履歴なし', enabled: false }]
-      : preferences.recentFiles.map((filePath) => ({
-          label: path.basename(filePath),
-          sublabel: filePath,
-          click: () => sendMenuFileAction({ type: 'open-recent', filePath })
-        }));
-
-  return {
-    label: 'File',
-    submenu: [
-      {
-        label: '新規',
-        accelerator: 'CmdOrCtrl+N',
-        click: () => createWindow()
-      },
-      {
-        label: '開く...',
-        accelerator: 'CmdOrCtrl+O',
-        click: () => sendMenuFileAction({ type: 'open' })
-      },
-      { type: 'separator' as const },
-      {
-        label: '保存',
-        accelerator: 'CmdOrCtrl+S',
-        click: () => sendMenuFileAction({ type: 'save' })
-      },
-      {
-        label: '別名で保存...',
-        accelerator: 'Shift+CmdOrCtrl+S',
-        click: () => sendMenuFileAction({ type: 'save-as' })
-      },
-      { type: 'separator' as const },
-      {
-        label: '最近使ったファイル',
-        submenu: recentSubmenu
-      },
-      { type: 'separator' as const },
-      ...(process.platform === 'darwin'
-        ? [{ role: 'close' as const }]
-        : [{ role: 'quit' as const }])
-    ]
-  };
-}
-
-function buildApplicationMenu(): void {
-  const fileMenu = buildFileMenuTemplate();
-  const template = process.platform === 'darwin'
-    ? [
-        { role: 'appMenu' as const },
-        fileMenu,
-        { role: 'editMenu' as const },
-        { role: 'viewMenu' as const },
-        { role: 'windowMenu' as const }
-      ]
-    : [fileMenu, { role: 'editMenu' as const }, { role: 'viewMenu' as const }, { role: 'windowMenu' as const }];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+function rebuildApplicationMenu(): void {
+  buildApplicationMenu({
+    preferences,
+    createWindow,
+    sendMenuAction
+  });
 }
 
 function createWindow(): void {
@@ -243,12 +180,12 @@ function parseMetadataFromPng(buffer: Buffer): EditorMeta | null {
 app.whenReady().then(async () => {
   await loadPreferences();
   createWindow();
-  buildApplicationMenu();
+  rebuildApplicationMenu();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
-      buildApplicationMenu();
+      rebuildApplicationMenu();
     }
   });
 });
