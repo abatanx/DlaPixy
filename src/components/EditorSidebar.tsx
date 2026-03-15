@@ -6,15 +6,11 @@ type EditorSidebarProps = {
   selectionTilePreviewDataUrl: string;
   tilePreviewSelection: Selection;
   selection: Selection;
-  gridSpacing: number;
   selectedColor: string;
   setSelectedColor: (value: string) => void;
   addColorToPalette: (hex: string) => void;
   palette: string[];
   setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
-  zoom: number;
-  currentFilePath?: string;
-  hasUnsavedChanges: boolean;
 };
 
 // プレビューと編集設定をまとめた左サイドパネル。
@@ -24,24 +20,18 @@ export function EditorSidebar({
   selectionTilePreviewDataUrl,
   tilePreviewSelection,
   selection,
-  gridSpacing,
   selectedColor,
   setSelectedColor,
   addColorToPalette,
   palette,
-  setHoveredPaletteColor,
-  zoom,
-  currentFilePath,
-  hasUnsavedChanges
+  setHoveredPaletteColor
 }: EditorSidebarProps) {
   return (
     <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar">
       <div className="card shadow-sm editor-sidebar-card">
         <div className="card-body editor-sidebar-body">
-          <h1 className="h4 mb-3">DlaPixy</h1>
-
           <div className="mb-3">
-            <label className="form-label">1x PNGプレビュー</label>
+            <h6 className="form-label small mb-1 font-monospace">Preview (1x)</h6>
             <div className="preview-wrap">
               {previewDataUrl ? (
                 <img
@@ -53,8 +43,7 @@ export function EditorSidebar({
                 />
               ) : null}
             </div>
-            <div className="form-text">{canvasSize}x{canvasSize} (1x)</div>
-            <label className="form-label mt-2 mb-1">矩形選択 3x3タイルプレビュー</label>
+            <h6 className="form-label small my-1 font-monospace">Tiling</h6>
             <div className="preview-wrap tile-preview-wrap">
               {selectionTilePreviewDataUrl ? (
                 <img
@@ -97,16 +86,6 @@ export function EditorSidebar({
                   title={color}
                 />
               ))}
-            </div>
-          </div>
-
-          <div className="small text-muted mt-3">
-            <div>キャンバス: {canvasSize}x{canvasSize}</div>
-            <div>グリッド線: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px 間隔`}</div>
-            <div>表示倍率: {zoom}x</div>
-            <div>
-              現在ファイル: {currentFilePath ?? '未保存'}
-              {hasUnsavedChanges ? ' *' : ''}
             </div>
           </div>
         </div>

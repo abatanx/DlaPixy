@@ -1916,8 +1916,8 @@ export function App() {
   }, [loadPng, openCanvasSizeModal, openGridSpacingModal, saveAsPng, savePng]);
 
   return (
-    <div>
-      <div className="container-fluid pt-3 pb-0 mb-1 app-shell">
+    <div className="app-layout">
+      <div className="container-fluid pt-3 pb-0 mb-0 app-shell">
         <div className="row g-3 app-main-row">
           <EditorSidebar
             canvasSize={canvasSize}
@@ -1925,15 +1925,11 @@ export function App() {
             selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
             tilePreviewSelection={tilePreviewSelection}
             selection={selection}
-            gridSpacing={gridSpacing}
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
             addColorToPalette={addColorToPalette}
             palette={palette}
             setHoveredPaletteColor={setHoveredPaletteColor}
-            zoom={zoom}
-            currentFilePath={currentFilePath}
-            hasUnsavedChanges={hasUnsavedChanges}
           />
 
           <main className="col-12 col-lg-8 col-xl-9 d-flex">
@@ -2267,7 +2263,32 @@ export function App() {
           </div>
         </div>
       </div>
-      <footer className="container-fluid app-footer font-monospace small pt-3 border-top">
+      <footer className="container-fluid app-footer font-monospace small border-top">
+        <div className="app-footer-status">
+          <button
+            type="button"
+            className="app-footer-action"
+            onClick={openCanvasSizeModal}
+            aria-label="キャンバスサイズ変更を開く"
+            title="キャンバスサイズ変更を開く"
+          >
+            キャンバス: {canvasSize}x{canvasSize}
+          </button>
+          <button
+            type="button"
+            className="app-footer-action"
+            onClick={openGridSpacingModal}
+            aria-label="グリッド線間隔変更を開く"
+            title="グリッド線間隔変更を開く"
+          >
+            グリッド線: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px 間隔`}
+          </button>
+          <span>表示倍率: {zoom}x</span>
+          <span>
+            現在ファイル: {currentFilePath ?? '未保存'}
+            {hasUnsavedChanges ? ' *' : ''}
+          </span>
+        </div>
       </footer>
     </div>
   );

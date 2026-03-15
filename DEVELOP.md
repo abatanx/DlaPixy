@@ -67,6 +67,9 @@ npm run dist
   - `Canvas -> Change Canvas Size...` opens modal dialog in renderer
   - `Canvas -> Change Grid Spacing...` opens modal dialog in renderer
   - Sidebar no longer shows persistent canvas size / grid spacing inputs
+- Footer status row
+  - `Canvas`, `Grid`, `Zoom`, and `Current File` status are shown in the bottom footer instead of the sidebar
+  - Tapping/clicking `Canvas` or `Grid` in the footer opens the existing change modal
 - 1x PNG preview panel
 - Selection 3x3 tile preview panel (under 1x preview)
   - Uses current selection, or keeps showing last selection when selection is cleared
