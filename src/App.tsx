@@ -1916,355 +1916,359 @@ export function App() {
   }, [loadPng, openCanvasSizeModal, openGridSpacingModal, saveAsPng, savePng]);
 
   return (
-    <div className="container-fluid py-3 app-shell">
-      <div className="row g-3 app-main-row">
-        <EditorSidebar
-          canvasSize={canvasSize}
-          previewDataUrl={previewDataUrl}
-          selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
-          tilePreviewSelection={tilePreviewSelection}
-          selection={selection}
-          gridSpacing={gridSpacing}
-          selectedColor={selectedColor}
-          setSelectedColor={setSelectedColor}
-          addColorToPalette={addColorToPalette}
-          palette={palette}
-          setHoveredPaletteColor={setHoveredPaletteColor}
-          zoom={zoom}
-          currentFilePath={currentFilePath}
-          hasUnsavedChanges={hasUnsavedChanges}
-        />
+    <div>
+      <div className="container-fluid pt-3 pb-0 mb-1 app-shell">
+        <div className="row g-3 app-main-row">
+          <EditorSidebar
+            canvasSize={canvasSize}
+            previewDataUrl={previewDataUrl}
+            selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
+            tilePreviewSelection={tilePreviewSelection}
+            selection={selection}
+            gridSpacing={gridSpacing}
+            selectedColor={selectedColor}
+            setSelectedColor={setSelectedColor}
+            addColorToPalette={addColorToPalette}
+            palette={palette}
+            setHoveredPaletteColor={setHoveredPaletteColor}
+            zoom={zoom}
+            currentFilePath={currentFilePath}
+            hasUnsavedChanges={hasUnsavedChanges}
+          />
 
-        <main className="col-12 col-lg-8 col-xl-9 d-flex">
-          <div className="card shadow-sm editor-card flex-grow-1">
-            <div
-              ref={canvasStageRef}
-              className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''}`}
-            >
-              <canvas
-                ref={canvasRef}
-                width={displaySize}
-                height={displaySize}
-                className={`pixel-canvas ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
-                onMouseDown={onMouseDown}
-                onMouseMove={onMouseMove}
-                onMouseUp={onMouseUp}
-                onMouseLeave={onMouseLeaveCanvas}
-              />
-            </div>
-            <div className="canvas-hover-info px-3 py-2 border-top">
-              {hoveredPixelInfo ? (
-                (() => {
-                  const fields = getPixelInfoFields(hoveredPixelInfo);
-                  return (
-                    <span className="canvas-hover-row">
-                      <span className="canvas-hover-swatch" title={hoveredPixelInfo.hex8}>
-                        <span
-                          className="canvas-hover-swatch-color"
-                          style={{
-                            backgroundColor: `rgba(${hoveredPixelInfo.rgba.r}, ${hoveredPixelInfo.rgba.g}, ${hoveredPixelInfo.rgba.b}, ${hoveredPixelInfo.rgba.a / 255})`
-                          }}
-                        />
-                      </span>
-                      <span className="canvas-hover-text">x,y: {hoveredPixelInfo.x}, {hoveredPixelInfo.y}</span>
-                      <span className="canvas-data-field">
-                        RGBA: {fields.rgba}
-                      </span>
-                      <span className="canvas-data-field">
-                        HEX8: {fields.hex8}
-                      </span>
-                      <span className="canvas-data-field">
-                        HSVA: {fields.hsva}
-                      </span>
-                      <span className="canvas-data-field">
-                        PaletteIndex: {fields.paletteIndex}
-                      </span>
-                    </span>
-                  );
-                })()
-              ) : (
-                <span className="canvas-hover-row">
-                  <span className="canvas-hover-swatch" aria-hidden="true" />
-                  <span className="canvas-hover-text">x,y: -</span>
-                  <span className="canvas-data-field">RGBA: -</span>
-                  <span className="canvas-data-field">HEX8: -</span>
-                  <span className="canvas-data-field">HSVA: -</span>
-                  <span className="canvas-data-field">PaletteIndex: -</span>
-                </span>
-              )}
-            </div>
-            <div className="canvas-reference-info px-3 py-2 border-top">
-              <div className="canvas-reference-header">
-                <span className="canvas-reference-label">参照 (F):</span>
-                <button
-                  type="button"
-                  className="canvas-copy-btn"
-                  onClick={clearReferencePixelInfos}
-                  title="参照をクリア"
-                  aria-label="参照をクリア"
-                >
-                  <i className="fa-solid fa-trash-can" aria-hidden="true" />
-                </button>
+          <main className="col-12 col-lg-8 col-xl-9 d-flex">
+            <div className="card shadow-sm editor-card flex-grow-1">
+              <div
+                ref={canvasStageRef}
+                className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''}`}
+              >
+                <canvas
+                  ref={canvasRef}
+                  width={displaySize}
+                  height={displaySize}
+                  className={`pixel-canvas ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
+                  onMouseDown={onMouseDown}
+                  onMouseMove={onMouseMove}
+                  onMouseUp={onMouseUp}
+                  onMouseLeave={onMouseLeaveCanvas}
+                />
               </div>
-              {referencePixelInfos.length > 0 ? (
-                <div className="canvas-reference-list">
-                  {referencePixelInfos.map((info, index) => {
-                    const fields = getPixelInfoFields(info);
-                    const referenceKey = getReferenceKey(info);
-                    const lineNumber = index < 9 ? String(index + 1) : '-';
+              <div className="canvas-hover-info px-3 py-2 border-top">
+                {hoveredPixelInfo ? (
+                  (() => {
+                    const fields = getPixelInfoFields(hoveredPixelInfo);
                     return (
-                      <div
-                        key={referenceKey}
-                        className={`canvas-reference-line ${draggingReferenceKey === referenceKey ? 'is-dragging' : ''}`}
-                        title={info.hex8}
-                        draggable
-                        onDragStart={(event) => onReferenceDragStart(event, referenceKey)}
-                        onDragEnd={onReferenceDragEnd}
-                        onDragOver={onReferenceDragOver}
-                        onDrop={(event) => onReferenceDrop(event, referenceKey)}
-                      >
-                        <span className="canvas-reference-number">{lineNumber}</span>
-                        <span className="canvas-reference-swatch">
+                      <span className="canvas-hover-row">
+                        <span className="canvas-hover-swatch" title={hoveredPixelInfo.hex8}>
                           <span
                             className="canvas-hover-swatch-color"
-                            style={{ backgroundColor: `rgba(${info.rgba.r}, ${info.rgba.g}, ${info.rgba.b}, ${info.rgba.a / 255})` }}
+                            style={{
+                              backgroundColor: `rgba(${hoveredPixelInfo.rgba.r}, ${hoveredPixelInfo.rgba.g}, ${hoveredPixelInfo.rgba.b}, ${hoveredPixelInfo.rgba.a / 255})`
+                            }}
                           />
                         </span>
-                        <span className="canvas-reference-text canvas-data-field">
+                        <span className="canvas-hover-text">x,y: {hoveredPixelInfo.x}, {hoveredPixelInfo.y}</span>
+                        <span className="canvas-data-field">
                           RGBA: {fields.rgba}
-                          <button
-                            type="button"
-                            className="canvas-copy-btn"
-                            onClick={() => void copyPixelField('RGBA', fields.rgba)}
-                            title="RGBAをコピー"
-                            aria-label="RGBAをコピー"
-                          >
-                            <i className="fa-regular fa-copy" aria-hidden="true" />
-                          </button>
                         </span>
-                        <span className="canvas-reference-text canvas-data-field">
+                        <span className="canvas-data-field">
                           HEX8: {fields.hex8}
-                          <button
-                            type="button"
-                            className="canvas-copy-btn"
-                            onClick={() => void copyPixelField('HEX8', fields.hex8)}
-                            title="HEX8をコピー"
-                            aria-label="HEX8をコピー"
-                          >
-                            <i className="fa-regular fa-copy" aria-hidden="true" />
-                          </button>
                         </span>
-                        <span className="canvas-reference-text canvas-data-field">
+                        <span className="canvas-data-field">
                           HSVA: {fields.hsva}
-                          <button
-                            type="button"
-                            className="canvas-copy-btn"
-                            onClick={() => void copyPixelField('HSVA', fields.hsva)}
-                            title="HSVAをコピー"
-                            aria-label="HSVAをコピー"
-                          >
-                            <i className="fa-regular fa-copy" aria-hidden="true" />
-                          </button>
                         </span>
-                        <span className="canvas-reference-text canvas-data-field">
+                        <span className="canvas-data-field">
                           PaletteIndex: {fields.paletteIndex}
-                          <button
-                            type="button"
-                            className="canvas-copy-btn"
-                            onClick={() => void copyPixelField('PaletteIndex', fields.paletteIndex)}
-                            title="PaletteIndexをコピー"
-                            aria-label="PaletteIndexをコピー"
-                          >
-                            <i className="fa-regular fa-copy" aria-hidden="true" />
-                          </button>
                         </span>
-                        <button
-                          type="button"
-                          className="canvas-copy-btn"
-                          onClick={() => removeReferencePixelInfo(info.x, info.y)}
-                          title="この参照を削除"
-                          aria-label="この参照を削除"
-                        >
-                          <i className="fa-solid fa-xmark" aria-hidden="true" />
-                        </button>
-                      </div>
+                      </span>
                     );
-                  })}
-                </div>
-              ) : (
-                <span className="canvas-reference-empty">-</span>
-              )}
-            </div>
-            <EditorToolbar
-              tool={tool}
-              setTool={setTool}
-              zoom={zoom}
-              zoomIn={zoomIn}
-              zoomOut={zoomOut}
-              doUndo={doUndo}
-              copySelection={copySelection}
-              pasteSelection={pasteSelection}
-              deleteSelection={deleteSelection}
-              clearCanvas={clearCanvas}
-            />
-          </div>
-        </main>
-      </div>
-      <div className={`status-toast ${isToastVisible ? 'show' : ''} ${toastType}`} role="status" aria-live="polite">
-        {statusText}
-      </div>
-      <div
-        ref={canvasSizeModalRef}
-        className="modal fade"
-        tabIndex={-1}
-        aria-labelledby="canvas-size-modal-title"
-        aria-hidden="true"
-      >
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content shadow">
-            <form onSubmit={submitCanvasSizeModal}>
-              <div className="modal-header">
-                <div>
-                  <h2 id="canvas-size-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
-                    <i className="fa-regular fa-square" aria-hidden="true" />
-                    <span>キャンバスサイズ変更</span>
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  className="btn-close"
-                  aria-label="閉じる"
-                  onClick={closeCanvasSizeModal}
-                />
-              </div>
-              <div className="modal-body py-4">
-                <label htmlFor="canvas-size-input" className="form-label">正方形キャンバスサイズ (px)</label>
-                <input
-                  ref={canvasSizeModalInputRef}
-                  id="canvas-size-input"
-                  type="number"
-                  min={MIN_CANVAS_SIZE}
-                  max={MAX_CANVAS_SIZE}
-                  className="form-control"
-                  value={pendingCanvasSize}
-                  onChange={(event) => setPendingCanvasSize(event.target.value)}
-                />
-                <div className="form-text">
-                  現在値: {canvasSize}x{canvasSize} / 範囲: {MIN_CANVAS_SIZE} - {MAX_CANVAS_SIZE}
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-outline-secondary" onClick={closeCanvasSizeModal}>
-                  <span className="d-inline-flex align-items-center gap-2">
-                    <i className="fa-solid fa-xmark" aria-hidden="true" />
-                    <span>キャンセル</span>
+                  })()
+                ) : (
+                  <span className="canvas-hover-row">
+                    <span className="canvas-hover-swatch" aria-hidden="true" />
+                    <span className="canvas-hover-text">x,y: -</span>
+                    <span className="canvas-data-field">RGBA: -</span>
+                    <span className="canvas-data-field">HEX8: -</span>
+                    <span className="canvas-data-field">HSVA: -</span>
+                    <span className="canvas-data-field">PaletteIndex: -</span>
                   </span>
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <span className="d-inline-flex align-items-center gap-2">
-                    <i className="fa-solid fa-check" aria-hidden="true" />
-                    <span>適用</span>
-                  </span>
-                </button>
+                )}
               </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      <div
-        ref={gridSpacingModalRef}
-        className="modal fade"
-        tabIndex={-1}
-        aria-labelledby="grid-spacing-modal-title"
-        aria-hidden="true"
-      >
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content shadow">
-            <form onSubmit={submitGridSpacingModal}>
-              <div className="modal-header">
-                <div>
-                  <h2 id="grid-spacing-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
-                    <i className="fa-solid fa-border-all" aria-hidden="true" />
-                    <span>グリッド線間隔変更</span>
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  className="btn-close"
-                  aria-label="閉じる"
-                  onClick={closeGridSpacingModal}
-                />
-              </div>
-              <div className="modal-body py-4">
-                <label className="form-label">グリッド線間隔</label>
-                <div className="btn-group w-100 mb-3" role="group" aria-label="grid spacing preset options">
-                  {GRID_SPACING_OPTIONS.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={`btn ${pendingGridSpacingOption === String(option) ? 'btn-primary' : 'btn-outline-primary'}`}
-                      onClick={() => {
-                        setPendingGridSpacingOption(String(option));
-                        applyGridSpacingAndClose(option);
-                      }}
-                    >
-                      {option === 0 ? 'なし' : `${option}px`}
-                    </button>
-                  ))}
+              <div className="canvas-reference-info px-3 py-2 border-top">
+                <div className="canvas-reference-header">
+                  <span className="canvas-reference-label">参照 (F):</span>
                   <button
                     type="button"
-                    className={`btn ${pendingGridSpacingOption === 'custom' ? 'btn-primary' : 'btn-outline-primary'}`}
-                    onClick={() => {
-                      setPendingGridSpacingOption('custom');
-                      window.setTimeout(() => {
-                        gridSpacingModalInputRef.current?.focus();
-                        gridSpacingModalInputRef.current?.select();
-                      }, 0);
-                    }}
+                    className="canvas-copy-btn"
+                    onClick={clearReferencePixelInfos}
+                    title="参照をクリア"
+                    aria-label="参照をクリア"
                   >
-                    カスタム
+                    <i className="fa-solid fa-trash-can" aria-hidden="true" />
                   </button>
                 </div>
-                {pendingGridSpacingOption === 'custom' ? (
-                  <div className="mt-3">
-                    <label htmlFor="grid-spacing-custom-input" className="form-label">カスタム値 (px)</label>
-                    <input
-                      ref={gridSpacingModalInputRef}
-                      id="grid-spacing-custom-input"
-                      type="number"
-                      min={1}
-                      max={canvasSize}
-                      className="form-control"
-                      value={pendingCustomGridSpacing}
-                      onChange={(event) => {
-                        setPendingGridSpacingOption('custom');
-                        setPendingCustomGridSpacing(event.target.value);
-                      }}
-                    />
-                    <div className="form-text">
-                      現在値: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px`} / 範囲: 1 - {canvasSize}
-                    </div>
+                {referencePixelInfos.length > 0 ? (
+                  <div className="canvas-reference-list">
+                    {referencePixelInfos.map((info, index) => {
+                      const fields = getPixelInfoFields(info);
+                      const referenceKey = getReferenceKey(info);
+                      const lineNumber = index < 9 ? String(index + 1) : '-';
+                      return (
+                        <div
+                          key={referenceKey}
+                          className={`canvas-reference-line ${draggingReferenceKey === referenceKey ? 'is-dragging' : ''}`}
+                          title={info.hex8}
+                          draggable
+                          onDragStart={(event) => onReferenceDragStart(event, referenceKey)}
+                          onDragEnd={onReferenceDragEnd}
+                          onDragOver={onReferenceDragOver}
+                          onDrop={(event) => onReferenceDrop(event, referenceKey)}
+                        >
+                          <span className="canvas-reference-number">{lineNumber}</span>
+                          <span className="canvas-reference-swatch">
+                            <span
+                              className="canvas-hover-swatch-color"
+                              style={{ backgroundColor: `rgba(${info.rgba.r}, ${info.rgba.g}, ${info.rgba.b}, ${info.rgba.a / 255})` }}
+                            />
+                          </span>
+                          <span className="canvas-reference-text canvas-data-field">
+                            RGBA: {fields.rgba}
+                            <button
+                              type="button"
+                              className="canvas-copy-btn"
+                              onClick={() => void copyPixelField('RGBA', fields.rgba)}
+                              title="RGBAをコピー"
+                              aria-label="RGBAをコピー"
+                            >
+                              <i className="fa-regular fa-copy" aria-hidden="true" />
+                            </button>
+                          </span>
+                          <span className="canvas-reference-text canvas-data-field">
+                            HEX8: {fields.hex8}
+                            <button
+                              type="button"
+                              className="canvas-copy-btn"
+                              onClick={() => void copyPixelField('HEX8', fields.hex8)}
+                              title="HEX8をコピー"
+                              aria-label="HEX8をコピー"
+                            >
+                              <i className="fa-regular fa-copy" aria-hidden="true" />
+                            </button>
+                          </span>
+                          <span className="canvas-reference-text canvas-data-field">
+                            HSVA: {fields.hsva}
+                            <button
+                              type="button"
+                              className="canvas-copy-btn"
+                              onClick={() => void copyPixelField('HSVA', fields.hsva)}
+                              title="HSVAをコピー"
+                              aria-label="HSVAをコピー"
+                            >
+                              <i className="fa-regular fa-copy" aria-hidden="true" />
+                            </button>
+                          </span>
+                          <span className="canvas-reference-text canvas-data-field">
+                            PaletteIndex: {fields.paletteIndex}
+                            <button
+                              type="button"
+                              className="canvas-copy-btn"
+                              onClick={() => void copyPixelField('PaletteIndex', fields.paletteIndex)}
+                              title="PaletteIndexをコピー"
+                              aria-label="PaletteIndexをコピー"
+                            >
+                              <i className="fa-regular fa-copy" aria-hidden="true" />
+                            </button>
+                          </span>
+                          <button
+                            type="button"
+                            className="canvas-copy-btn"
+                            onClick={() => removeReferencePixelInfo(info.x, info.y)}
+                            title="この参照を削除"
+                            aria-label="この参照を削除"
+                          >
+                            <i className="fa-solid fa-xmark" aria-hidden="true" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
-                ) : null}
+                ) : (
+                  <span className="canvas-reference-empty">-</span>
+                )}
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-outline-secondary" onClick={closeGridSpacingModal}>
-                  <span className="d-inline-flex align-items-center gap-2">
-                    <i className="fa-solid fa-xmark" aria-hidden="true" />
-                    <span>キャンセル</span>
-                  </span>
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <span className="d-inline-flex align-items-center gap-2">
-                    <i className="fa-solid fa-check" aria-hidden="true" />
-                    <span>適用</span>
-                  </span>
-                </button>
-              </div>
-            </form>
+              <EditorToolbar
+                tool={tool}
+                setTool={setTool}
+                zoom={zoom}
+                zoomIn={zoomIn}
+                zoomOut={zoomOut}
+                doUndo={doUndo}
+                copySelection={copySelection}
+                pasteSelection={pasteSelection}
+                deleteSelection={deleteSelection}
+                clearCanvas={clearCanvas}
+              />
+            </div>
+          </main>
+        </div>
+        <div className={`status-toast ${isToastVisible ? 'show' : ''} ${toastType}`} role="status" aria-live="polite">
+          {statusText}
+        </div>
+        <div
+          ref={canvasSizeModalRef}
+          className="modal fade"
+          tabIndex={-1}
+          aria-labelledby="canvas-size-modal-title"
+          aria-hidden="true"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content shadow">
+              <form onSubmit={submitCanvasSizeModal}>
+                <div className="modal-header">
+                  <div>
+                    <h2 id="canvas-size-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
+                      <i className="fa-regular fa-square" aria-hidden="true" />
+                      <span>キャンバスサイズ変更</span>
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="閉じる"
+                    onClick={closeCanvasSizeModal}
+                  />
+                </div>
+                <div className="modal-body py-4">
+                  <label htmlFor="canvas-size-input" className="form-label">正方形キャンバスサイズ (px)</label>
+                  <input
+                    ref={canvasSizeModalInputRef}
+                    id="canvas-size-input"
+                    type="number"
+                    min={MIN_CANVAS_SIZE}
+                    max={MAX_CANVAS_SIZE}
+                    className="form-control"
+                    value={pendingCanvasSize}
+                    onChange={(event) => setPendingCanvasSize(event.target.value)}
+                  />
+                  <div className="form-text">
+                    現在値: {canvasSize}x{canvasSize} / 範囲: {MIN_CANVAS_SIZE} - {MAX_CANVAS_SIZE}
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline-secondary" onClick={closeCanvasSizeModal}>
+                    <span className="d-inline-flex align-items-center gap-2">
+                      <i className="fa-solid fa-xmark" aria-hidden="true" />
+                      <span>キャンセル</span>
+                    </span>
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    <span className="d-inline-flex align-items-center gap-2">
+                      <i className="fa-solid fa-check" aria-hidden="true" />
+                      <span>適用</span>
+                    </span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div
+          ref={gridSpacingModalRef}
+          className="modal fade"
+          tabIndex={-1}
+          aria-labelledby="grid-spacing-modal-title"
+          aria-hidden="true"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content shadow">
+              <form onSubmit={submitGridSpacingModal}>
+                <div className="modal-header">
+                  <div>
+                    <h2 id="grid-spacing-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
+                      <i className="fa-solid fa-border-all" aria-hidden="true" />
+                      <span>グリッド線間隔変更</span>
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="閉じる"
+                    onClick={closeGridSpacingModal}
+                  />
+                </div>
+                <div className="modal-body py-4">
+                  <label className="form-label">グリッド線間隔</label>
+                  <div className="btn-group w-100 mb-3" role="group" aria-label="grid spacing preset options">
+                    {GRID_SPACING_OPTIONS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={`btn ${pendingGridSpacingOption === String(option) ? 'btn-primary' : 'btn-outline-primary'}`}
+                        onClick={() => {
+                          setPendingGridSpacingOption(String(option));
+                          applyGridSpacingAndClose(option);
+                        }}
+                      >
+                        {option === 0 ? 'なし' : `${option}px`}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={`btn ${pendingGridSpacingOption === 'custom' ? 'btn-primary' : 'btn-outline-primary'}`}
+                      onClick={() => {
+                        setPendingGridSpacingOption('custom');
+                        window.setTimeout(() => {
+                          gridSpacingModalInputRef.current?.focus();
+                          gridSpacingModalInputRef.current?.select();
+                        }, 0);
+                      }}
+                    >
+                      カスタム
+                    </button>
+                  </div>
+                  {pendingGridSpacingOption === 'custom' ? (
+                    <div className="mt-3">
+                      <label htmlFor="grid-spacing-custom-input" className="form-label">カスタム値 (px)</label>
+                      <input
+                        ref={gridSpacingModalInputRef}
+                        id="grid-spacing-custom-input"
+                        type="number"
+                        min={1}
+                        max={canvasSize}
+                        className="form-control"
+                        value={pendingCustomGridSpacing}
+                        onChange={(event) => {
+                          setPendingGridSpacingOption('custom');
+                          setPendingCustomGridSpacing(event.target.value);
+                        }}
+                      />
+                      <div className="form-text">
+                        現在値: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px`} / 範囲: 1 - {canvasSize}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline-secondary" onClick={closeGridSpacingModal}>
+                    <span className="d-inline-flex align-items-center gap-2">
+                      <i className="fa-solid fa-xmark" aria-hidden="true" />
+                      <span>キャンセル</span>
+                    </span>
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    <span className="d-inline-flex align-items-center gap-2">
+                      <i className="fa-solid fa-check" aria-hidden="true" />
+                      <span>適用</span>
+                    </span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>
+      <footer className="container-fluid app-footer font-monospace small pt-3 border-top">
+      </footer>
     </div>
   );
 }

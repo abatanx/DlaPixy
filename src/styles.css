@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --footer-height: 3lh;
 }
 
 html,
@@ -35,14 +36,14 @@ body {
 
 .editor-sidebar {
   display: flex;
-  height: calc(100vh - 2rem);
-  max-height: calc(100vh - 2rem);
+  height: calc(100vh - var(--footer-height));
+  max-height: calc(100vh - var(--footer-height));
 }
 
 .editor-sidebar-card {
   width: 100%;
-  height: calc(100vh - 2rem);
-  max-height: calc(100vh - 2rem);
+  height: calc(100vh - var(--footer-height));
+  max-height: calc(100vh - var(--footer-height));
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -71,8 +72,8 @@ body {
 
 .editor-card {
   position: relative;
-  height: calc(100vh - 2rem);
-  max-height: calc(100vh - 2rem);
+  height: calc(100vh - var(--footer-height));
+  max-height: calc(100vh - var(--footer-height));
   display: flex;
   flex-direction: column;
   min-height: 0;

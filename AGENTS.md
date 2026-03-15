@@ -1,0 +1,1 @@
+/Users/abatan/Dropbox/OpenAI/Umekurage/AGENTS.md
