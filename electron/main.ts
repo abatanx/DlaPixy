@@ -59,11 +59,16 @@ async function savePreferences(): Promise<void> {
 async function loadPreferences(): Promise<void> {
   try {
     const raw = await fs.readFile(getPreferencesPath(), 'utf8');
-    const parsed = JSON.parse(raw) as Partial<AppPreferences>;
-    const recentFiles = Array.isArray(parsed.recentFiles)
-      ? parsed.recentFiles.filter((item): item is string => typeof item === 'string')
+    const parsed: unknown = JSON.parse(raw);
+    const parsedPreferences =
+      parsed && typeof parsed === 'object'
+        ? (parsed as { recentFiles?: unknown; lastDirectory?: unknown })
+        : {};
+    const recentFiles = Array.isArray(parsedPreferences.recentFiles)
+      ? parsedPreferences.recentFiles.filter((item): item is string => typeof item === 'string')
       : [];
-    const lastDirectory = typeof parsed.lastDirectory === 'string' ? parsed.lastDirectory : null;
+    const lastDirectory =
+      typeof parsedPreferences.lastDirectory === 'string' ? parsedPreferences.lastDirectory : null;
     preferences = {
       recentFiles: recentFiles.slice(0, RECENT_MAX),
       lastDirectory
