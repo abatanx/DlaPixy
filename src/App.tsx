@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from 'bootstrap/js/dist/modal';
 import { EditorSidebar } from './components/EditorSidebar';
 import { EditorToolbar } from './components/EditorToolbar';
+import type { MenuAction as FileMenuAction } from '../shared/ipc';
 import {
   DEFAULT_CANVAS_SIZE,
   DEFAULT_GRID_SPACING,
@@ -30,13 +31,6 @@ import {
 } from './editor/utils';
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
-type FileMenuAction =
-  | { type: 'open' }
-  | { type: 'save' }
-  | { type: 'save-as' }
-  | { type: 'open-recent'; filePath: string }
-  | { type: 'canvas-size' }
-  | { type: 'grid-spacing' };
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {

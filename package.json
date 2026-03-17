@@ -11,7 +11,10 @@
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
     "dist": "npm run build && electron-builder",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "npm run typecheck:renderer && npm run typecheck:node && npm run typecheck:electron",
+    "typecheck:renderer": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:electron": "tsc --noEmit -p tsconfig.electron.json"
   },
   "build": {
     "appId": "com.umekurage.dlapixy",

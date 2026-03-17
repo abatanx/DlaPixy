@@ -1,4 +1,4 @@
-import type { MenuAction } from './menu';
+import type { MenuAction } from '../shared/ipc';
 export {};
 
 declare global {

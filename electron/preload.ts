@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { MenuAction } from './menu';
+import type { MenuAction } from '../shared/ipc';
 
 type EditorMeta = {
   version: number;

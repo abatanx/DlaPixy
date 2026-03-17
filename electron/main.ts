@@ -7,7 +7,8 @@ import os from 'node:os';
 import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
 import * as pngText from 'png-chunk-text';
-import { buildApplicationMenu, type AppPreferences, type MenuAction } from './menu';
+import type { MenuAction } from '../shared/ipc';
+import { buildApplicationMenu, type AppPreferences } from './menu';
 
 type EditorMeta = {
   version: number;

@@ -15,6 +15,7 @@
 ```bash
 npm install
 npm run dev
+npm run typecheck
 npm run build
 npm run dist
 ```
@@ -143,6 +144,13 @@ Current metadata shape:
 
 ## 8. Important Implementation Notes
 - Grid is **overlay spacing**, not canvas resolution.
+- TypeScript config is split by runtime:
+  - `tsconfig.app.json`: renderer (`src/**`)
+  - `tsconfig.node.json`: Vite config (`vite.config.ts`)
+  - `tsconfig.electron.json`: Electron main/preload (`electron/**`)
+  - Root `tsconfig.json` is a solution-style reference entry for IDE project discovery.
+- Shared cross-runtime types live in `shared/**/*.ts`.
+  - Current example: `shared/ipc.ts` for `MenuAction`
 - Canvas size change is opened from native `Canvas` menu and edited in renderer modal.
 - Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
@@ -178,3 +186,5 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/2
 - #3 `refactor: Clipboard integration responsibility split`
   - https://github.com/abatanx/DlaPixy/issues/3
+- #33 `fix: Edited image disappears when changing canvas size`
+  - https://github.com/abatanx/DlaPixy/issues/33

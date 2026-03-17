@@ -15,6 +15,7 @@
 ```bash
 npm install
 npm run dev
+npm run typecheck
 npm run build
 npm run dist
 ```
@@ -143,6 +144,13 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 
 ## 8. 実装上の重要ポイント
 - グリッドは「線間隔」であり、キャンバス解像度ではない。
+- TypeScript の設定は実行環境ごとに分割している。
+  - `tsconfig.app.json`: renderer（`src/**`）
+  - `tsconfig.node.json`: Vite設定（`vite.config.ts`）
+  - `tsconfig.electron.json`: Electron main/preload（`electron/**`）
+  - ルート `tsconfig.json` は IDE が project を認識しやすくするための参照用
+- 実行環境をまたぐ共通型は `shared/**/*.ts` に置く。
+  - 現状の例: `shared/ipc.ts` の `MenuAction`
 - キャンバスサイズ変更はネイティブ `Canvas` メニューから開く renderer モーダルで行う。
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
 - 貼り付けは内部クリップボード（`selectionClipboardRef`）を使う。
@@ -182,3 +190,5 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - https://github.com/abatanx/DlaPixy/issues/2
 - #3 `refactor: クリップボード連携を整理（内部ピクセルとOSクリップボードの責務分離）`
   - https://github.com/abatanx/DlaPixy/issues/3
+- #33 `fix: キャンバスサイズ変更で編集中の画像が消える`
+  - https://github.com/abatanx/DlaPixy/issues/33
