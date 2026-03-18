@@ -120,7 +120,13 @@ Current metadata shape:
   - Main editor state and behavior orchestration
   - Canvas interaction handlers and keyboard shortcuts
 - `src/components/EditorSidebar.tsx`
-  - Left panel UI (preview, grid settings, palette)
+  - Left sidebar container that composes preview and palette sections
+- `src/components/sidebar/SidebarPreviewSection.tsx`
+  - Preview section for 1x preview and tiling preview
+- `src/components/sidebar/SidebarPaletteSection.tsx`
+  - Palette section for color picker and palette grid; memoized to reduce rerenders during canvas edits
+- `src/components/sidebar/types.ts`
+  - Shared prop types for sidebar sections
 - `src/components/EditorToolbar.tsx`
   - Right toolbar UI (tool switch, zoom, undo, copy/paste/delete/clear)
 - `src/components/modals/CanvasSizeModal.tsx`

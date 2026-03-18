@@ -120,7 +120,13 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - エディター本体の状態管理と処理オーケストレーション
   - キャンバス操作ハンドラとキーボードショートカット
 - `src/components/EditorSidebar.tsx`
-  - 左サイドパネルUI（プレビュー、グリッド設定、パレット）
+  - 左サイドバーのコンテナ。プレビュー部とパレット部を組み立てる
+- `src/components/sidebar/SidebarPreviewSection.tsx`
+  - 1xプレビューとタイルプレビューを担当するプレビューセクション
+- `src/components/sidebar/SidebarPaletteSection.tsx`
+  - 色選択とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
+- `src/components/sidebar/types.ts`
+  - サイドバー各セクションで共有する props 型
 - `src/components/EditorToolbar.tsx`
   - 右ツールバーUI（ツール切替、ズーム、Undo、コピー/貼り付け/削除/クリア）
 - `src/components/modals/CanvasSizeModal.tsx`
