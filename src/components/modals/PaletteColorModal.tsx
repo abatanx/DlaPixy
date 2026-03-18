@@ -92,6 +92,19 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
     setValidationMessage('');
   }, []);
 
+  const syncFromHsva = useCallback((nextHsva: HsvaChannels) => {
+    const nextRgba = hsvaToRgba(nextHsva.h, nextHsva.s, nextHsva.v, nextHsva.a / 100);
+    setPendingHsva(nextHsva);
+    setPendingRgba({
+      r: nextRgba.r,
+      g: nextRgba.g,
+      b: nextRgba.b,
+      a: nextRgba.a
+    });
+    setPendingHexInput(rgbaToHex8(nextRgba.r, nextRgba.g, nextRgba.b, nextRgba.a));
+    setValidationMessage('');
+  }, []);
+
   const syncPendingState = useCallback(() => {
     syncFromRgba(hexToRgba(selectedColor));
   }, [selectedColor, syncFromRgba]);
@@ -158,15 +171,9 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
             : Math.max(0, Math.min(parsed, 100))
       };
 
-      const nextRgba = hsvaToRgba(nextHsva.h, nextHsva.s, nextHsva.v, pendingHsva.a / 100);
-      syncFromRgba({
-        r: nextRgba.r,
-        g: nextRgba.g,
-        b: nextRgba.b,
-        a: pendingRgba.a
-      });
+      syncFromHsva(nextHsva);
     },
-    [pendingHsva, pendingRgba.a, syncFromRgba]
+    [pendingHsva, syncFromHsva]
   );
 
   const handleAlphaPercentChange = useCallback(
@@ -176,13 +183,12 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
         return;
       }
       const safePercent = Math.max(0, Math.min(parsed, 100));
-      const nextRgba = {
-        ...pendingRgba,
-        a: Math.round((safePercent / 100) * 255)
-      };
-      syncFromRgba(nextRgba);
+      syncFromHsva({
+        ...pendingHsva,
+        a: safePercent
+      });
     },
-    [pendingRgba, syncFromRgba]
+    [pendingHsva, syncFromHsva]
   );
 
   const handleSubmit = useCallback(
