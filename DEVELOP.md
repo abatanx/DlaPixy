@@ -123,6 +123,12 @@ Current metadata shape:
   - Left panel UI (preview, grid settings, palette)
 - `src/components/EditorToolbar.tsx`
   - Right toolbar UI (tool switch, zoom, undo, copy/paste/delete/clear)
+- `src/components/modals/CanvasSizeModal.tsx`
+  - Canvas size modal UI and validation/apply trigger
+- `src/components/modals/GridSpacingModal.tsx`
+  - Grid spacing modal UI, preset/custom input handling
+- `src/components/modals/useBootstrapModal.ts`
+  - Shared Bootstrap modal lifecycle hook for renderer modals
 - `src/editor/constants.ts`
   - Editor constants (grid/canvas/zoom limits, default palette)
 - `src/editor/types.ts`
@@ -153,6 +159,7 @@ Current metadata shape:
   - Current example: `shared/ipc.ts` for `MenuAction`
 - Canvas size change is opened from native `Canvas` menu and edited in renderer modal.
 - Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
+- Renderer modals are split into per-modal component files under `src/components/modals/**`.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
 - Selection drag-move also reuses `floatingPasteRef` flow:
   - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.

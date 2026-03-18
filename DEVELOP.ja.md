@@ -123,6 +123,12 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 左サイドパネルUI（プレビュー、グリッド設定、パレット）
 - `src/components/EditorToolbar.tsx`
   - 右ツールバーUI（ツール切替、ズーム、Undo、コピー/貼り付け/削除/クリア）
+- `src/components/modals/CanvasSizeModal.tsx`
+  - キャンバスサイズ変更モーダルのUIと入力検証/適用トリガー
+- `src/components/modals/GridSpacingModal.tsx`
+  - グリッド線間隔変更モーダルのUI、プリセット/カスタム入力処理
+- `src/components/modals/useBootstrapModal.ts`
+  - renderer モーダル共通の Bootstrap ライフサイクル hook
 - `src/editor/constants.ts`
   - グリッド/キャンバス/ズーム制約、デフォルトパレットなど定数
 - `src/editor/types.ts`
@@ -153,6 +159,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 現状の例: `shared/ipc.ts` の `MenuAction`
 - キャンバスサイズ変更はネイティブ `Canvas` メニューから開く renderer モーダルで行う。
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
+- renderer モーダルは `src/components/modals/**` 配下で、モーダル単位のファイルに分割している。
 - 貼り付けは内部クリップボード（`selectionClipboardRef`）を使う。
 - 貼り付け直後の移動は `floatingPasteRef` により実現。
 - 選択範囲のドラッグ移動も `floatingPasteRef` の同じ経路を再利用

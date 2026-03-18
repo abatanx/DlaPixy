@@ -1,14 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Modal from 'bootstrap/js/dist/modal';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent
+} from 'react';
 import { EditorSidebar } from './components/EditorSidebar';
 import { EditorToolbar } from './components/EditorToolbar';
+import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
+import { GridSpacingModal } from './components/modals/GridSpacingModal';
 import type { MenuAction as FileMenuAction } from '../shared/ipc';
 import {
   DEFAULT_CANVAS_SIZE,
   DEFAULT_GRID_SPACING,
   DEFAULT_PALETTE,
   DEFAULT_ZOOM,
-  GRID_SPACING_OPTIONS,
   MAX_CANVAS_SIZE,
   MAX_ZOOM,
   MAX_UNDO,
@@ -36,7 +44,6 @@ type ToastType = 'success' | 'warning' | 'error' | 'info';
 export function App() {
   // ---- UI / editor state ----
   const [canvasSize, setCanvasSize] = useState<number>(DEFAULT_CANVAS_SIZE);
-  const [pendingCanvasSize, setPendingCanvasSize] = useState<string>(String(DEFAULT_CANVAS_SIZE));
   const [gridSpacing, setGridSpacing] = useState<number>(DEFAULT_GRID_SPACING);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
   const [pixels, setPixels] = useState<Uint8ClampedArray>(() => createEmptyPixels(DEFAULT_CANVAS_SIZE));
@@ -57,8 +64,8 @@ export function App() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
-  const [pendingGridSpacingOption, setPendingGridSpacingOption] = useState<string>(String(DEFAULT_GRID_SPACING));
-  const [pendingCustomGridSpacing, setPendingCustomGridSpacing] = useState<string>('');
+  const [isCanvasSizeModalOpen, setIsCanvasSizeModalOpen] = useState<boolean>(false);
+  const [isGridSpacingModalOpen, setIsGridSpacingModalOpen] = useState<boolean>(false);
 
   const setStatusText = useCallback((text: string, type: ToastType) => {
     setStatusTextRaw(text);
@@ -69,86 +76,10 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
-  const canvasSizeModalRef = useRef<HTMLDivElement | null>(null);
-  const canvasSizeModalInputRef = useRef<HTMLInputElement | null>(null);
-  const canvasSizeModalInstanceRef = useRef<Modal | null>(null);
-  const gridSpacingModalRef = useRef<HTMLDivElement | null>(null);
-  const gridSpacingModalInputRef = useRef<HTMLInputElement | null>(null);
-  const gridSpacingModalInstanceRef = useRef<Modal | null>(null);
 
   useEffect(() => {
     document.title = `DlaPixy${hasUnsavedChanges ? ' *' : ''}`;
   }, [hasUnsavedChanges]);
-
-  useEffect(() => {
-    const modalElement = canvasSizeModalRef.current;
-    if (!modalElement) {
-      return;
-    }
-
-    const instance = new Modal(modalElement, {
-      backdrop: 'static',
-      keyboard: false
-    });
-    canvasSizeModalInstanceRef.current = instance;
-
-    const onShown = () => {
-      canvasSizeModalInputRef.current?.focus();
-      canvasSizeModalInputRef.current?.select();
-    };
-    const onHidden = () => {
-      setPendingCanvasSize(String(canvasSize));
-    };
-
-    modalElement.addEventListener('shown.bs.modal', onShown);
-    modalElement.addEventListener('hidden.bs.modal', onHidden);
-
-    return () => {
-      modalElement.removeEventListener('shown.bs.modal', onShown);
-      modalElement.removeEventListener('hidden.bs.modal', onHidden);
-      instance.dispose();
-      canvasSizeModalInstanceRef.current = null;
-    };
-  }, [canvasSize]);
-
-  useEffect(() => {
-    const modalElement = gridSpacingModalRef.current;
-    if (!modalElement) {
-      return;
-    }
-
-    const instance = new Modal(modalElement, {
-      backdrop: 'static',
-      keyboard: false
-    });
-    gridSpacingModalInstanceRef.current = instance;
-
-    const onShown = () => {
-      if (!gridSpacingModalInputRef.current?.disabled) {
-        gridSpacingModalInputRef.current?.focus();
-        gridSpacingModalInputRef.current?.select();
-      }
-    };
-    const onHidden = () => {
-      if (GRID_SPACING_OPTIONS.includes(gridSpacing as (typeof GRID_SPACING_OPTIONS)[number])) {
-        setPendingGridSpacingOption(String(gridSpacing));
-        setPendingCustomGridSpacing('');
-      } else {
-        setPendingGridSpacingOption('custom');
-        setPendingCustomGridSpacing(String(gridSpacing));
-      }
-    };
-
-    modalElement.addEventListener('shown.bs.modal', onShown);
-    modalElement.addEventListener('hidden.bs.modal', onHidden);
-
-    return () => {
-      modalElement.removeEventListener('shown.bs.modal', onShown);
-      modalElement.removeEventListener('hidden.bs.modal', onHidden);
-      instance.dispose();
-      gridSpacingModalInstanceRef.current = null;
-    };
-  }, [gridSpacing]);
   // drawStateRef: pointer interaction state machine for draw/select/move.
   const drawStateRef = useRef<{
     active: boolean;
@@ -593,7 +524,7 @@ export function App() {
   );
 
   const getCellFromEvent = useCallback(
-    (event: React.MouseEvent<HTMLCanvasElement>) => {
+    (event: ReactMouseEvent<HTMLCanvasElement>) => {
       const rect = event.currentTarget.getBoundingClientRect();
       const x = Math.floor(((event.clientX - rect.left) / rect.width) * canvasSize);
       const y = Math.floor(((event.clientY - rect.top) / rect.height) * canvasSize);
@@ -629,6 +560,26 @@ export function App() {
     floatingPasteRef.current = null;
     drawStateRef.current.moveStartCell = null;
     drawStateRef.current.moveStartOrigin = null;
+  }, []);
+
+  const resetDrawState = useCallback(() => {
+    drawStateRef.current.active = false;
+    drawStateRef.current.selectionStart = null;
+    drawStateRef.current.selectionMoved = false;
+    drawStateRef.current.clearSelectionOnMouseUp = false;
+    drawStateRef.current.lastDrawCell = null;
+    drawStateRef.current.moveStartCell = null;
+    drawStateRef.current.moveStartOrigin = null;
+  }, []);
+
+  const beginFloatingMove = useCallback((cell: { x: number; y: number }, origin: { x: number; y: number }) => {
+    drawStateRef.current.active = true;
+    drawStateRef.current.selectionStart = null;
+    drawStateRef.current.selectionMoved = false;
+    drawStateRef.current.clearSelectionOnMouseUp = false;
+    drawStateRef.current.lastDrawCell = null;
+    drawStateRef.current.moveStartCell = cell;
+    drawStateRef.current.moveStartOrigin = origin;
   }, []);
 
   const updateHoveredPixelInfo = useCallback(
@@ -668,26 +619,13 @@ export function App() {
   }, []);
 
   const copyTextToClipboard = useCallback(async (text: string): Promise<boolean> => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    } catch {
-      // Fall through to legacy copy path.
+    if (!navigator.clipboard?.writeText) {
+      return false;
     }
 
     try {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.setAttribute('readonly', 'true');
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      const copied = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      return copied;
+      await navigator.clipboard.writeText(text);
+      return true;
     } catch {
       return false;
     }
@@ -700,6 +638,10 @@ export function App() {
     },
     [copyTextToClipboard]
   );
+
+  const formatReferenceSourceLabel = useCallback((info: NonNullable<HoveredPixelInfo>): string => {
+    return info.x >= 0 ? `(${info.x}, ${info.y})` : `パレット[${info.paletteIndex}]`;
+  }, []);
 
   const selectReferenceByNumber = useCallback(
     (number: number): boolean => {
@@ -766,20 +708,12 @@ export function App() {
     const existingIndex = referencePixelInfos.findIndex((info) => info.x === activeInfo.x && info.y === activeInfo.y);
     if (existingIndex < 0) {
       setReferencePixelInfos((prev) => [...prev, activeInfo]);
-      if (activeInfo.x >= 0) {
-        setStatusText(`参照追加: (${activeInfo.x}, ${activeInfo.y}) ${activeInfo.hex8}`, 'success');
-      } else {
-        setStatusText(`参照追加: パレット[${activeInfo.paletteIndex}] ${activeInfo.hex8}`, 'success');
-      }
+      setStatusText(`参照追加: ${formatReferenceSourceLabel(activeInfo)} ${activeInfo.hex8}`, 'success');
       return;
     }
 
     if (referencePixelInfos[existingIndex].hex8 === activeInfo.hex8) {
-      if (activeInfo.x >= 0) {
-        setStatusText(`参照維持: (${activeInfo.x}, ${activeInfo.y}) は同じ色です`, 'warning');
-      } else {
-        setStatusText(`参照維持: パレット[${activeInfo.paletteIndex}] は同じ色です`, 'warning');
-      }
+      setStatusText(`参照維持: ${formatReferenceSourceLabel(activeInfo)} は同じ色です`, 'warning');
       return;
     }
 
@@ -788,12 +722,8 @@ export function App() {
       next[existingIndex] = activeInfo;
       return next;
     });
-    if (activeInfo.x >= 0) {
-      setStatusText(`参照更新: (${activeInfo.x}, ${activeInfo.y}) -> ${activeInfo.hex8}`, 'success');
-    } else {
-      setStatusText(`参照更新: パレット[${activeInfo.paletteIndex}] -> ${activeInfo.hex8}`, 'success');
-    }
-  }, [hoveredPaletteColor, hoveredPixelInfo, referencePixelInfos]);
+    setStatusText(`参照更新: ${formatReferenceSourceLabel(activeInfo)} -> ${activeInfo.hex8}`, 'success');
+  }, [formatReferenceSourceLabel, hoveredPaletteColor, hoveredPixelInfo, referencePixelInfos]);
 
   const clearReferencePixelInfos = useCallback(() => {
     if (referencePixelInfos.length === 0) {
@@ -823,7 +753,7 @@ export function App() {
 
   const getReferenceKey = useCallback((info: NonNullable<HoveredPixelInfo>): string => `${info.x}:${info.y}`, []);
 
-  const onReferenceDragStart = useCallback((event: React.DragEvent<HTMLDivElement>, sourceKey: string) => {
+  const onReferenceDragStart = useCallback((event: ReactDragEvent<HTMLDivElement>, sourceKey: string) => {
     setDraggingReferenceKey(sourceKey);
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', sourceKey);
@@ -833,13 +763,13 @@ export function App() {
     setDraggingReferenceKey(null);
   }, []);
 
-  const onReferenceDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+  const onReferenceDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
   const onReferenceDrop = useCallback(
-    (event: React.DragEvent<HTMLDivElement>, targetKey: string) => {
+    (event: ReactDragEvent<HTMLDivElement>, targetKey: string) => {
       event.preventDefault();
       const sourceKey = draggingReferenceKey ?? event.dataTransfer.getData('text/plain');
       setDraggingReferenceKey(null);
@@ -890,7 +820,7 @@ export function App() {
   }, [clearFloatingPaste]);
 
   const onMouseDown = useCallback(
-    (event: React.MouseEvent<HTMLCanvasElement>) => {
+    (event: ReactMouseEvent<HTMLCanvasElement>) => {
       if (isSpacePressed) {
         beginPan(event.clientX, event.clientY);
         return;
@@ -903,13 +833,7 @@ export function App() {
 
       if (tool === 'select' && floatingPasteRef.current && pointInSelection(cell, selection)) {
         // Continue dragging an already-floating block.
-        drawStateRef.current.active = true;
-        drawStateRef.current.selectionStart = null;
-        drawStateRef.current.selectionMoved = false;
-        drawStateRef.current.clearSelectionOnMouseUp = false;
-        drawStateRef.current.lastDrawCell = null;
-        drawStateRef.current.moveStartCell = cell;
-        drawStateRef.current.moveStartOrigin = { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y };
+        beginFloatingMove(cell, { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y });
         setStatusText('選択範囲を移動中', 'info');
         return;
       }
@@ -956,13 +880,7 @@ export function App() {
           restoreSelection: cloneSelection(selection),
           restoreTool: tool
         };
-        drawStateRef.current.active = true;
-        drawStateRef.current.selectionStart = null;
-        drawStateRef.current.selectionMoved = false;
-        drawStateRef.current.clearSelectionOnMouseUp = false;
-        drawStateRef.current.lastDrawCell = null;
-        drawStateRef.current.moveStartCell = cell;
-        drawStateRef.current.moveStartOrigin = { x: selection.x, y: selection.y };
+        beginFloatingMove(cell, { x: selection.x, y: selection.y });
         setStatusText('選択範囲を移動中', 'info');
         return;
       }
@@ -976,13 +894,7 @@ export function App() {
           setHasUnsavedChanges(true);
         }
         clearFloatingPaste();
-        drawStateRef.current.active = false;
-        drawStateRef.current.selectionStart = null;
-        drawStateRef.current.selectionMoved = false;
-        drawStateRef.current.clearSelectionOnMouseUp = false;
-        drawStateRef.current.lastDrawCell = null;
-        drawStateRef.current.moveStartCell = null;
-        drawStateRef.current.moveStartOrigin = null;
+        resetDrawState();
         setStatusText(filled ? '塗りつぶしました' : '塗りつぶし対象がありません', filled ? 'success' : 'warning');
         return;
       }
@@ -1016,6 +928,7 @@ export function App() {
     },
     [
       applyStrokeSegment,
+      beginFloatingMove,
       beginPan,
       clearFloatingPaste,
       createFloodFillResult,
@@ -1024,13 +937,14 @@ export function App() {
       isSpacePressed,
       pixels,
       pushUndo,
+      resetDrawState,
       selection,
       tool
     ]
   );
 
   const onMouseMove = useCallback(
-    (event: React.MouseEvent<HTMLCanvasElement>) => {
+    (event: ReactMouseEvent<HTMLCanvasElement>) => {
       const hoveredCell = getCellFromEvent(event);
       updateHoveredPixelInfo(hoveredCell);
 
@@ -1127,32 +1041,16 @@ export function App() {
         setStatusText('グリッド線が「なし」のため、シングルクリック選択はできません', 'warning');
       }
     }
-    drawStateRef.current.active = false;
-    drawStateRef.current.selectionStart = null;
-    drawStateRef.current.selectionMoved = false;
-    drawStateRef.current.clearSelectionOnMouseUp = false;
-    drawStateRef.current.lastDrawCell = null;
-    drawStateRef.current.moveStartCell = null;
-    drawStateRef.current.moveStartOrigin = null;
+    resetDrawState();
     if (wasMovingPaste && !shouldSelectSingleTile) {
       setStatusText('選択範囲を配置しました', 'success');
     }
-  }, [endPan, gridSpacing, resolveSingleTileSelection, tool]);
+  }, [endPan, gridSpacing, resetDrawState, resolveSingleTileSelection, tool]);
 
   const onMouseLeaveCanvas = useCallback(() => {
     onMouseUp();
     setHoveredPixelInfo(null);
   }, [onMouseUp]);
-
-  const resolveCanvasSizeInput = useCallback(() => {
-    const parsed = Number.parseInt(pendingCanvasSize, 10);
-    if (!Number.isFinite(parsed)) {
-      setStatusText('キャンバスサイズは数値で指定してください', 'warning');
-      return null;
-    }
-
-    return clampCanvasSize(parsed, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-  }, [pendingCanvasSize, setStatusText]);
 
   const applyCanvasSize = useCallback((normalized: number) => {
     setCanvasSize(normalized);
@@ -1161,129 +1059,32 @@ export function App() {
     clearFloatingPaste();
     setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
     setHasUnsavedChanges(true);
-    setPendingCanvasSize(String(normalized));
+    setIsCanvasSizeModalOpen(false);
     undoStackRef.current = [];
   }, [clearFloatingPaste, setStatusText]);
 
-  const resolveGridSpacingInput = useCallback(() => {
-    if (pendingGridSpacingOption !== 'custom') {
-      return Number.parseInt(pendingGridSpacingOption, 10);
-    }
-
-    const parsed = Number.parseInt(pendingCustomGridSpacing, 10);
-    if (!Number.isFinite(parsed)) {
-      setStatusText('カスタムグリッド線間隔は数値で指定してください', 'warning');
-      return null;
-    }
-    if (parsed < 1 || parsed > canvasSize) {
-      setStatusText(`グリッド線間隔は 1 から ${canvasSize} の範囲で指定してください`, 'warning');
-      return null;
-    }
-
-    return parsed;
-  }, [canvasSize, pendingCustomGridSpacing, pendingGridSpacingOption, setStatusText]);
-
   const openCanvasSizeModal = useCallback(() => {
-    setPendingCanvasSize(String(canvasSize));
-    canvasSizeModalInstanceRef.current?.show();
-  }, [canvasSize]);
-
-  const closeCanvasSizeModal = useCallback(() => {
-    canvasSizeModalInstanceRef.current?.hide();
+    setIsCanvasSizeModalOpen(true);
   }, []);
 
-  const submitCanvasSizeModal = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const normalized = resolveCanvasSizeInput();
-      if (normalized === null) {
-        return;
-      }
-
-      const modalElement = canvasSizeModalRef.current;
-      const modalInstance = canvasSizeModalInstanceRef.current;
-      if (!modalElement || !modalInstance) {
-        applyCanvasSize(normalized);
-        return;
-      }
-
-      const onHidden = () => {
-        modalElement.removeEventListener('hidden.bs.modal', onHidden);
-        applyCanvasSize(normalized);
-      };
-
-      modalElement.addEventListener('hidden.bs.modal', onHidden);
-      modalInstance.hide();
-    },
-    [applyCanvasSize, resolveCanvasSizeInput]
-  );
+  const closeCanvasSizeModal = useCallback(() => {
+    setIsCanvasSizeModalOpen(false);
+  }, []);
 
   const applyGridSpacing = useCallback((value: number) => {
     setGridSpacing(value);
     setHasUnsavedChanges(true);
+    setIsGridSpacingModalOpen(false);
     setStatusText(value === 0 ? '補助グリッドを非表示にしました' : `補助グリッドを ${value}px 間隔に変更しました`, 'success');
   }, []);
 
   const openGridSpacingModal = useCallback(() => {
-    if (GRID_SPACING_OPTIONS.includes(gridSpacing as (typeof GRID_SPACING_OPTIONS)[number])) {
-      setPendingGridSpacingOption(String(gridSpacing));
-      setPendingCustomGridSpacing('');
-    } else {
-      setPendingGridSpacingOption('custom');
-      setPendingCustomGridSpacing(String(gridSpacing));
-    }
-    gridSpacingModalInstanceRef.current?.show();
-  }, [gridSpacing]);
-
-  const closeGridSpacingModal = useCallback(() => {
-    gridSpacingModalInstanceRef.current?.hide();
+    setIsGridSpacingModalOpen(true);
   }, []);
 
-  const submitGridSpacingModal = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const normalized = resolveGridSpacingInput();
-      if (normalized === null) {
-        return;
-      }
-
-      const modalElement = gridSpacingModalRef.current;
-      const modalInstance = gridSpacingModalInstanceRef.current;
-      if (!modalElement || !modalInstance) {
-        applyGridSpacing(normalized);
-        return;
-      }
-
-      const onHidden = () => {
-        modalElement.removeEventListener('hidden.bs.modal', onHidden);
-        applyGridSpacing(normalized);
-      };
-
-      modalElement.addEventListener('hidden.bs.modal', onHidden);
-      modalInstance.hide();
-    },
-    [applyGridSpacing, resolveGridSpacingInput]
-  );
-
-  const applyGridSpacingAndClose = useCallback(
-    (value: number) => {
-      const modalElement = gridSpacingModalRef.current;
-      const modalInstance = gridSpacingModalInstanceRef.current;
-      if (!modalElement || !modalInstance) {
-        applyGridSpacing(value);
-        return;
-      }
-
-      const onHidden = () => {
-        modalElement.removeEventListener('hidden.bs.modal', onHidden);
-        applyGridSpacing(value);
-      };
-
-      modalElement.addEventListener('hidden.bs.modal', onHidden);
-      modalInstance.hide();
-    },
-    [applyGridSpacing]
-  );
+  const closeGridSpacingModal = useCallback(() => {
+    setIsGridSpacingModalOpen(false);
+  }, []);
 
   const zoomIn = useCallback(() => {
     setZoom((prev) => {
@@ -1802,7 +1603,6 @@ export function App() {
       }
 
       setCanvasSize(targetCanvasSize);
-      setPendingCanvasSize(String(targetCanvasSize));
       setPixels(new Uint8ClampedArray(imageData.data));
       setSelection(null);
       clearFloatingPaste();
@@ -2104,158 +1904,21 @@ export function App() {
         <div className={`status-toast ${isToastVisible ? 'show' : ''} ${toastType}`} role="status" aria-live="polite">
           {statusText}
         </div>
-        <div
-          ref={canvasSizeModalRef}
-          className="modal fade"
-          tabIndex={-1}
-          aria-labelledby="canvas-size-modal-title"
-          aria-hidden="true"
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content shadow">
-              <form onSubmit={submitCanvasSizeModal}>
-                <div className="modal-header">
-                  <div>
-                    <h2 id="canvas-size-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
-                      <i className="fa-regular fa-square" aria-hidden="true" />
-                      <span>キャンバスサイズ変更</span>
-                    </h2>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="閉じる"
-                    onClick={closeCanvasSizeModal}
-                  />
-                </div>
-                <div className="modal-body py-4">
-                  <label htmlFor="canvas-size-input" className="form-label">正方形キャンバスサイズ (px)</label>
-                  <input
-                    ref={canvasSizeModalInputRef}
-                    id="canvas-size-input"
-                    type="number"
-                    min={MIN_CANVAS_SIZE}
-                    max={MAX_CANVAS_SIZE}
-                    className="form-control"
-                    value={pendingCanvasSize}
-                    onChange={(event) => setPendingCanvasSize(event.target.value)}
-                  />
-                  <div className="form-text">
-                    現在値: {canvasSize}x{canvasSize} / 範囲: {MIN_CANVAS_SIZE} - {MAX_CANVAS_SIZE}
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-outline-secondary" onClick={closeCanvasSizeModal}>
-                    <span className="d-inline-flex align-items-center gap-2">
-                      <i className="fa-solid fa-xmark" aria-hidden="true" />
-                      <span>キャンセル</span>
-                    </span>
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    <span className="d-inline-flex align-items-center gap-2">
-                      <i className="fa-solid fa-check" aria-hidden="true" />
-                      <span>適用</span>
-                    </span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-        <div
-          ref={gridSpacingModalRef}
-          className="modal fade"
-          tabIndex={-1}
-          aria-labelledby="grid-spacing-modal-title"
-          aria-hidden="true"
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content shadow">
-              <form onSubmit={submitGridSpacingModal}>
-                <div className="modal-header">
-                  <div>
-                    <h2 id="grid-spacing-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
-                      <i className="fa-solid fa-border-all" aria-hidden="true" />
-                      <span>グリッド線間隔変更</span>
-                    </h2>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="閉じる"
-                    onClick={closeGridSpacingModal}
-                  />
-                </div>
-                <div className="modal-body py-4">
-                  <label className="form-label">グリッド線間隔</label>
-                  <div className="btn-group w-100 mb-3" role="group" aria-label="grid spacing preset options">
-                    {GRID_SPACING_OPTIONS.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        className={`btn ${pendingGridSpacingOption === String(option) ? 'btn-primary' : 'btn-outline-primary'}`}
-                        onClick={() => {
-                          setPendingGridSpacingOption(String(option));
-                          applyGridSpacingAndClose(option);
-                        }}
-                      >
-                        {option === 0 ? 'なし' : `${option}px`}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      className={`btn ${pendingGridSpacingOption === 'custom' ? 'btn-primary' : 'btn-outline-primary'}`}
-                      onClick={() => {
-                        setPendingGridSpacingOption('custom');
-                        window.setTimeout(() => {
-                          gridSpacingModalInputRef.current?.focus();
-                          gridSpacingModalInputRef.current?.select();
-                        }, 0);
-                      }}
-                    >
-                      カスタム
-                    </button>
-                  </div>
-                  {pendingGridSpacingOption === 'custom' ? (
-                    <div className="mt-3">
-                      <label htmlFor="grid-spacing-custom-input" className="form-label">カスタム値 (px)</label>
-                      <input
-                        ref={gridSpacingModalInputRef}
-                        id="grid-spacing-custom-input"
-                        type="number"
-                        min={1}
-                        max={canvasSize}
-                        className="form-control"
-                        value={pendingCustomGridSpacing}
-                        onChange={(event) => {
-                          setPendingGridSpacingOption('custom');
-                          setPendingCustomGridSpacing(event.target.value);
-                        }}
-                      />
-                      <div className="form-text">
-                        現在値: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px`} / 範囲: 1 - {canvasSize}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-outline-secondary" onClick={closeGridSpacingModal}>
-                    <span className="d-inline-flex align-items-center gap-2">
-                      <i className="fa-solid fa-xmark" aria-hidden="true" />
-                      <span>キャンセル</span>
-                    </span>
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    <span className="d-inline-flex align-items-center gap-2">
-                      <i className="fa-solid fa-check" aria-hidden="true" />
-                      <span>適用</span>
-                    </span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        <CanvasSizeModal
+          isOpen={isCanvasSizeModalOpen}
+          canvasSize={canvasSize}
+          onApply={applyCanvasSize}
+          onClose={closeCanvasSizeModal}
+          onValidationError={(message) => setStatusText(message, 'warning')}
+        />
+        <GridSpacingModal
+          isOpen={isGridSpacingModalOpen}
+          gridSpacing={gridSpacing}
+          canvasSize={canvasSize}
+          onApply={applyGridSpacing}
+          onClose={closeGridSpacingModal}
+          onValidationError={(message) => setStatusText(message, 'warning')}
+        />
       </div>
       <footer className="container-fluid app-footer font-monospace small border-top">
         <div className="app-footer-status">
