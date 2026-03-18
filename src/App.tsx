@@ -35,10 +35,17 @@ import {
   rasterLinePoints,
   rgbaToHex,
   rgbaToHex8,
-  rgbaToHsva
+  rgbaToHsva,
+  resizeCanvasPixels
 } from './editor/utils';
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
+
+type UndoSnapshot = {
+  canvasSize: number;
+  pixels: Uint8ClampedArray;
+  selection: Selection;
+};
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
@@ -132,7 +139,7 @@ export function App() {
     restoreSelection: Selection;
     restoreTool: Tool;
   } | null>(null);
-  const undoStackRef = useRef<Uint8ClampedArray[]>([]);
+  const undoStackRef = useRef<UndoSnapshot[]>([]);
 
   const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
   const previewDataUrl = useMemo(() => {
@@ -204,11 +211,15 @@ export function App() {
 
   const pushUndo = useCallback(() => {
     // Keep immutable snapshots; cap history size to avoid unbounded memory growth.
-    undoStackRef.current.push(clonePixels(pixels));
+    undoStackRef.current.push({
+      canvasSize,
+      pixels: clonePixels(pixels),
+      selection: cloneSelection(selection)
+    });
     if (undoStackRef.current.length > MAX_UNDO) {
       undoStackRef.current.shift();
     }
-  }, [pixels]);
+  }, [canvasSize, pixels, selection]);
 
   const drawCanvas = useCallback(
     (sourcePixels: Uint8ClampedArray, maybeSelection: Selection) => {
@@ -1053,15 +1064,21 @@ export function App() {
   }, [onMouseUp]);
 
   const applyCanvasSize = useCallback((normalized: number) => {
+    if (normalized === canvasSize) {
+      setIsCanvasSizeModalOpen(false);
+      return;
+    }
+
+    pushUndo();
     setCanvasSize(normalized);
-    setPixels(createEmptyPixels(normalized));
+    setPixels((prev) => resizeCanvasPixels(prev, canvasSize, normalized));
     setSelection(null);
+    setLastTilePreviewSelection(null);
     clearFloatingPaste();
     setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
     setHasUnsavedChanges(true);
     setIsCanvasSizeModalOpen(false);
-    undoStackRef.current = [];
-  }, [clearFloatingPaste, setStatusText]);
+  }, [canvasSize, clearFloatingPaste, pushUndo, setStatusText]);
 
   const openCanvasSizeModal = useCallback(() => {
     setIsCanvasSizeModalOpen(true);
@@ -1142,7 +1159,10 @@ export function App() {
       setStatusText('Undo履歴がありません', 'warning');
       return;
     }
-    setPixels(previous);
+    setCanvasSize(previous.canvasSize);
+    setPixels(previous.pixels);
+    setSelection(previous.selection);
+    setLastTilePreviewSelection(previous.selection);
     clearFloatingPaste();
     setHasUnsavedChanges(true);
     setStatusText('1手戻しました', 'success');

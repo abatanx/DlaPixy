@@ -121,6 +121,25 @@ export function clonePixels(pixels: Uint8ClampedArray): Uint8ClampedArray {
   return new Uint8ClampedArray(pixels);
 }
 
+// 左上基準で既存ピクセルを新しいキャンバスサイズへコピーする。
+export function resizeCanvasPixels(
+  sourcePixels: Uint8ClampedArray,
+  sourceCanvasSize: number,
+  targetCanvasSize: number
+): Uint8ClampedArray {
+  const next = createEmptyPixels(targetCanvasSize);
+  const copySize = Math.min(sourceCanvasSize, targetCanvasSize);
+
+  for (let y = 0; y < copySize; y += 1) {
+    const sourceStart = y * sourceCanvasSize * 4;
+    const targetStart = y * targetCanvasSize * 4;
+    const rowWidth = copySize * 4;
+    next.set(sourcePixels.subarray(sourceStart, sourceStart + rowWidth), targetStart);
+  }
+
+  return next;
+}
+
 // 2点間を結ぶラスター線分の全ピクセル座標を返す（Bresenham系）。
 export function rasterLinePoints(x0: number, y0: number, x1: number, y1: number): Array<{ x: number; y: number }> {
   const points: Array<{ x: number; y: number }> = [];
