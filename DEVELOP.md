@@ -42,6 +42,7 @@ npm run dist
 - Canvas size is independent from grid:
   - Canvas: default `256x256` (change from native `Canvas` menu modal)
   - Grid overlay spacing: `none / 8 / 16 / 32 / custom`
+- Initial palette uses the 216 Web Safe Colors
 - Tools:
   - Pencil
   - Eraser
@@ -125,6 +126,7 @@ Current metadata shape:
   - Preview section for 1x preview and tiling preview
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - Palette section for color picker and palette grid; memoized to reduce rerenders during canvas edits
+  - Palette grid is compact + independently scrollable so large palettes (hundreds of colors) stay usable
 - `src/components/sidebar/types.ts`
   - Shared prop types for sidebar sections
 - `src/components/EditorToolbar.tsx`
@@ -175,7 +177,7 @@ Current metadata shape:
   - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.
 - Floating pasted state is cleared on destructive/reset flows:
   - canvas resize, clear, delete selection, load, undo.
-- Undo snapshots include at least `canvasSize`, `pixels`, and `selection` so canvas resize can be reverted.
+- Undo snapshots include at least `canvasSize`, `pixels`, `selection`, `palette`, and `selectedColor`.
 - Tile preview keeps last valid selection (`lastTilePreviewSelection`) so preview does not disappear when selection is cleared.
 - Fill tool uses flood-fill over contiguous same-color pixels (4-neighbor).
 

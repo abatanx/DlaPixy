@@ -17,5 +17,9 @@ export const MIN_CANVAS_SIZE = 8;
 // キャンバスサイズの上限。
 export const MAX_CANVAS_SIZE = 1024;
 
-// 初期パレットカラー。
-export const DEFAULT_PALETTE = ['#000000', '#ffffff', '#ef4444', '#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#0ea5e9'];
+const WEB_SAFE_CHANNELS = ['00', '33', '66', '99', 'CC', 'FF'] as const;
+
+// 初期パレットカラーは Web Safe Color 216 色。
+export const DEFAULT_PALETTE = WEB_SAFE_CHANNELS.flatMap((r) =>
+  WEB_SAFE_CHANNELS.flatMap((g) => WEB_SAFE_CHANNELS.map((b) => `#${r}${g}${b}`.toLowerCase()))
+);

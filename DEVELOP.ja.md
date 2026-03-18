@@ -42,6 +42,7 @@ npm run dist
 - キャンバスサイズとグリッドを分離
   - キャンバス: 初期 `256x256`（変更はネイティブ `Canvas` メニューのモーダルから）
   - グリッド線間隔: `なし / 8 / 16 / 32 / カスタム`
+- 初期パレットは Web Safe Color 216 色を使う
 - ツール
   - 描画（Pencil）
   - 消しゴム（Eraser）
@@ -125,6 +126,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 1xプレビューとタイルプレビューを担当するプレビューセクション
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - 色選択とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
+  - パレット一覧はコンパクト表示 + 独立スクロールにして、大量色でも使いやすくしている
 - `src/components/sidebar/types.ts`
   - サイドバー各セクションで共有する props 型
 - `src/components/EditorToolbar.tsx`
@@ -180,7 +182,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 選択削除
   - PNG読込
   - Undo
-- Undo スナップショットは少なくとも `canvasSize`, `pixels`, `selection` を保持し、キャンバスサイズ変更も巻き戻せる。
+- Undo スナップショットは少なくとも `canvasSize`, `pixels`, `selection`, `palette`, `selectedColor` を保持する。
 - タイルプレビューは `lastTilePreviewSelection` を保持して、選択解除後も表示可能。
 - 塗りつぶしは4近傍の連結同色領域に対して実行。
 

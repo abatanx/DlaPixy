@@ -45,6 +45,8 @@ type UndoSnapshot = {
   canvasSize: number;
   pixels: Uint8ClampedArray;
   selection: Selection;
+  palette: string[];
+  selectedColor: string;
 };
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
@@ -214,12 +216,14 @@ export function App() {
     undoStackRef.current.push({
       canvasSize,
       pixels: clonePixels(pixels),
-      selection: cloneSelection(selection)
+      selection: cloneSelection(selection),
+      palette: [...palette],
+      selectedColor
     });
     if (undoStackRef.current.length > MAX_UNDO) {
       undoStackRef.current.shift();
     }
-  }, [canvasSize, pixels, selection]);
+  }, [canvasSize, palette, pixels, selectedColor, selection]);
 
   const drawCanvas = useCallback(
     (sourcePixels: Uint8ClampedArray, maybeSelection: Selection) => {
@@ -1163,6 +1167,8 @@ export function App() {
     setPixels(previous.pixels);
     setSelection(previous.selection);
     setLastTilePreviewSelection(previous.selection);
+    setPalette(previous.palette);
+    setSelectedColor(previous.selectedColor);
     clearFloatingPaste();
     setHasUnsavedChanges(true);
     setStatusText('1手戻しました', 'success');
@@ -1458,15 +1464,29 @@ export function App() {
     zoomOut
   ]);
 
-  const addColorToPalette = useCallback((hex: string) => {
-    setPalette((prev) => {
-      if (prev.includes(hex)) {
-        return prev;
-      }
-      setHasUnsavedChanges(true);
-      return [...prev, hex];
-    });
-  }, []);
+  const addSelectedColorToPalette = useCallback(() => {
+    if (palette.includes(selectedColor)) {
+      setStatusText('選択色はすでにパレットにあります', 'warning');
+      return;
+    }
+
+    pushUndo();
+    setPalette((prev) => [...prev, selectedColor]);
+    setHasUnsavedChanges(true);
+    setStatusText(`パレットに追加しました: ${selectedColor.toUpperCase()}`, 'success');
+  }, [palette, pushUndo, selectedColor, setStatusText]);
+
+  const removeSelectedColorFromPalette = useCallback(() => {
+    if (!palette.includes(selectedColor)) {
+      setStatusText('選択色はパレットにありません', 'warning');
+      return;
+    }
+
+    pushUndo();
+    setPalette((prev) => prev.filter((color) => color !== selectedColor));
+    setHasUnsavedChanges(true);
+    setStatusText(`パレットから削除しました: ${selectedColor.toUpperCase()}`, 'success');
+  }, [palette, pushUndo, selectedColor, setStatusText]);
 
   const createSavePayload = useCallback(() => {
     const canvas = document.createElement('canvas');
@@ -1741,9 +1761,10 @@ export function App() {
             selection={selection}
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
-            addColorToPalette={addColorToPalette}
             palette={palette}
             setHoveredPaletteColor={setHoveredPaletteColor}
+            addSelectedColorToPalette={addSelectedColorToPalette}
+            removeSelectedColorFromPalette={removeSelectedColorFromPalette}
           />
 
           <main className="col-12 col-lg-8 col-xl-9 d-flex">

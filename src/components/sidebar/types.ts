@@ -8,9 +8,10 @@ export type EditorSidebarProps = {
   selection: Selection;
   selectedColor: string;
   setSelectedColor: (value: string) => void;
-  addColorToPalette: (hex: string) => void;
   palette: string[];
   setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
+  addSelectedColorToPalette: () => void;
+  removeSelectedColorFromPalette: () => void;
 };
 
 export type SidebarPreviewSectionProps = Pick<
@@ -20,5 +21,10 @@ export type SidebarPreviewSectionProps = Pick<
 
 export type SidebarPaletteSectionProps = Pick<
   EditorSidebarProps,
-  'selectedColor' | 'setSelectedColor' | 'addColorToPalette' | 'palette' | 'setHoveredPaletteColor'
+  | 'selectedColor'
+  | 'setSelectedColor'
+  | 'palette'
+  | 'setHoveredPaletteColor'
+  | 'addSelectedColorToPalette'
+  | 'removeSelectedColorFromPalette'
 >;
