@@ -11,6 +11,13 @@ type UseBootstrapModalOptions = {
 export function useBootstrapModal({ isOpen, onShown, onHidden }: UseBootstrapModalOptions) {
   const modalRef = useRef<HTMLDivElement | null>(null);
   const modalInstanceRef = useRef<Modal | null>(null);
+  const onShownRef = useRef(onShown);
+  const onHiddenRef = useRef(onHidden);
+
+  useEffect(() => {
+    onShownRef.current = onShown;
+    onHiddenRef.current = onHidden;
+  }, [onHidden, onShown]);
 
   useEffect(() => {
     const modalElement = modalRef.current;
@@ -25,10 +32,10 @@ export function useBootstrapModal({ isOpen, onShown, onHidden }: UseBootstrapMod
     modalInstanceRef.current = instance;
 
     const handleShown = () => {
-      onShown?.();
+      onShownRef.current?.();
     };
     const handleHidden = () => {
-      onHidden?.();
+      onHiddenRef.current?.();
     };
 
     modalElement.addEventListener('shown.bs.modal', handleShown);
@@ -40,7 +47,7 @@ export function useBootstrapModal({ isOpen, onShown, onHidden }: UseBootstrapMod
       instance.dispose();
       modalInstanceRef.current = null;
     };
-  }, [onHidden, onShown]);
+  }, []);
 
   useEffect(() => {
     const instance = modalInstanceRef.current;
