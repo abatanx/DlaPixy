@@ -29,6 +29,7 @@ npm run dist
   - Clears display when pointer leaves canvas
 - Reference color line below hover info:
   - Press `F` while hovering canvas pixel or left palette color to append reference
+  - If the hovered color already exists in the palette, `F` also selects that palette color
   - Repeated `F` at same coordinate ignores if same color, overwrites if color changed
   - Reference lines are reorderable with drag-and-drop
   - Lines are auto-numbered from top (`1..9`), and lines after 9 show `-`
@@ -97,7 +98,7 @@ npm run dist
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
-  - `F`: Add/update hovered pixel in reference line
+  - `F`: Add/update hovered pixel in reference line, and select matching palette color if present
   - `1..9`: Select color from numbered reference line
   - `Enter`: Finalize floating paste/move
   - `Esc`: Cancel floating paste/move (if active), otherwise clear current selection

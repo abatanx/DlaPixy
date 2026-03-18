@@ -696,6 +696,11 @@ export function App() {
       return;
     }
 
+    const matchingPaletteColor = activeInfo.paletteIndex !== null ? palette[activeInfo.paletteIndex] : null;
+    if (matchingPaletteColor) {
+      setSelectedColor(matchingPaletteColor);
+    }
+
     const hasSameInfoIgnoringCoordinate = referencePixelInfos.some(
       (info) =>
         info.rgba.r === activeInfo.rgba.r &&
@@ -733,7 +738,7 @@ export function App() {
       return next;
     });
     setStatusText(`参照更新: ${formatReferenceSourceLabel(activeInfo)} -> ${activeInfo.hex8}`, 'success');
-  }, [formatReferenceSourceLabel, hoveredPaletteColor, hoveredPixelInfo, referencePixelInfos]);
+  }, [formatReferenceSourceLabel, hoveredPaletteColor, hoveredPixelInfo, palette, referencePixelInfos]);
 
   const clearReferencePixelInfos = useCallback(() => {
     if (referencePixelInfos.length === 0) {
