@@ -158,6 +158,10 @@ Current metadata shape:
 - Shared cross-runtime types live in `shared/**/*.ts`.
   - Current example: `shared/ipc.ts` for `MenuAction`
 - Canvas size change is opened from native `Canvas` menu and edited in renderer modal.
+- Canvas size change preserves existing pixels with a top-left anchor:
+  - expand: keep pixels, fill new area with transparency
+  - shrink: crop pixels outside the new bounds
+  - selection / floating paste are cleared on resize
 - Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
 - Renderer modals are split into per-modal component files under `src/components/modals/**`.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
@@ -165,6 +169,7 @@ Current metadata shape:
   - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.
 - Floating pasted state is cleared on destructive/reset flows:
   - canvas resize, clear, delete selection, load, undo.
+- Undo snapshots include at least `canvasSize`, `pixels`, and `selection` so canvas resize can be reverted.
 - Tile preview keeps last valid selection (`lastTilePreviewSelection`) so preview does not disappear when selection is cleared.
 - Fill tool uses flood-fill over contiguous same-color pixels (4-neighbor).
 

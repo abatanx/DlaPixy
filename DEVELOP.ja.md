@@ -158,6 +158,10 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - 実行環境をまたぐ共通型は `shared/**/*.ts` に置く。
   - 現状の例: `shared/ipc.ts` の `MenuAction`
 - キャンバスサイズ変更はネイティブ `Canvas` メニューから開く renderer モーダルで行う。
+- キャンバスサイズ変更は左上基準で既存ピクセルを保持する。
+  - 拡大時: 既存ピクセルを保持し、追加領域は透明で埋める
+  - 縮小時: 新しい範囲外のピクセルを切り捨てる
+  - サイズ変更時は選択状態 / 浮動貼り付け状態を解除する
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
 - renderer モーダルは `src/components/modals/**` 配下で、モーダル単位のファイルに分割している。
 - 貼り付けは内部クリップボード（`selectionClipboardRef`）を使う。
@@ -170,6 +174,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 選択削除
   - PNG読込
   - Undo
+- Undo スナップショットは少なくとも `canvasSize`, `pixels`, `selection` を保持し、キャンバスサイズ変更も巻き戻せる。
 - タイルプレビューは `lastTilePreviewSelection` を保持して、選択解除後も表示可能。
 - 塗りつぶしは4近傍の連結同色領域に対して実行。
 
