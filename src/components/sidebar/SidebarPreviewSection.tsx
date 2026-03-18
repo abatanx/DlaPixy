@@ -9,7 +9,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
   selection
 }: SidebarPreviewSectionProps) {
   return (
-    <div className="mb-3">
+    <div className="sidebar-preview-section flex-shrink-0 mb-3">
       <h6 className="form-label small mb-1 font-monospace">Preview (1x)</h6>
       <div className="preview-wrap">
         {previewDataUrl ? (

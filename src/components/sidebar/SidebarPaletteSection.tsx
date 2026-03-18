@@ -49,7 +49,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   }, [setHoveredPaletteColor]);
 
   return (
-    <div className="sidebar-palette-section mb-3">
+    <div className="sidebar-palette-section d-flex flex-column flex-grow-1">
       <div className="sidebar-palette-header">
         <label className="form-label font-monospace small mb-0">Palette</label>
         <span className="sidebar-palette-count">{palette.length} colors</span>
@@ -85,7 +85,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
           </button>
         ) : null}
       </div>
-      <div className="palette-grid-wrap">
+      <div className="palette-grid-wrap flex-grow-1">
         <div className="palette-grid" role="list" aria-label="palette colors">
           {palette.map((color, index) => (
             <button

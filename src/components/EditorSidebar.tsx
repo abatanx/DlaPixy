@@ -18,9 +18,9 @@ export const EditorSidebar = memo(function EditorSidebar({
   removeSelectedColorFromPalette
 }: EditorSidebarProps) {
   return (
-    <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar">
-      <div className="card shadow-sm editor-sidebar-card">
-        <div className="card-body editor-sidebar-body">
+    <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar d-flex h-100">
+      <div className="card shadow-sm editor-sidebar-card w-100 h-100 d-flex flex-column">
+        <div className="card-body editor-sidebar-body d-flex flex-column overflow-hidden">
           <SidebarPreviewSection
             canvasSize={canvasSize}
             previewDataUrl={previewDataUrl}
