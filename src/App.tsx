@@ -31,9 +31,10 @@ import {
   clonePixels,
   cloneSelection,
   createEmptyPixels,
+  hexToRgba,
+  normalizeColorHex,
   pointInSelection,
   rasterLinePoints,
-  rgbaToHex,
   rgbaToHex8,
   rgbaToHsva,
   resizeCanvasPixels
@@ -49,6 +50,11 @@ type UndoSnapshot = {
   selectedColor: string;
 };
 
+const INITIAL_PALETTE = DEFAULT_PALETTE
+  .map((color) => normalizeColorHex(color))
+  .filter((color): color is string => color !== null);
+const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0] ?? '#000000ff';
+
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
   // ---- UI / editor state ----
@@ -56,8 +62,8 @@ export function App() {
   const [gridSpacing, setGridSpacing] = useState<number>(DEFAULT_GRID_SPACING);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
   const [pixels, setPixels] = useState<Uint8ClampedArray>(() => createEmptyPixels(DEFAULT_CANVAS_SIZE));
-  const [palette, setPalette] = useState<string[]>(DEFAULT_PALETTE);
-  const [selectedColor, setSelectedColor] = useState<string>(DEFAULT_PALETTE[0]);
+  const [palette, setPalette] = useState<string[]>(INITIAL_PALETTE);
+  const [selectedColor, setSelectedColor] = useState<string>(INITIAL_SELECTED_COLOR);
   const [tool, setTool] = useState<Tool>('pencil');
   const [selection, setSelection] = useState<Selection>(null);
   const [lastTilePreviewSelection, setLastTilePreviewSelection] = useState<Selection>(null);
@@ -401,14 +407,7 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [isToastVisible, toastSequence]);
 
-  const colorBytes = useMemo(() => {
-    const rgb = selectedColor.replace('#', '');
-    return {
-      r: Number.parseInt(rgb.slice(0, 2), 16),
-      g: Number.parseInt(rgb.slice(2, 4), 16),
-      b: Number.parseInt(rgb.slice(4, 6), 16)
-    };
-  }, [selectedColor]);
+  const colorBytes = useMemo(() => hexToRgba(selectedColor), [selectedColor]);
 
   const applyStrokeSegment = useCallback(
     (from: { x: number; y: number }, to: { x: number; y: number }, erase = false) => {
@@ -439,14 +438,14 @@ export function App() {
             next[idx] === colorBytes.r &&
             next[idx + 1] === colorBytes.g &&
             next[idx + 2] === colorBytes.b &&
-            next[idx + 3] === 255
+            next[idx + 3] === colorBytes.a
           ) {
             continue;
           }
           next[idx] = colorBytes.r;
           next[idx + 1] = colorBytes.g;
           next[idx + 2] = colorBytes.b;
-          next[idx + 3] = 255;
+          next[idx + 3] = colorBytes.a;
           changed = true;
         }
         // Preserve previous reference when no change happened to avoid extra renders.
@@ -474,7 +473,7 @@ export function App() {
         source[startIdx + 2],
         source[startIdx + 3]
       ] as const;
-      const replacement = [colorBytes.r, colorBytes.g, colorBytes.b, 255] as const;
+      const replacement = [colorBytes.r, colorBytes.g, colorBytes.b, colorBytes.a] as const;
 
       if (
         target[0] === replacement[0] &&
@@ -610,7 +609,7 @@ export function App() {
       const b = pixels[idx + 2];
       const a = pixels[idx + 3];
       const hsva = rgbaToHsva(r, g, b, a);
-      const paletteIndex = palette.findIndex((color) => color.toLowerCase() === rgbaToHex(r, g, b).toLowerCase());
+      const paletteIndex = palette.findIndex((color) => color === rgbaToHex8(r, g, b, a));
 
       setHoveredPixelInfo({
         x: cell.x,
@@ -668,7 +667,7 @@ export function App() {
       if (!info) {
         return false;
       }
-      setSelectedColor(rgbaToHex(info.rgba.r, info.rgba.g, info.rgba.b));
+      setSelectedColor(rgbaToHex8(info.rgba.r, info.rgba.g, info.rgba.b, info.rgba.a));
       setStatusText(`参照 ${number} の色を選択しました`, 'success');
       return true;
     },
@@ -680,11 +679,7 @@ export function App() {
       if (!hoveredPaletteColor) {
         return null;
       }
-      const rgb = hoveredPaletteColor.hex.replace('#', '');
-      const r = Number.parseInt(rgb.slice(0, 2), 16);
-      const g = Number.parseInt(rgb.slice(2, 4), 16);
-      const b = Number.parseInt(rgb.slice(4, 6), 16);
-      const a = 255;
+      const { r, g, b, a } = hexToRgba(hoveredPaletteColor.hex);
       return {
         x: -1,
         y: hoveredPaletteColor.index,
@@ -1636,7 +1631,7 @@ export function App() {
         if (a === 0) {
           continue;
         }
-        detected.add(rgbaToHex(imageData.data[i], imageData.data[i + 1], imageData.data[i + 2]));
+        detected.add(rgbaToHex8(imageData.data[i], imageData.data[i + 1], imageData.data[i + 2], a));
         if (detected.size > 128) {
           break;
         }
@@ -1649,8 +1644,11 @@ export function App() {
       undoStackRef.current = [];
       setCurrentFilePath(result.filePath);
 
-      if (result.metadata?.palette?.length) {
-        setPalette(result.metadata.palette);
+      const normalizedPalette = result.metadata?.palette?.length
+        ? result.metadata.palette.map((color) => normalizeColorHex(color)).filter((color): color is string => color !== null)
+        : [];
+      if (normalizedPalette.length > 0) {
+        setPalette(normalizedPalette);
       } else if (detected.size > 0) {
         setPalette(Array.from(detected).slice(0, 64));
       }

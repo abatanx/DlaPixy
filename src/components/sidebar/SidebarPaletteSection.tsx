@@ -1,5 +1,6 @@
-import { memo, useCallback } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent } from 'react';
+import { memo, useCallback, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import { PaletteColorModal } from '../modals/PaletteColorModal';
 import type { SidebarPaletteSectionProps } from './types';
 
 export const SidebarPaletteSection = memo(function SidebarPaletteSection({
@@ -11,20 +12,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   removeSelectedColorFromPalette
 }: SidebarPaletteSectionProps) {
   const isSelectedColorInPalette = palette.includes(selectedColor);
-
-  const handleColorInput = useCallback(
-    (event: FormEvent<HTMLInputElement>) => {
-      setSelectedColor(event.currentTarget.value);
-    },
-    [setSelectedColor]
-  );
-
-  const handleColorCommit = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      setSelectedColor(event.target.value);
-    },
-    [setSelectedColor]
-  );
+  const [isPaletteColorModalOpen, setIsPaletteColorModalOpen] = useState<boolean>(false);
 
   const handlePaletteClick = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -55,13 +43,15 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
         <span className="sidebar-palette-count">{palette.length} colors</span>
       </div>
       <div className="sidebar-palette-controls">
-        <input
-          type="color"
-          className="form-control form-control-color"
-          value={selectedColor}
-          onInput={handleColorInput}
-          onChange={handleColorCommit}
-        />
+        <button
+          type="button"
+          className="sidebar-color-trigger"
+          onClick={() => setIsPaletteColorModalOpen(true)}
+          aria-label="色選択ダイアログを開く"
+          title="色選択ダイアログを開く"
+        >
+          <span className="sidebar-color-trigger-fill" style={{ backgroundColor: selectedColor }} aria-hidden="true" />
+        </button>
         <div className="sidebar-palette-selected font-monospace">{selectedColor.toUpperCase()}</div>
         <button
           type="button"
@@ -104,6 +94,12 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
           ))}
         </div>
       </div>
+      <PaletteColorModal
+        isOpen={isPaletteColorModalOpen}
+        selectedColor={selectedColor}
+        onApply={setSelectedColor}
+        onClose={() => setIsPaletteColorModalOpen(false)}
+      />
     </div>
   );
 });

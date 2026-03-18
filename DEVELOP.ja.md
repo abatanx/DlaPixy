@@ -125,7 +125,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - 1xプレビューとタイルプレビューを担当するプレビューセクション
 - `src/components/sidebar/SidebarPaletteSection.tsx`
-  - 色選択とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
+  - 色セレクタ起点とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
   - パレット一覧はコンパクト表示 + 独立スクロールにして、大量色でも使いやすくしている
 - `src/components/sidebar/types.ts`
   - サイドバー各セクションで共有する props 型
@@ -135,6 +135,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - キャンバスサイズ変更モーダルのUIと入力検証/適用トリガー
 - `src/components/modals/GridSpacingModal.tsx`
   - グリッド線間隔変更モーダルのUI、プリセット/カスタム入力処理
+- `src/components/modals/PaletteColorModal.tsx`
+  - HEX8 / RGBA / HSV 操作で選択色を編集する renderer モーダル
 - `src/components/modals/useBootstrapModal.ts`
   - renderer モーダル共通の Bootstrap ライフサイクル hook
 - `src/editor/constants.ts`
@@ -171,6 +173,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 縮小時: 新しい範囲外のピクセルを切り捨てる
   - サイズ変更時は選択状態 / 浮動貼り付け状態を解除する
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
+- パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。
+- 描画色とパレット色は alpha 付き `#RRGGBBAA` も扱え、従来の `#RRGGBB` は読込時に正規化する。
 - renderer モーダルは `src/components/modals/**` 配下で、モーダル単位のファイルに分割している。
 - 貼り付けは内部クリップボード（`selectionClipboardRef`）を使う。
 - 貼り付け直後の移動は `floatingPasteRef` により実現。
