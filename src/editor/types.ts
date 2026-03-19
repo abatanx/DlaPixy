@@ -14,6 +14,7 @@ export type HoveredPixelInfo = {
   hex8: string;
   hsva: { h: number; s: number; v: number; a: number };
   paletteIndex: number | null;
+  paletteCaption: string | null;
 } | null;
 
 export type EditorMeta = {

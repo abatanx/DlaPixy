@@ -11,6 +11,7 @@ import { EditorSidebar } from './components/EditorSidebar';
 import { EditorToolbar } from './components/EditorToolbar';
 import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
 import { GridSpacingModal } from './components/modals/GridSpacingModal';
+import type { PaletteColorModalRequest } from './components/sidebar/types';
 import type { MenuAction as FileMenuAction } from '../shared/ipc';
 import {
   DEFAULT_CANVAS_SIZE,
@@ -55,6 +56,25 @@ type UndoSnapshot = {
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 
+function hasHoveredPixelInfoSameContent(
+  left: NonNullable<HoveredPixelInfo>,
+  right: NonNullable<HoveredPixelInfo>
+): boolean {
+  return (
+    left.rgba.r === right.rgba.r &&
+    left.rgba.g === right.rgba.g &&
+    left.rgba.b === right.rgba.b &&
+    left.rgba.a === right.rgba.a &&
+    left.hex8 === right.hex8 &&
+    left.hsva.h === right.hsva.h &&
+    left.hsva.s === right.hsva.s &&
+    left.hsva.v === right.hsva.v &&
+    left.hsva.a === right.hsva.a &&
+    left.paletteIndex === right.paletteIndex &&
+    left.paletteCaption === right.paletteCaption
+  );
+}
+
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
   // ---- UI / editor state ----
@@ -75,6 +95,7 @@ export function App() {
   const [hoveredPaletteColor, setHoveredPaletteColor] = useState<{ hex: string; index: number } | null>(null);
   const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
   const [draggingReferenceKey, setDraggingReferenceKey] = useState<string | null>(null);
+  const [paletteColorModalRequest, setPaletteColorModalRequest] = useState<PaletteColorModalRequest>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
@@ -576,6 +597,78 @@ export function App() {
     drawStateRef.current.moveStartOrigin = null;
   }, []);
 
+  const resolvePaletteMatch = useCallback(
+    (hex8: string): { paletteIndex: number | null; paletteCaption: string | null } => {
+      const paletteIndex = palette.findIndex((entry) => entry.color === hex8.toLowerCase());
+      if (paletteIndex < 0) {
+        return { paletteIndex: null, paletteCaption: null };
+      }
+      return {
+        paletteIndex,
+        paletteCaption: palette[paletteIndex]?.caption || null
+      };
+    },
+    [palette]
+  );
+
+  const syncHoveredPixelInfoWithPalette = useCallback(
+    (info: NonNullable<HoveredPixelInfo>): NonNullable<HoveredPixelInfo> => {
+      const { paletteIndex, paletteCaption } = resolvePaletteMatch(info.hex8);
+      return {
+        ...info,
+        y: info.x < 0 && paletteIndex !== null ? paletteIndex : info.y,
+        paletteIndex,
+        paletteCaption
+      };
+    },
+    [resolvePaletteMatch]
+  );
+
+  const syncReferencePixelInfo = useCallback(
+    (info: NonNullable<HoveredPixelInfo>): NonNullable<HoveredPixelInfo> => {
+      if (info.x >= 0 && info.y >= 0 && info.x < canvasSize && info.y < canvasSize) {
+        const idx = (info.y * canvasSize + info.x) * 4;
+        const r = pixels[idx];
+        const g = pixels[idx + 1];
+        const b = pixels[idx + 2];
+        const a = pixels[idx + 3];
+        const hex8 = rgbaToHex8(r, g, b, a).toUpperCase();
+        const { paletteIndex, paletteCaption } = resolvePaletteMatch(hex8);
+        return {
+          x: info.x,
+          y: info.y,
+          rgba: { r, g, b, a },
+          hex8,
+          hsva: rgbaToHsva(r, g, b, a),
+          paletteIndex,
+          paletteCaption
+        };
+      }
+
+      const paletteSourceIndex = info.paletteIndex ?? info.y;
+      const paletteEntry = paletteSourceIndex >= 0 ? palette[paletteSourceIndex] ?? null : null;
+      if (!paletteEntry) {
+        return {
+          ...info,
+          paletteIndex: null,
+          paletteCaption: null
+        };
+      }
+
+      const { r, g, b, a } = hexToRgba(paletteEntry.color);
+      return {
+        x: info.x,
+        y: paletteSourceIndex,
+        rgba: { r, g, b, a },
+        hex8: rgbaToHex8(r, g, b, a).toUpperCase(),
+        hsva: rgbaToHsva(r, g, b, a),
+        paletteIndex: paletteSourceIndex,
+        paletteCaption: paletteEntry.caption || null
+      };
+    },
+    [canvasSize, palette, pixels, resolvePaletteMatch]
+  );
+
   const resetDrawState = useCallback(() => {
     drawStateRef.current.active = false;
     drawStateRef.current.selectionStart = null;
@@ -609,28 +702,32 @@ export function App() {
       const b = pixels[idx + 2];
       const a = pixels[idx + 3];
       const hsva = rgbaToHsva(r, g, b, a);
-      const paletteIndex = palette.findIndex((entry) => entry.color === rgbaToHex8(r, g, b, a));
+      const hex8 = rgbaToHex8(r, g, b, a).toUpperCase();
+      const { paletteIndex, paletteCaption } = resolvePaletteMatch(hex8);
 
       setHoveredPixelInfo({
         x: cell.x,
         y: cell.y,
         rgba: { r, g, b, a },
-        hex8: rgbaToHex8(r, g, b, a).toUpperCase(),
+        hex8,
         hsva,
-        paletteIndex: paletteIndex >= 0 ? paletteIndex : null
+        paletteIndex,
+        paletteCaption
       });
     },
-    [canvasSize, palette, pixels]
+    [canvasSize, pixels, resolvePaletteMatch]
   );
 
   const getPixelInfoFields = useCallback((info: NonNullable<HoveredPixelInfo>) => {
+    const syncedInfo = syncReferencePixelInfo(info);
     return {
-      rgba: `${info.rgba.r}, ${info.rgba.g}, ${info.rgba.b}, ${info.rgba.a}`,
-      hex8: info.hex8,
-      hsva: `${info.hsva.h.toFixed(1)}, ${info.hsva.s.toFixed(1)}%, ${info.hsva.v.toFixed(1)}%, ${info.hsva.a.toFixed(3)}`,
-      paletteIndex: String(info.paletteIndex ?? '-')
+      rgba: `${syncedInfo.rgba.r}, ${syncedInfo.rgba.g}, ${syncedInfo.rgba.b}, ${syncedInfo.rgba.a}`,
+      hex8: syncedInfo.hex8,
+      hsva: `${syncedInfo.hsva.h.toFixed(1)}, ${syncedInfo.hsva.s.toFixed(1)}%, ${syncedInfo.hsva.v.toFixed(1)}%, ${syncedInfo.hsva.a.toFixed(3)}`,
+      paletteIndex: String(syncedInfo.paletteIndex ?? '-'),
+      paletteCaption: syncedInfo.paletteCaption || '-'
     };
-  }, []);
+  }, [syncReferencePixelInfo]);
 
   const copyTextToClipboard = useCallback(async (text: string): Promise<boolean> => {
     if (!navigator.clipboard?.writeText) {
@@ -654,7 +751,7 @@ export function App() {
   );
 
   const formatReferenceSourceLabel = useCallback((info: NonNullable<HoveredPixelInfo>): string => {
-    return info.x >= 0 ? `(${info.x}, ${info.y})` : `パレット[${info.paletteIndex}]`;
+    return info.x >= 0 ? `(${info.x}, ${info.y})` : `パレット[${info.paletteIndex ?? '-'}]`;
   }, []);
 
   const selectReferenceByNumber = useCallback(
@@ -667,11 +764,12 @@ export function App() {
       if (!info) {
         return false;
       }
-      setSelectedColor(rgbaToHex8(info.rgba.r, info.rgba.g, info.rgba.b, info.rgba.a));
+      const syncedInfo = syncReferencePixelInfo(info);
+      setSelectedColor(rgbaToHex8(syncedInfo.rgba.r, syncedInfo.rgba.g, syncedInfo.rgba.b, syncedInfo.rgba.a));
       setStatusText(`参照 ${number} の色を選択しました`, 'success');
       return true;
     },
-    [referencePixelInfos]
+    [referencePixelInfos, syncReferencePixelInfo]
   );
 
   const freezeHoveredPixelInfo = useCallback(() => {
@@ -686,7 +784,8 @@ export function App() {
         rgba: { r, g, b, a },
         hex8: rgbaToHex8(r, g, b, a).toUpperCase(),
         hsva: rgbaToHsva(r, g, b, a),
-        paletteIndex: hoveredPaletteColor.index
+        paletteIndex: hoveredPaletteColor.index,
+        paletteCaption: null
       } satisfies NonNullable<HoveredPixelInfo>;
     })();
 
@@ -695,50 +794,60 @@ export function App() {
       setStatusText('参照追加: キャンバスまたはパレット上にマウスを置いてから F を押してください', 'warning');
       return;
     }
+    const syncedActiveInfo = syncReferencePixelInfo(activeInfo);
 
-    const matchingPaletteColor = activeInfo.paletteIndex !== null ? palette[activeInfo.paletteIndex]?.color ?? null : null;
+    const matchingPaletteColor =
+      syncedActiveInfo.paletteIndex !== null ? palette[syncedActiveInfo.paletteIndex]?.color ?? null : null;
     if (matchingPaletteColor) {
       setSelectedColor(matchingPaletteColor);
     }
 
     const hasSameInfoIgnoringCoordinate = referencePixelInfos.some(
       (info) =>
-        info.rgba.r === activeInfo.rgba.r &&
-        info.rgba.g === activeInfo.rgba.g &&
-        info.rgba.b === activeInfo.rgba.b &&
-        info.rgba.a === activeInfo.rgba.a &&
-        info.hex8 === activeInfo.hex8 &&
-        info.hsva.h === activeInfo.hsva.h &&
-        info.hsva.s === activeInfo.hsva.s &&
-        info.hsva.v === activeInfo.hsva.v &&
-        info.hsva.a === activeInfo.hsva.a &&
-        info.paletteIndex === activeInfo.paletteIndex &&
-        !(info.x === activeInfo.x && info.y === activeInfo.y)
+        hasHoveredPixelInfoSameContent(info, syncedActiveInfo) &&
+        !(info.x === syncedActiveInfo.x && info.y === syncedActiveInfo.y)
     );
     if (hasSameInfoIgnoringCoordinate) {
       setStatusText('参照追加: 同じ色情報がすでに登録済みです', 'warning');
       return;
     }
 
-    const existingIndex = referencePixelInfos.findIndex((info) => info.x === activeInfo.x && info.y === activeInfo.y);
+    const existingIndex = referencePixelInfos.findIndex(
+      (info) => info.x === syncedActiveInfo.x && info.y === syncedActiveInfo.y
+    );
     if (existingIndex < 0) {
-      setReferencePixelInfos((prev) => [...prev, activeInfo]);
-      setStatusText(`参照追加: ${formatReferenceSourceLabel(activeInfo)} ${activeInfo.hex8}`, 'success');
+      setReferencePixelInfos((prev) => [...prev, syncedActiveInfo]);
+      setStatusText(`参照追加: ${formatReferenceSourceLabel(syncedActiveInfo)} ${syncedActiveInfo.hex8}`, 'success');
       return;
     }
 
-    if (referencePixelInfos[existingIndex].hex8 === activeInfo.hex8) {
-      setStatusText(`参照維持: ${formatReferenceSourceLabel(activeInfo)} は同じ色です`, 'warning');
+    if (hasHoveredPixelInfoSameContent(referencePixelInfos[existingIndex], syncedActiveInfo)) {
+      setStatusText(`参照維持: ${formatReferenceSourceLabel(syncedActiveInfo)} は同じ色です`, 'warning');
       return;
     }
 
     setReferencePixelInfos((prev) => {
       const next = [...prev];
-      next[existingIndex] = activeInfo;
+      next[existingIndex] = syncedActiveInfo;
       return next;
     });
-    setStatusText(`参照更新: ${formatReferenceSourceLabel(activeInfo)} -> ${activeInfo.hex8}`, 'success');
-  }, [formatReferenceSourceLabel, hoveredPaletteColor, hoveredPixelInfo, palette, referencePixelInfos]);
+    setStatusText(`参照更新: ${formatReferenceSourceLabel(syncedActiveInfo)} -> ${syncedActiveInfo.hex8}`, 'success');
+  }, [formatReferenceSourceLabel, hoveredPaletteColor, hoveredPixelInfo, palette, referencePixelInfos, syncReferencePixelInfo]);
+
+  useEffect(() => {
+    setReferencePixelInfos((prev) => {
+      let changed = false;
+      const next = prev.map((info) => {
+        const syncedInfo = syncReferencePixelInfo(info);
+        if (syncedInfo.x === info.x && syncedInfo.y === info.y && hasHoveredPixelInfoSameContent(syncedInfo, info)) {
+          return info;
+        }
+        changed = true;
+        return syncedInfo;
+      });
+      return changed ? next : prev;
+    });
+  }, [syncReferencePixelInfo]);
 
   const clearReferencePixelInfos = useCallback(() => {
     if (referencePixelInfos.length === 0) {
@@ -765,6 +874,25 @@ export function App() {
       setStatusText(`参照を削除しました: (${x}, ${y})`, 'success');
     }
   }, []);
+
+  const openReferencePaletteColorModal = useCallback(
+    (info: NonNullable<HoveredPixelInfo>) => {
+      const syncedInfo = syncReferencePixelInfo(info);
+      const matchedEntry =
+        syncedInfo.paletteIndex !== null ? palette[syncedInfo.paletteIndex] ?? null : null;
+      const modalEntry: PaletteEntry = matchedEntry ?? {
+        color: syncedInfo.hex8.toLowerCase(),
+        caption: syncedInfo.paletteCaption ?? ''
+      };
+
+      setSelectedColor(modalEntry.color);
+      setPaletteColorModalRequest({
+        mode: matchedEntry ? 'edit' : 'create',
+        entry: modalEntry
+      });
+    },
+    [palette, syncReferencePixelInfo]
+  );
 
   const getReferenceKey = useCallback((info: NonNullable<HoveredPixelInfo>): string => `${info.x}:${info.y}`, []);
 
@@ -1830,6 +1958,7 @@ export function App() {
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
+            paletteColorModalRequest={paletteColorModalRequest}
           />
 
           <main className="col-12 col-lg-8 col-xl-9 d-flex">
@@ -1876,6 +2005,9 @@ export function App() {
                         <span className="canvas-data-field">
                           PaletteIndex: {fields.paletteIndex}
                         </span>
+                        <span className="canvas-data-field">
+                          Caption: {fields.paletteCaption}
+                        </span>
                       </span>
                     );
                   })()
@@ -1887,6 +2019,7 @@ export function App() {
                     <span className="canvas-data-field">HEX8: -</span>
                     <span className="canvas-data-field">HSVA: -</span>
                     <span className="canvas-data-field">PaletteIndex: -</span>
+                    <span className="canvas-data-field">Caption: -</span>
                   </span>
                 )}
               </div>
@@ -1906,14 +2039,15 @@ export function App() {
                 {referencePixelInfos.length > 0 ? (
                   <div className="canvas-reference-list">
                     {referencePixelInfos.map((info, index) => {
-                      const fields = getPixelInfoFields(info);
+                      const syncedInfo = syncReferencePixelInfo(info);
+                      const fields = getPixelInfoFields(syncedInfo);
                       const referenceKey = getReferenceKey(info);
                       const lineNumber = index < 9 ? String(index + 1) : '-';
                       return (
                         <div
                           key={referenceKey}
                           className={`canvas-reference-line ${draggingReferenceKey === referenceKey ? 'is-dragging' : ''}`}
-                          title={info.hex8}
+                          title={syncedInfo.hex8}
                           draggable
                           onDragStart={(event) => onReferenceDragStart(event, referenceKey)}
                           onDragEnd={onReferenceDragEnd}
@@ -1921,10 +2055,17 @@ export function App() {
                           onDrop={(event) => onReferenceDrop(event, referenceKey)}
                         >
                           <span className="canvas-reference-number">{lineNumber}</span>
-                          <span className="canvas-reference-swatch">
+                          <span
+                            className="canvas-reference-swatch"
+                            onDoubleClick={() => openReferencePaletteColorModal(info)}
+                            title="ダブルクリックで色モーダルを開く"
+                            aria-label="ダブルクリックで色モーダルを開く"
+                          >
                             <span
                               className="canvas-hover-swatch-color"
-                              style={{ backgroundColor: `rgba(${info.rgba.r}, ${info.rgba.g}, ${info.rgba.b}, ${info.rgba.a / 255})` }}
+                              style={{
+                                backgroundColor: `rgba(${syncedInfo.rgba.r}, ${syncedInfo.rgba.g}, ${syncedInfo.rgba.b}, ${syncedInfo.rgba.a / 255})`
+                              }}
                             />
                           </span>
                           <span className="canvas-reference-text canvas-data-field">
@@ -1971,6 +2112,18 @@ export function App() {
                               onClick={() => void copyPixelField('PaletteIndex', fields.paletteIndex)}
                               title="PaletteIndexをコピー"
                               aria-label="PaletteIndexをコピー"
+                            >
+                              <i className="fa-regular fa-copy" aria-hidden="true" />
+                            </button>
+                          </span>
+                          <span className="canvas-reference-text canvas-data-field">
+                            Caption: {fields.paletteCaption}
+                            <button
+                              type="button"
+                              className="canvas-copy-btn"
+                              onClick={() => void copyPixelField('Caption', fields.paletteCaption)}
+                              title="Captionをコピー"
+                              aria-label="Captionをコピー"
                             >
                               <i className="fa-regular fa-copy" aria-hidden="true" />
                             </button>

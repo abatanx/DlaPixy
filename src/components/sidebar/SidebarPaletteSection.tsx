@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { PaletteColorModal } from '../modals/PaletteColorModal';
 import type { SidebarPaletteSectionProps } from './types';
@@ -10,7 +10,8 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   palette,
   setHoveredPaletteColor,
   addPaletteColor,
-  removeSelectedColorFromPalette
+  removeSelectedColorFromPalette,
+  paletteColorModalRequest
 }: SidebarPaletteSectionProps) {
   const selectedPaletteEntry = useMemo(
     () => palette.find((entry) => entry.color === selectedColor) ?? null,
@@ -24,11 +25,15 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     caption: ''
   });
 
-  const openEditPaletteColorModal = useCallback((entry: { color: string; caption: string }) => {
-    setPaletteColorModalMode('edit');
+  const openPaletteColorModal = useCallback((mode: 'edit' | 'create', entry: { color: string; caption: string }) => {
+    setPaletteColorModalMode(mode);
     setPaletteColorModalInitial(entry);
     setIsPaletteColorModalOpen(true);
   }, []);
+
+  const openEditPaletteColorModal = useCallback((entry: { color: string; caption: string }) => {
+    openPaletteColorModal('edit', entry);
+  }, [openPaletteColorModal]);
 
   const openSelectedColorEditPaletteColorModal = useCallback(() => {
     openEditPaletteColorModal({
@@ -38,13 +43,11 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   }, [openEditPaletteColorModal, selectedColor, selectedPaletteEntry]);
 
   const openCreatePaletteColorModal = useCallback(() => {
-    setPaletteColorModalMode('create');
-    setPaletteColorModalInitial({
+    openPaletteColorModal('create', {
       color: selectedColor,
       caption: ''
     });
-    setIsPaletteColorModalOpen(true);
-  }, [selectedColor]);
+  }, [openPaletteColorModal, selectedColor]);
 
   const handlePaletteColorModalApply = useCallback(
     (nextEntry: { color: string; caption: string }) => {
@@ -97,6 +100,14 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   const handlePaletteMouseLeave = useCallback(() => {
     setHoveredPaletteColor(null);
   }, [setHoveredPaletteColor]);
+
+  useEffect(() => {
+    if (!paletteColorModalRequest) {
+      return;
+    }
+    setSelectedColor(paletteColorModalRequest.entry.color);
+    openPaletteColorModal(paletteColorModalRequest.mode, paletteColorModalRequest.entry);
+  }, [openPaletteColorModal, paletteColorModalRequest, setSelectedColor]);
 
   return (
     <div className="sidebar-palette-section d-flex flex-column flex-grow-1">

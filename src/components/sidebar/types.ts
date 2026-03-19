@@ -1,5 +1,10 @@
 import type { PaletteEntry, Selection } from '../../editor/types';
 
+export type PaletteColorModalRequest = {
+  mode: 'edit' | 'create';
+  entry: PaletteEntry;
+} | null;
+
 export type EditorSidebarProps = {
   canvasSize: number;
   previewDataUrl: string;
@@ -13,6 +18,7 @@ export type EditorSidebarProps = {
   setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
   addPaletteColor: (value: PaletteEntry) => void;
   removeSelectedColorFromPalette: () => void;
+  paletteColorModalRequest: PaletteColorModalRequest;
 };
 
 export type SidebarPreviewSectionProps = Pick<
@@ -29,4 +35,5 @@ export type SidebarPaletteSectionProps = Pick<
   | 'setHoveredPaletteColor'
   | 'addPaletteColor'
   | 'removeSelectedColorFromPalette'
+  | 'paletteColorModalRequest'
 >;

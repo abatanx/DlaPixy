@@ -25,11 +25,14 @@ npm run dist
   - `rgbaToHsva` (`RGBA 0-255` -> `HSVA H:0-360, S/V:0-100, A:0-1`)
   - `hsvaToRgba` (`HSVA` -> `RGBA 0-255`)
 - Hovered pixel color details in a single line below canvas:
-  - Displays `x,y`, `RGBA`, `#RRGGBBAA`, `HSVA`, and optional palette index
+  - Displays `x,y`, `RGBA`, `#RRGGBBAA`, `HSVA`, optional palette index, and matching palette caption
   - Clears display when pointer leaves canvas
 - Reference color line below hover info:
   - Press `F` while hovering canvas pixel or left palette color to append reference
   - If the hovered color already exists in the palette, `F` also selects that palette color
+  - Reference lines also keep and display the matching palette caption when available
+  - Reference line color/caption/index stay synced with current canvas/palette state when the source color is edited later
+  - Double-clicking a reference swatch opens the palette color modal (edit if registered, create if not)
   - Repeated `F` at same coordinate ignores if same color, overwrites if color changed
   - Reference lines are reorderable with drag-and-drop
   - Lines are auto-numbered from top (`1..9`), and lines after 9 show `-`
