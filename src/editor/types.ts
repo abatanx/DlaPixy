@@ -2,6 +2,11 @@ export type Tool = 'pencil' | 'eraser' | 'fill' | 'select';
 
 export type Selection = { x: number; y: number; w: number; h: number } | null;
 
+export type PaletteEntry = {
+  color: string;
+  caption: string;
+};
+
 export type HoveredPixelInfo = {
   x: number;
   y: number;
@@ -15,6 +20,6 @@ export type EditorMeta = {
   version: number;
   canvasSize?: number;
   gridSpacing?: number;
-  palette: string[];
+  palette: PaletteEntry[];
   lastTool: Tool;
 };

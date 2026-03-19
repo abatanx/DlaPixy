@@ -1,13 +1,15 @@
+import { PALETTE_CAPTION_MAX_LENGTH } from '../../editor/constants';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { hexToRgba, hsvaToRgba, normalizeColorHex, rgbaToHex8, rgbaToHsva } from '../../editor/utils';
+import type { PaletteEntry } from '../../editor/types';
+import { hexToRgba, hsvaToRgba, normalizeColorHex, normalizePaletteCaption, rgbaToHex8, rgbaToHsva } from '../../editor/utils';
 import { useBootstrapModal } from './useBootstrapModal';
 
 type PaletteColorModalProps = {
   isOpen: boolean;
-  selectedColor: string;
-  palette: string[];
+  selectedPalette: PaletteEntry;
+  palette: PaletteEntry[];
   paletteEditTarget?: string | null;
-  onApply: (value: string) => void;
+  onApply: (value: PaletteEntry) => void;
   onClose: () => void;
 };
 
@@ -62,6 +64,14 @@ function roundHsvaForInput(hsva: { h: number; s: number; v: number }, alphaByte:
   };
 }
 
+function getCircularHueDelta(nextHue: number, previousHue: number): number {
+  return ((nextHue - previousHue + 540) % 360) - 180;
+}
+
+function formatSignedDelta(value: number): string {
+  return `${value >= 0 ? '+' : ''}${value}`;
+}
+
 function buildRgbaSliderPreview(channel: keyof RgbaChannels, rgba: RgbaChannels): string {
   switch (channel) {
     case 'r':
@@ -103,22 +113,32 @@ function buildHsvaSliderPreview(channel: 'h' | 's' | 'v', hsva: HsvaChannels, al
 
 export function PaletteColorModal({
   isOpen,
-  selectedColor,
+  selectedPalette,
   palette,
-  paletteEditTarget = selectedColor,
+  paletteEditTarget = selectedPalette.color,
   onApply,
   onClose
 }: PaletteColorModalProps) {
-  const initialHexParts = splitColorHexInput(selectedColor);
+  const initialHexParts = splitColorHexInput(selectedPalette.color);
   const [pendingHexRgbInput, setPendingHexRgbInput] = useState<string>(initialHexParts.rgb);
   const [pendingAlphaHexInput, setPendingAlphaHexInput] = useState<string>(initialHexParts.alpha);
-  const [pendingRgba, setPendingRgba] = useState<RgbaChannels>(() => hexToRgba(selectedColor));
+  const [pendingCaptionInput, setPendingCaptionInput] = useState<string>(normalizePaletteCaption(selectedPalette.caption));
+  const [pendingRgba, setPendingRgba] = useState<RgbaChannels>(() => hexToRgba(selectedPalette.color));
   const [pendingHsva, setPendingHsva] = useState<HsvaChannels>(() => {
-    const rgba = hexToRgba(selectedColor);
+    const rgba = hexToRgba(selectedPalette.color);
     return roundHsvaForInput(rgbaToHsva(rgba.r, rgba.g, rgba.b, rgba.a), rgba.a);
   });
   const [validationMessage, setValidationMessage] = useState<string>('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const originalRgba = hexToRgba(selectedPalette.color);
+  const originalHsva = roundHsvaForInput(rgbaToHsva(originalRgba.r, originalRgba.g, originalRgba.b, originalRgba.a), originalRgba.a);
+  const hsvDelta = {
+    h: getCircularHueDelta(pendingHsva.h, originalHsva.h),
+    s: pendingHsva.s - originalHsva.s,
+    v: pendingHsva.v - originalHsva.v
+  };
+  const originalColorHex = (normalizeColorHex(selectedPalette.color) ?? '#000000ff').toUpperCase();
+  const currentColorHex = rgbaToHex8(pendingRgba.r, pendingRgba.g, pendingRgba.b, pendingRgba.a).toUpperCase();
 
   const syncFromRgba = useCallback((nextRgba: RgbaChannels) => {
     setPendingRgba(nextRgba);
@@ -145,8 +165,9 @@ export function PaletteColorModal({
   }, []);
 
   const syncPendingState = useCallback(() => {
-    syncFromRgba(hexToRgba(selectedColor));
-  }, [selectedColor, syncFromRgba]);
+    syncFromRgba(hexToRgba(selectedPalette.color));
+    setPendingCaptionInput(normalizePaletteCaption(selectedPalette.caption));
+  }, [selectedPalette.caption, selectedPalette.color, syncFromRgba]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -205,6 +226,10 @@ export function PaletteColorModal({
     [pendingHexRgbInput, syncFromRgba]
   );
 
+  const handleCaptionInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setPendingCaptionInput(normalizePaletteCaption(event.target.value));
+  }, []);
+
   const handleRgbaChannelChange = useCallback(
     (channel: keyof RgbaChannels, value: string) => {
       const parsed = Number.parseInt(value, 10);
@@ -256,14 +281,17 @@ export function PaletteColorModal({
   const normalizedPendingAlpha = normalizeAlphaHexInput(pendingAlphaHexInput);
   const normalizedPendingColor =
     normalizedPendingRgb !== null && normalizedPendingAlpha !== null
-      ? `${normalizedPendingRgb}${normalizedPendingAlpha}`
+      ? normalizeColorHex(`${normalizedPendingRgb}${normalizedPendingAlpha}`)
       : null;
   const hasDuplicatePaletteColor =
     normalizedPendingColor !== null &&
     normalizedPendingColor !== paletteEditTarget &&
-    palette.includes(normalizedPendingColor);
+    palette.some((entry) => entry.color === normalizedPendingColor);
   const effectiveValidationMessage =
     validationMessage || (hasDuplicatePaletteColor ? 'パレットに同じ色がすでにあります' : '');
+  const hasValidationError = effectiveValidationMessage.length > 0;
+  const feedbackMessage = hasValidationError ? effectiveValidationMessage : 'OK';
+  const feedbackClassName = hasValidationError ? 'palette-color-modal-feedback text-danger' : 'palette-color-modal-feedback text-success';
 
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -282,11 +310,18 @@ export function PaletteColorModal({
         return;
       }
 
-      const nextColor = `${normalizedPendingRgb}${normalizedPendingAlpha}`;
-      onApply(nextColor);
+      const nextColor = normalizedPendingColor;
+      if (!nextColor) {
+        setValidationMessage('HEX は #RRGGBB 形式で入力してください');
+        return;
+      }
+      onApply({
+        color: nextColor,
+        caption: normalizePaletteCaption(pendingCaptionInput)
+      });
       onClose();
     },
-    [hasDuplicatePaletteColor, normalizedPendingAlpha, normalizedPendingColor, normalizedPendingRgb, onApply, onClose]
+    [hasDuplicatePaletteColor, normalizedPendingAlpha, normalizedPendingColor, normalizedPendingRgb, onApply, onClose, pendingCaptionInput]
   );
 
   return (
@@ -297,7 +332,7 @@ export function PaletteColorModal({
       aria-labelledby="palette-color-modal-title"
       aria-hidden="true"
     >
-      <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-dialog modal-lg modal-dialog-centered">
         <div className="modal-content shadow">
           <form onSubmit={handleSubmit}>
             <div className="modal-header">
@@ -310,17 +345,52 @@ export function PaletteColorModal({
               <button type="button" className="btn-close" aria-label="閉じる" onClick={onClose} />
             </div>
             <div className="modal-body py-4">
-              <div className="palette-color-modal-preview mb-4">
-                <div className="palette-color-modal-preview-swatch" aria-hidden="true">
-                  <div
-                    className="palette-color-modal-preview-swatch-fill"
-                    style={{ backgroundColor: rgbaToHex8(pendingRgba.r, pendingRgba.g, pendingRgba.b, pendingRgba.a) }}
+              <div className="row g-3 mb-4">
+                <div className="col-12">
+                  <label htmlFor="palette-color-caption-input" className="form-label">Caption</label>
+                  <input
+                    id="palette-color-caption-input"
+                    type="text"
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className="form-control font-monospace"
+                    value={pendingCaptionInput}
+                    onChange={handleCaptionInputChange}
+                    placeholder={`${PALETTE_CAPTION_MAX_LENGTH}文字まで`}
+                    maxLength={PALETTE_CAPTION_MAX_LENGTH}
                   />
                 </div>
-                <div className="palette-color-modal-preview-meta">
-                  <div className="small text-uppercase text-secondary fw-semibold">Current Color</div>
-                  <div className="font-monospace fs-5">
-                    {rgbaToHex8(pendingRgba.r, pendingRgba.g, pendingRgba.b, pendingRgba.a).toUpperCase()}
+              </div>
+              <div className="palette-color-modal-preview mb-4">
+                <div className="palette-color-modal-preview-item">
+                  <div className="palette-color-modal-preview-swatch" aria-hidden="true">
+                    <div className="palette-color-modal-preview-swatch-fill" style={{ backgroundColor: originalColorHex }} />
+                  </div>
+                  <div className="palette-color-modal-preview-meta">
+                    <div className="small text-uppercase text-secondary fw-semibold">Before</div>
+                    <div className="font-monospace fs-5">{originalColorHex}</div>
+                  </div>
+                </div>
+                <div className="palette-color-modal-preview-delta">
+                  <div className="small text-uppercase text-secondary fw-semibold">Delta HSV</div>
+                  <div className="palette-color-modal-preview-delta-values font-monospace">
+                    <span>H {formatSignedDelta(hsvDelta.h)}</span>
+                    <span>S {formatSignedDelta(hsvDelta.s)}</span>
+                    <span>V {formatSignedDelta(hsvDelta.v)}</span>
+                  </div>
+                </div>
+                <div className="palette-color-modal-preview-arrow text-secondary" aria-hidden="true">
+                  <i className="fa-solid fa-arrow-right" />
+                </div>
+                <div className="palette-color-modal-preview-item">
+                  <div className="palette-color-modal-preview-swatch" aria-hidden="true">
+                    <div className="palette-color-modal-preview-swatch-fill" style={{ backgroundColor: currentColorHex }} />
+                  </div>
+                  <div className="palette-color-modal-preview-meta">
+                    <div className="small text-uppercase text-secondary fw-semibold">Current Color</div>
+                    <div className="font-monospace fs-5">{currentColorHex}</div>
                   </div>
                 </div>
               </div>
@@ -335,7 +405,7 @@ export function PaletteColorModal({
                     autoCapitalize="characters"
                     autoCorrect="off"
                     spellCheck={false}
-                    className={`form-control font-monospace ${effectiveValidationMessage ? 'is-invalid' : ''}`}
+                    className={`form-control font-monospace ${hasValidationError ? 'is-invalid' : ''}`}
                     value={pendingHexRgbInput}
                     onChange={handleHexRgbInputChange}
                     placeholder="#RRGGBB"
@@ -350,18 +420,16 @@ export function PaletteColorModal({
                     autoCapitalize="characters"
                     autoCorrect="off"
                     spellCheck={false}
-                    className={`form-control font-monospace ${effectiveValidationMessage ? 'is-invalid' : ''}`}
+                    className={`form-control font-monospace ${hasValidationError ? 'is-invalid' : ''}`}
                     value={pendingAlphaHexInput}
                     onChange={handleAlphaHexInputChange}
                     placeholder="FF"
                     maxLength={2}
                   />
                 </div>
-                {effectiveValidationMessage ? (
-                  <div className="col-12">
-                    <div className="invalid-feedback d-block">{effectiveValidationMessage}</div>
-                  </div>
-                ) : null}
+                <div className="col-12">
+                  <div className={feedbackClassName}>{feedbackMessage}</div>
+                </div>
               </div>
               <div className="small text-uppercase text-secondary fw-semibold mb-2">RGBA</div>
               {(['r', 'g', 'b', 'a'] as const).map((channel) => (

@@ -1,6 +1,11 @@
 import type { MenuAction } from '../shared/ipc';
 export {};
 
+type PaletteEntry = {
+  color: string;
+  caption: string;
+};
+
 declare global {
   interface Window {
     pixelApi: {
@@ -10,7 +15,7 @@ declare global {
           version: number;
           canvasSize?: number;
           gridSpacing?: number;
-          palette: string[];
+          palette: PaletteEntry[];
           lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
         };
         filePath?: string;
@@ -25,7 +30,7 @@ declare global {
           version: number;
           canvasSize?: number;
           gridSpacing?: number;
-          palette: string[];
+          palette: PaletteEntry[];
           lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
         } | null;
       }>;

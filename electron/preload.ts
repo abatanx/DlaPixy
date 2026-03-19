@@ -1,11 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { MenuAction } from '../shared/ipc';
 
+type PaletteEntry = {
+  color: string;
+  caption: string;
+};
+
 type EditorMeta = {
   version: number;
   canvasSize?: number;
   gridSpacing?: number;
-  palette: string[];
+  palette: PaletteEntry[];
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
 };
 

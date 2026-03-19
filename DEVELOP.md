@@ -44,6 +44,8 @@ npm run dist
   - Canvas: default `256x256` (change from native `Canvas` menu modal)
   - Grid overlay spacing: `none / 8 / 16 / 32 / custom`
 - Initial palette uses the 216 Web Safe Colors
+- Palette entries can store a short caption (up to 4 characters), shown under each swatch
+  - Double-clicking an existing palette swatch selects it and opens the color edit modal
 - Tools:
   - Pencil
   - Eraser
@@ -112,7 +114,7 @@ Current metadata shape:
   version: number,
   canvasSize?: number,
   gridSpacing?: number,
-  palette: string[],
+  palette: Array<{ color: string, caption: string }>,
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
 }
 ```
@@ -175,6 +177,9 @@ Current metadata shape:
   - selection / floating paste are cleared on resize
 - Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
 - Palette color selection is edited in a renderer modal instead of the native browser color picker.
+- The palette color modal preview shows both the original color and the current editing color side by side, with a nearby `Delta HSV` diff.
+- Palette entries are stored as `{ color, caption }[]`.
+- Palette caption max length is managed by `PALETTE_CAPTION_MAX_LENGTH` in `src/editor/constants.ts`.
 - Selected drawing color and palette entries can carry alpha (`#RRGGBBAA`), while legacy `#RRGGBB` values are normalized on load.
 - Editing an existing palette color also replaces matching pixels on the canvas with the new color in one undoable operation.
 - While editing an existing palette color, Apply is disabled if the adjusted color already exists elsewhere in the palette.

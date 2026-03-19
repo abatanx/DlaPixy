@@ -23,16 +23,18 @@ import {
   MIN_CANVAS_SIZE,
   MIN_ZOOM
 } from './editor/constants';
-import type { EditorMeta, HoveredPixelInfo, Selection, Tool } from './editor/types';
+import type { EditorMeta, HoveredPixelInfo, PaletteEntry, Selection, Tool } from './editor/types';
 import {
   blitBlockOnCanvas,
   clampCanvasSize,
   clampSelectionToCanvas,
+  clonePaletteEntries,
   clonePixels,
   cloneSelection,
+  createPaletteEntries,
   createEmptyPixels,
   hexToRgba,
-  normalizeColorHex,
+  normalizePaletteEntries,
   pointInSelection,
   rasterLinePoints,
   rgbaToHex8,
@@ -46,14 +48,12 @@ type UndoSnapshot = {
   canvasSize: number;
   pixels: Uint8ClampedArray;
   selection: Selection;
-  palette: string[];
+  palette: PaletteEntry[];
   selectedColor: string;
 };
 
-const INITIAL_PALETTE = DEFAULT_PALETTE
-  .map((color) => normalizeColorHex(color))
-  .filter((color): color is string => color !== null);
-const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0] ?? '#000000ff';
+const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
+const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
@@ -62,7 +62,7 @@ export function App() {
   const [gridSpacing, setGridSpacing] = useState<number>(DEFAULT_GRID_SPACING);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
   const [pixels, setPixels] = useState<Uint8ClampedArray>(() => createEmptyPixels(DEFAULT_CANVAS_SIZE));
-  const [palette, setPalette] = useState<string[]>(INITIAL_PALETTE);
+  const [palette, setPalette] = useState<PaletteEntry[]>(INITIAL_PALETTE);
   const [selectedColor, setSelectedColor] = useState<string>(INITIAL_SELECTED_COLOR);
   const [tool, setTool] = useState<Tool>('pencil');
   const [selection, setSelection] = useState<Selection>(null);
@@ -223,7 +223,7 @@ export function App() {
       canvasSize,
       pixels: clonePixels(pixels),
       selection: cloneSelection(selection),
-      palette: [...palette],
+      palette: clonePaletteEntries(palette),
       selectedColor
     });
     if (undoStackRef.current.length > MAX_UNDO) {
@@ -609,7 +609,7 @@ export function App() {
       const b = pixels[idx + 2];
       const a = pixels[idx + 3];
       const hsva = rgbaToHsva(r, g, b, a);
-      const paletteIndex = palette.findIndex((color) => color === rgbaToHex8(r, g, b, a));
+      const paletteIndex = palette.findIndex((entry) => entry.color === rgbaToHex8(r, g, b, a));
 
       setHoveredPixelInfo({
         x: cell.x,
@@ -696,7 +696,7 @@ export function App() {
       return;
     }
 
-    const matchingPaletteColor = activeInfo.paletteIndex !== null ? palette[activeInfo.paletteIndex] : null;
+    const matchingPaletteColor = activeInfo.paletteIndex !== null ? palette[activeInfo.paletteIndex]?.color ?? null : null;
     if (matchingPaletteColor) {
       setSelectedColor(matchingPaletteColor);
     }
@@ -1167,7 +1167,7 @@ export function App() {
     setPixels(previous.pixels);
     setSelection(previous.selection);
     setLastTilePreviewSelection(previous.selection);
-    setPalette(previous.palette);
+    setPalette(clonePaletteEntries(previous.palette));
     setSelectedColor(previous.selectedColor);
     clearFloatingPaste();
     setHasUnsavedChanges(true);
@@ -1465,15 +1465,15 @@ export function App() {
   ]);
 
   const addPaletteColor = useCallback(
-    (nextColor: string) => {
-      if (palette.includes(nextColor)) {
+    ({ color: nextColor, caption: nextCaption }: PaletteEntry) => {
+      if (palette.some((entry) => entry.color === nextColor)) {
         setStatusText('同じ色はすでにパレットにあります', 'warning');
         return;
       }
 
       pushUndo();
       setSelectedColor(nextColor);
-      setPalette((prev) => [...prev, nextColor]);
+      setPalette((prev) => [...prev, { color: nextColor, caption: nextCaption }]);
       setHasUnsavedChanges(true);
       setStatusText(`パレットに追加しました: ${nextColor.toUpperCase()}`, 'success');
     },
@@ -1481,24 +1481,27 @@ export function App() {
   );
 
   const removeSelectedColorFromPalette = useCallback(() => {
-    if (!palette.includes(selectedColor)) {
+    const selectedPaletteIndex = palette.findIndex((entry) => entry.color === selectedColor);
+    if (selectedPaletteIndex < 0) {
       setStatusText('選択色はパレットにありません', 'warning');
       return;
     }
 
     pushUndo();
-    setPalette((prev) => prev.filter((color) => color !== selectedColor));
+    setPalette((prev) => prev.filter((_entry, index) => index !== selectedPaletteIndex));
     setHasUnsavedChanges(true);
     setStatusText(`パレットから削除しました: ${selectedColor.toUpperCase()}`, 'success');
   }, [palette, pushUndo, selectedColor, setStatusText]);
 
   const applySelectedColorChange = useCallback(
-    (nextColor: string) => {
-      if (nextColor === selectedColor) {
+    ({ color: nextColor, caption: nextCaption }: PaletteEntry) => {
+      const selectedPaletteIndex = palette.findIndex((entry) => entry.color === selectedColor);
+      const currentCaption = selectedPaletteIndex >= 0 ? palette[selectedPaletteIndex]?.caption ?? '' : '';
+      if (nextColor === selectedColor && nextCaption === currentCaption) {
         return;
       }
 
-      if (!palette.includes(selectedColor)) {
+      if (selectedPaletteIndex < 0) {
         setSelectedColor(nextColor);
         return;
       }
@@ -1525,8 +1528,8 @@ export function App() {
         replacedPixelCount += 1;
       }
 
-      const nextPalette = Array.from(
-        new Set(palette.map((color) => (color === selectedColor ? nextColor : color)))
+      const nextPalette = palette.map((entry, index) =>
+        index === selectedPaletteIndex ? { color: nextColor, caption: nextCaption } : entry
       );
 
       pushUndo();
@@ -1534,10 +1537,14 @@ export function App() {
       setPalette(nextPalette);
       setPixels(replacedPixelCount > 0 ? nextPixels : pixels);
       setHasUnsavedChanges(true);
-      setStatusText(
-        `パレット色を更新しました: ${selectedColor.toUpperCase()} -> ${nextColor.toUpperCase()}${replacedPixelCount > 0 ? ` / ${replacedPixelCount}px` : ''}`,
-        'success'
-      );
+      if (nextColor !== selectedColor) {
+        setStatusText(
+          `パレット色を更新しました: ${selectedColor.toUpperCase()} -> ${nextColor.toUpperCase()}${replacedPixelCount > 0 ? ` / ${replacedPixelCount}px` : ''}`,
+          'success'
+        );
+      } else {
+        setStatusText(`パレットキャプションを更新しました: ${nextCaption || '(空)'}`, 'success');
+      }
     },
     [palette, pixels, pushUndo, selectedColor, setStatusText]
   );
@@ -1556,10 +1563,10 @@ export function App() {
     const base64Png = dataUrl.replace(/^data:image\/png;base64,/, '');
 
     const metadata: EditorMeta = {
-      version: 2,
+      version: 3,
       canvasSize,
       gridSpacing,
-      palette,
+      palette: clonePaletteEntries(palette),
       lastTool: tool
     };
 
@@ -1704,12 +1711,12 @@ export function App() {
       setCurrentFilePath(result.filePath);
 
       const normalizedPalette = result.metadata?.palette?.length
-        ? result.metadata.palette.map((color) => normalizeColorHex(color)).filter((color): color is string => color !== null)
+        ? normalizePaletteEntries(result.metadata.palette)
         : [];
       if (normalizedPalette.length > 0) {
         setPalette(normalizedPalette);
       } else if (detected.size > 0) {
-        setPalette(Array.from(detected).slice(0, 64));
+        setPalette(createPaletteEntries(Array.from(detected).slice(0, 64)));
       }
 
       if (result.metadata?.lastTool) {

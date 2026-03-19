@@ -44,6 +44,8 @@ npm run dist
   - キャンバス: 初期 `256x256`（変更はネイティブ `Canvas` メニューのモーダルから）
   - グリッド線間隔: `なし / 8 / 16 / 32 / カスタム`
 - 初期パレットは Web Safe Color 216 色を使う
+- パレット項目は短いキャプション（最大4文字）を持てて、各スウォッチの下に小さく表示する
+  - 既存スウォッチをダブルクリックすると、その色を選択しつつ色編集モーダルを開く
 - ツール
   - 描画（Pencil）
   - 消しゴム（Eraser）
@@ -112,7 +114,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   version: number,
   canvasSize?: number,
   gridSpacing?: number,
-  palette: string[],
+  palette: Array<{ color: string, caption: string }>,
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
 }
 ```
@@ -175,6 +177,9 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - サイズ変更時は選択状態 / 浮動貼り付け状態を解除する
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
 - パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。
+- パレット色モーダルのプレビューは、変更前の色と現在編集中の色を横並びで表示し、近くに `Delta HSV` 差分を出す。
+- パレット項目は `{ color, caption }[]` で保持する。
+- パレットキャプションの最大文字数は `src/editor/constants.ts` の `PALETTE_CAPTION_MAX_LENGTH` で管理する。
 - 描画色とパレット色は alpha 付き `#RRGGBBAA` も扱え、従来の `#RRGGBB` は読込時に正規化する。
 - 既存パレット色を編集したときは、キャンバス上の一致ピクセルも新しい色へ置換し、Undo 1 回で戻せる。
 - 既存パレット色の編集中に、調整後の色が別のパレット色と重複する場合は `適用` できない。

@@ -1,4 +1,4 @@
-import type { Selection } from '../../editor/types';
+import type { PaletteEntry, Selection } from '../../editor/types';
 
 export type EditorSidebarProps = {
   canvasSize: number;
@@ -8,10 +8,10 @@ export type EditorSidebarProps = {
   selection: Selection;
   selectedColor: string;
   setSelectedColor: (value: string) => void;
-  applySelectedColorChange: (value: string) => void;
-  palette: string[];
+  applySelectedColorChange: (value: PaletteEntry) => void;
+  palette: PaletteEntry[];
   setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
-  addPaletteColor: (value: string) => void;
+  addPaletteColor: (value: PaletteEntry) => void;
   removeSelectedColorFromPalette: () => void;
 };
 

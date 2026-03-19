@@ -10,11 +10,16 @@ import * as pngText from 'png-chunk-text';
 import type { MenuAction } from '../shared/ipc';
 import { buildApplicationMenu, type AppPreferences } from './menu';
 
+type PaletteEntry = {
+  color: string;
+  caption: string;
+};
+
 type EditorMeta = {
   version: number;
   canvasSize?: number;
   gridSpacing?: number;
-  palette: string[];
+  palette: PaletteEntry[];
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
 };
 

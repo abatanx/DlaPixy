@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { PaletteColorModal } from '../modals/PaletteColorModal';
 import type { SidebarPaletteSectionProps } from './types';
@@ -12,30 +12,47 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   addPaletteColor,
   removeSelectedColorFromPalette
 }: SidebarPaletteSectionProps) {
-  const isSelectedColorInPalette = palette.includes(selectedColor);
+  const selectedPaletteEntry = useMemo(
+    () => palette.find((entry) => entry.color === selectedColor) ?? null,
+    [palette, selectedColor]
+  );
+  const isSelectedColorInPalette = selectedPaletteEntry !== null;
   const [isPaletteColorModalOpen, setIsPaletteColorModalOpen] = useState<boolean>(false);
   const [paletteColorModalMode, setPaletteColorModalMode] = useState<'edit' | 'create'>('edit');
-  const [paletteColorModalInitialColor, setPaletteColorModalInitialColor] = useState<string>(selectedColor);
+  const [paletteColorModalInitial, setPaletteColorModalInitial] = useState({
+    color: selectedColor,
+    caption: ''
+  });
 
-  const openEditPaletteColorModal = useCallback(() => {
+  const openEditPaletteColorModal = useCallback((entry: { color: string; caption: string }) => {
     setPaletteColorModalMode('edit');
-    setPaletteColorModalInitialColor(selectedColor);
+    setPaletteColorModalInitial(entry);
     setIsPaletteColorModalOpen(true);
-  }, [selectedColor]);
+  }, []);
+
+  const openSelectedColorEditPaletteColorModal = useCallback(() => {
+    openEditPaletteColorModal({
+      color: selectedColor,
+      caption: selectedPaletteEntry?.caption ?? ''
+    });
+  }, [openEditPaletteColorModal, selectedColor, selectedPaletteEntry]);
 
   const openCreatePaletteColorModal = useCallback(() => {
     setPaletteColorModalMode('create');
-    setPaletteColorModalInitialColor(selectedColor);
+    setPaletteColorModalInitial({
+      color: selectedColor,
+      caption: ''
+    });
     setIsPaletteColorModalOpen(true);
   }, [selectedColor]);
 
   const handlePaletteColorModalApply = useCallback(
-    (nextColor: string) => {
+    (nextEntry: { color: string; caption: string }) => {
       if (paletteColorModalMode === 'create') {
-        addPaletteColor(nextColor);
+        addPaletteColor(nextEntry);
         return;
       }
-      applySelectedColorChange(nextColor);
+      applySelectedColorChange(nextEntry);
     },
     [addPaletteColor, applySelectedColorChange, paletteColorModalMode]
   );
@@ -45,6 +62,25 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
       setSelectedColor(event.currentTarget.dataset.color ?? selectedColor);
     },
     [selectedColor, setSelectedColor]
+  );
+
+  const handlePaletteDoubleClick = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      const { color, index } = event.currentTarget.dataset;
+      if (!color || index === undefined) {
+        return;
+      }
+
+      const paletteIndex = Number.parseInt(index, 10);
+      const entry = palette[paletteIndex];
+      if (!entry) {
+        return;
+      }
+
+      setSelectedColor(entry.color);
+      openEditPaletteColorModal(entry);
+    },
+    [openEditPaletteColorModal, palette, setSelectedColor]
   );
 
   const handlePaletteMouseEnter = useCallback(
@@ -72,7 +108,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
         <button
           type="button"
           className="sidebar-color-trigger"
-          onClick={openEditPaletteColorModal}
+          onClick={openSelectedColorEditPaletteColorModal}
           aria-label="色選択ダイアログを開く"
           title="色選択ダイアログを開く"
         >
@@ -93,20 +129,23 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
       </div>
       <div className="palette-grid-wrap flex-grow-1">
         <div className="palette-grid" role="list" aria-label="palette colors">
-          {palette.map((color, index) => (
+          {palette.map((entry, index) => (
             <button
-              key={`${color}-${index}`}
+              key={`${entry.color}-${index}`}
               type="button"
-              className={`palette-item ${selectedColor === color ? 'active' : ''}`}
-              style={{ backgroundColor: color }}
-              data-color={color}
+              className={`palette-item ${selectedColor === entry.color ? 'active' : ''}`}
+              data-color={entry.color}
               data-index={index}
               onClick={handlePaletteClick}
+              onDoubleClick={handlePaletteDoubleClick}
               onMouseEnter={handlePaletteMouseEnter}
               onMouseLeave={handlePaletteMouseLeave}
-              title={color}
-              aria-label={`palette color ${color}`}
-            />
+              title={entry.caption ? `${entry.color} (${entry.caption})` : entry.color}
+              aria-label={`palette color ${entry.color}`}
+            >
+              <span className="palette-item-swatch" style={{ backgroundColor: entry.color }} aria-hidden="true" />
+              <span className="palette-item-caption">{entry.caption || '\u00A0'}</span>
+            </button>
           ))}
           <button
             type="button"
@@ -115,15 +154,18 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
             title="新しいパレット色を追加"
             aria-label="新しいパレット色を追加"
           >
-            <i className="fa-solid fa-plus" aria-hidden="true" />
+            <span className="palette-item-swatch" aria-hidden="true">
+              <i className="fa-solid fa-plus" aria-hidden="true" />
+            </span>
+            <span className="palette-item-caption">{'\u00A0'}</span>
           </button>
         </div>
       </div>
       <PaletteColorModal
         isOpen={isPaletteColorModalOpen}
-        selectedColor={paletteColorModalInitialColor}
+        selectedPalette={paletteColorModalInitial}
         palette={palette}
-        paletteEditTarget={paletteColorModalMode === 'edit' ? paletteColorModalInitialColor : null}
+        paletteEditTarget={paletteColorModalMode === 'edit' ? paletteColorModalInitial.color : null}
         onApply={handlePaletteColorModalApply}
         onClose={() => setIsPaletteColorModalOpen(false)}
       />
