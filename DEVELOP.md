@@ -29,6 +29,7 @@ npm run dist
   - Clears display when pointer leaves canvas
 - Reference color line below hover info:
   - Press `F` while hovering canvas pixel or left palette color to append reference
+  - If the hovered color already exists in the palette, `F` also selects that palette color
   - Repeated `F` at same coordinate ignores if same color, overwrites if color changed
   - Reference lines are reorderable with drag-and-drop
   - Lines are auto-numbered from top (`1..9`), and lines after 9 show `-`
@@ -97,7 +98,7 @@ npm run dist
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
-  - `F`: Add/update hovered pixel in reference line
+  - `F`: Add/update hovered pixel in reference line, and select matching palette color if present
   - `1..9`: Select color from numbered reference line
   - `Enter`: Finalize floating paste/move
   - `Esc`: Cancel floating paste/move (if active), otherwise clear current selection
@@ -125,7 +126,7 @@ Current metadata shape:
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - Preview section for 1x preview and tiling preview
 - `src/components/sidebar/SidebarPaletteSection.tsx`
-  - Palette section for color picker and palette grid; memoized to reduce rerenders during canvas edits
+  - Palette section for color selector trigger and palette grid; memoized to reduce rerenders during canvas edits
   - Palette grid is compact + independently scrollable so large palettes (hundreds of colors) stay usable
 - `src/components/sidebar/types.ts`
   - Shared prop types for sidebar sections
@@ -135,6 +136,8 @@ Current metadata shape:
   - Canvas size modal UI and validation/apply trigger
 - `src/components/modals/GridSpacingModal.tsx`
   - Grid spacing modal UI, preset/custom input handling
+- `src/components/modals/PaletteColorModal.tsx`
+  - Selected color editor modal with `#RRGGBB` + separate `AA` hex input, plus RGBA + HSV controls
 - `src/components/modals/useBootstrapModal.ts`
   - Shared Bootstrap modal lifecycle hook for renderer modals
 - `src/editor/constants.ts`
@@ -171,6 +174,11 @@ Current metadata shape:
   - shrink: crop pixels outside the new bounds
   - selection / floating paste are cleared on resize
 - Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
+- Palette color selection is edited in a renderer modal instead of the native browser color picker.
+- Selected drawing color and palette entries can carry alpha (`#RRGGBBAA`), while legacy `#RRGGBB` values are normalized on load.
+- Editing an existing palette color also replaces matching pixels on the canvas with the new color in one undoable operation.
+- While editing an existing palette color, Apply is disabled if the adjusted color already exists elsewhere in the palette.
+- The last cell in the palette grid is a `+` action that opens the same modal in create mode and adds a new unique palette color.
 - Renderer modals are split into per-modal component files under `src/components/modals/**`.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
 - Selection drag-move also reuses `floatingPasteRef` flow:

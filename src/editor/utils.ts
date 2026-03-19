@@ -12,6 +12,29 @@ export function rgbaToHex8(r: number, g: number, b: number, a: number): string {
     .join('')}`;
 }
 
+// 16進カラー文字列を #rrggbbaa の正規形へ変換する。#rrggbb も受け付ける。
+export function normalizeColorHex(value: string): string | null {
+  const normalized = value.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return `#${normalized.toLowerCase()}ff`;
+  }
+  if (/^[0-9a-fA-F]{8}$/.test(normalized)) {
+    return `#${normalized.toLowerCase()}`;
+  }
+  return null;
+}
+
+// 16進カラー文字列（#rrggbb / #rrggbbaa）をRGBA値へ変換する。
+export function hexToRgba(hex: string): { r: number; g: number; b: number; a: number } {
+  const normalized = normalizeColorHex(hex) ?? '#000000ff';
+  return {
+    r: Number.parseInt(normalized.slice(1, 3), 16),
+    g: Number.parseInt(normalized.slice(3, 5), 16),
+    b: Number.parseInt(normalized.slice(5, 7), 16),
+    a: Number.parseInt(normalized.slice(7, 9), 16)
+  };
+}
+
 // 数値を指定範囲に収める。
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));

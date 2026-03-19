@@ -29,6 +29,7 @@ npm run dist
   - キャンバス外へマウスが出たら表示クリア
 - ホバー情報の下に参照ラインを追加
   - キャンバス上のピクセル、または左パレット色にホバー中に `F` で参照追加
+  - ホバー中色がパレット登録済みなら、`F` でそのパレット色も選択する
   - 同一座標で `F` 連打時は、同色なら無視・色が変わっていれば上書き
   - 参照ラインはドラッグ&ドロップで並び替え可能
   - 表示順で上から `1..9` を自動付番し、10行目以降は `-` 表示
@@ -98,7 +99,7 @@ npm run dist
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + C`: 選択範囲コピー
   - `Cmd/Ctrl + V`: 貼り付け
-  - `F`: ホバー中ピクセルを参照ラインへ追加/更新
+  - `F`: ホバー中ピクセルを参照ラインへ追加/更新し、パレット登録色ならその色を選択
   - `1..9`: 番号付き参照ラインの色を選択
   - `Enter`: 浮動貼り付け/移動を確定
   - `Esc`: 浮動貼り付け/移動中はキャンセル、それ以外は選択範囲を解除
@@ -125,7 +126,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - 1xプレビューとタイルプレビューを担当するプレビューセクション
 - `src/components/sidebar/SidebarPaletteSection.tsx`
-  - 色選択とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
+  - 色セレクタ起点とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
   - パレット一覧はコンパクト表示 + 独立スクロールにして、大量色でも使いやすくしている
 - `src/components/sidebar/types.ts`
   - サイドバー各セクションで共有する props 型
@@ -135,6 +136,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - キャンバスサイズ変更モーダルのUIと入力検証/適用トリガー
 - `src/components/modals/GridSpacingModal.tsx`
   - グリッド線間隔変更モーダルのUI、プリセット/カスタム入力処理
+- `src/components/modals/PaletteColorModal.tsx`
+  - `#RRGGBB` と別枠 `AA` の HEX入力、および RGBA / HSV で選択色を編集する renderer モーダル
 - `src/components/modals/useBootstrapModal.ts`
   - renderer モーダル共通の Bootstrap ライフサイクル hook
 - `src/editor/constants.ts`
@@ -171,6 +174,11 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 縮小時: 新しい範囲外のピクセルを切り捨てる
   - サイズ変更時は選択状態 / 浮動貼り付け状態を解除する
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
+- パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。
+- 描画色とパレット色は alpha 付き `#RRGGBBAA` も扱え、従来の `#RRGGBB` は読込時に正規化する。
+- 既存パレット色を編集したときは、キャンバス上の一致ピクセルも新しい色へ置換し、Undo 1 回で戻せる。
+- 既存パレット色の編集中に、調整後の色が別のパレット色と重複する場合は `適用` できない。
+- パレットグリッド末尾の `+` セルから同じモーダルを追加モードで開き、重複しない新規パレット色を追加できる。
 - renderer モーダルは `src/components/modals/**` 配下で、モーダル単位のファイルに分割している。
 - 貼り付けは内部クリップボード（`selectionClipboardRef`）を使う。
 - 貼り付け直後の移動は `floatingPasteRef` により実現。
