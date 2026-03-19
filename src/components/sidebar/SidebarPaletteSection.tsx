@@ -6,13 +6,39 @@ import type { SidebarPaletteSectionProps } from './types';
 export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   selectedColor,
   setSelectedColor,
+  applySelectedColorChange,
   palette,
   setHoveredPaletteColor,
-  addSelectedColorToPalette,
+  addPaletteColor,
   removeSelectedColorFromPalette
 }: SidebarPaletteSectionProps) {
   const isSelectedColorInPalette = palette.includes(selectedColor);
   const [isPaletteColorModalOpen, setIsPaletteColorModalOpen] = useState<boolean>(false);
+  const [paletteColorModalMode, setPaletteColorModalMode] = useState<'edit' | 'create'>('edit');
+  const [paletteColorModalInitialColor, setPaletteColorModalInitialColor] = useState<string>(selectedColor);
+
+  const openEditPaletteColorModal = useCallback(() => {
+    setPaletteColorModalMode('edit');
+    setPaletteColorModalInitialColor(selectedColor);
+    setIsPaletteColorModalOpen(true);
+  }, [selectedColor]);
+
+  const openCreatePaletteColorModal = useCallback(() => {
+    setPaletteColorModalMode('create');
+    setPaletteColorModalInitialColor(selectedColor);
+    setIsPaletteColorModalOpen(true);
+  }, [selectedColor]);
+
+  const handlePaletteColorModalApply = useCallback(
+    (nextColor: string) => {
+      if (paletteColorModalMode === 'create') {
+        addPaletteColor(nextColor);
+        return;
+      }
+      applySelectedColorChange(nextColor);
+    },
+    [addPaletteColor, applySelectedColorChange, paletteColorModalMode]
+  );
 
   const handlePaletteClick = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -46,23 +72,13 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
         <button
           type="button"
           className="sidebar-color-trigger"
-          onClick={() => setIsPaletteColorModalOpen(true)}
+          onClick={openEditPaletteColorModal}
           aria-label="色選択ダイアログを開く"
           title="色選択ダイアログを開く"
         >
           <span className="sidebar-color-trigger-fill" style={{ backgroundColor: selectedColor }} aria-hidden="true" />
         </button>
         <div className="sidebar-palette-selected font-monospace">{selectedColor.toUpperCase()}</div>
-        <button
-          type="button"
-          className="btn btn-sm sidebar-palette-action-btn sidebar-palette-action-btn-add"
-          onClick={addSelectedColorToPalette}
-          disabled={isSelectedColorInPalette}
-          title="パレットに追加"
-          aria-label="パレットに追加"
-        >
-          <i className="fa-solid fa-plus" aria-hidden="true" />
-        </button>
         {isSelectedColorInPalette ? (
           <button
             type="button"
@@ -92,12 +108,23 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
               aria-label={`palette color ${color}`}
             />
           ))}
+          <button
+            type="button"
+            className="palette-item palette-item-add"
+            onClick={openCreatePaletteColorModal}
+            title="新しいパレット色を追加"
+            aria-label="新しいパレット色を追加"
+          >
+            <i className="fa-solid fa-plus" aria-hidden="true" />
+          </button>
         </div>
       </div>
       <PaletteColorModal
         isOpen={isPaletteColorModalOpen}
-        selectedColor={selectedColor}
-        onApply={setSelectedColor}
+        selectedColor={paletteColorModalInitialColor}
+        palette={palette}
+        paletteEditTarget={paletteColorModalMode === 'edit' ? paletteColorModalInitialColor : null}
+        onApply={handlePaletteColorModalApply}
         onClose={() => setIsPaletteColorModalOpen(false)}
       />
     </div>

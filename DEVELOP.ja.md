@@ -137,7 +137,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - `src/components/modals/GridSpacingModal.tsx`
   - グリッド線間隔変更モーダルのUI、プリセット/カスタム入力処理
 - `src/components/modals/PaletteColorModal.tsx`
-  - HEX8 / RGBA / HSV 操作で選択色を編集する renderer モーダル
+  - `#RRGGBB` と別枠 `AA` の HEX入力、および RGBA / HSV で選択色を編集する renderer モーダル
 - `src/components/modals/useBootstrapModal.ts`
   - renderer モーダル共通の Bootstrap ライフサイクル hook
 - `src/editor/constants.ts`
@@ -176,6 +176,9 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
 - パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。
 - 描画色とパレット色は alpha 付き `#RRGGBBAA` も扱え、従来の `#RRGGBB` は読込時に正規化する。
+- 既存パレット色を編集したときは、キャンバス上の一致ピクセルも新しい色へ置換し、Undo 1 回で戻せる。
+- 既存パレット色の編集中に、調整後の色が別のパレット色と重複する場合は `適用` できない。
+- パレットグリッド末尾の `+` セルから同じモーダルを追加モードで開き、重複しない新規パレット色を追加できる。
 - renderer モーダルは `src/components/modals/**` 配下で、モーダル単位のファイルに分割している。
 - 貼り付けは内部クリップボード（`selectionClipboardRef`）を使う。
 - 貼り付け直後の移動は `floatingPasteRef` により実現。

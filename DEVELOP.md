@@ -137,7 +137,7 @@ Current metadata shape:
 - `src/components/modals/GridSpacingModal.tsx`
   - Grid spacing modal UI, preset/custom input handling
 - `src/components/modals/PaletteColorModal.tsx`
-  - Selected color editor modal with HEX8 + RGBA + HSV controls
+  - Selected color editor modal with `#RRGGBB` + separate `AA` hex input, plus RGBA + HSV controls
 - `src/components/modals/useBootstrapModal.ts`
   - Shared Bootstrap modal lifecycle hook for renderer modals
 - `src/editor/constants.ts`
@@ -176,6 +176,9 @@ Current metadata shape:
 - Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
 - Palette color selection is edited in a renderer modal instead of the native browser color picker.
 - Selected drawing color and palette entries can carry alpha (`#RRGGBBAA`), while legacy `#RRGGBB` values are normalized on load.
+- Editing an existing palette color also replaces matching pixels on the canvas with the new color in one undoable operation.
+- While editing an existing palette color, Apply is disabled if the adjusted color already exists elsewhere in the palette.
+- The last cell in the palette grid is a `+` action that opens the same modal in create mode and adds a new unique palette color.
 - Renderer modals are split into per-modal component files under `src/components/modals/**`.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
 - Selection drag-move also reuses `floatingPasteRef` flow:

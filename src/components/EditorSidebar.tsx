@@ -12,9 +12,10 @@ export const EditorSidebar = memo(function EditorSidebar({
   selection,
   selectedColor,
   setSelectedColor,
+  applySelectedColorChange,
   palette,
   setHoveredPaletteColor,
-  addSelectedColorToPalette,
+  addPaletteColor,
   removeSelectedColorFromPalette
 }: EditorSidebarProps) {
   return (
@@ -31,9 +32,10 @@ export const EditorSidebar = memo(function EditorSidebar({
           <SidebarPaletteSection
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
+            applySelectedColorChange={applySelectedColorChange}
             palette={palette}
             setHoveredPaletteColor={setHoveredPaletteColor}
-            addSelectedColorToPalette={addSelectedColorToPalette}
+            addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
           />
         </div>

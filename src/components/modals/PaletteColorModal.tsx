@@ -5,6 +5,8 @@ import { useBootstrapModal } from './useBootstrapModal';
 type PaletteColorModalProps = {
   isOpen: boolean;
   selectedColor: string;
+  palette: string[];
+  paletteEditTarget?: string | null;
   onApply: (value: string) => void;
   onClose: () => void;
 };
@@ -22,6 +24,30 @@ type HsvaChannels = {
   v: number;
   a: number;
 };
+
+function splitColorHexInput(color: string): { rgb: string; alpha: string } {
+  const normalized = normalizeColorHex(color) ?? '#000000FF';
+  return {
+    rgb: normalized.slice(0, 7).toUpperCase(),
+    alpha: normalized.slice(7, 9).toUpperCase()
+  };
+}
+
+function normalizeRgbHexInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (!/^#?[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return null;
+  }
+  return `#${trimmed.replace(/^#/, '').toUpperCase()}`;
+}
+
+function normalizeAlphaHexInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (!/^[0-9a-fA-F]{2}$/.test(trimmed)) {
+    return null;
+  }
+  return trimmed.toUpperCase();
+}
 
 function buildLinearGradient(stops: string[]): string {
   return `linear-gradient(90deg, ${stops.map((color, index) => `${color} ${(index / Math.max(stops.length - 1, 1)) * 100}%`).join(', ')})`;
@@ -75,8 +101,17 @@ function buildHsvaSliderPreview(channel: 'h' | 's' | 'v', hsva: HsvaChannels, al
   }
 }
 
-export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: PaletteColorModalProps) {
-  const [pendingHexInput, setPendingHexInput] = useState<string>(selectedColor);
+export function PaletteColorModal({
+  isOpen,
+  selectedColor,
+  palette,
+  paletteEditTarget = selectedColor,
+  onApply,
+  onClose
+}: PaletteColorModalProps) {
+  const initialHexParts = splitColorHexInput(selectedColor);
+  const [pendingHexRgbInput, setPendingHexRgbInput] = useState<string>(initialHexParts.rgb);
+  const [pendingAlphaHexInput, setPendingAlphaHexInput] = useState<string>(initialHexParts.alpha);
   const [pendingRgba, setPendingRgba] = useState<RgbaChannels>(() => hexToRgba(selectedColor));
   const [pendingHsva, setPendingHsva] = useState<HsvaChannels>(() => {
     const rgba = hexToRgba(selectedColor);
@@ -88,7 +123,9 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
   const syncFromRgba = useCallback((nextRgba: RgbaChannels) => {
     setPendingRgba(nextRgba);
     setPendingHsva(roundHsvaForInput(rgbaToHsva(nextRgba.r, nextRgba.g, nextRgba.b, nextRgba.a), nextRgba.a));
-    setPendingHexInput(rgbaToHex8(nextRgba.r, nextRgba.g, nextRgba.b, nextRgba.a));
+    const nextHex = rgbaToHex8(nextRgba.r, nextRgba.g, nextRgba.b, nextRgba.a).toUpperCase();
+    setPendingHexRgbInput(nextHex.slice(0, 7));
+    setPendingAlphaHexInput(nextHex.slice(7, 9));
     setValidationMessage('');
   }, []);
 
@@ -101,7 +138,9 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
       b: nextRgba.b,
       a: nextRgba.a
     });
-    setPendingHexInput(rgbaToHex8(nextRgba.r, nextRgba.g, nextRgba.b, nextRgba.a));
+    const nextHex = rgbaToHex8(nextRgba.r, nextRgba.g, nextRgba.b, nextRgba.a).toUpperCase();
+    setPendingHexRgbInput(nextHex.slice(0, 7));
+    setPendingAlphaHexInput(nextHex.slice(7, 9));
     setValidationMessage('');
   }, []);
 
@@ -132,17 +171,39 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
     onHidden: handleHidden
   });
 
-  const handleHexInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const nextValue = event.target.value;
-    setPendingHexInput(nextValue);
+  const handleHexRgbInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const nextValue = event.target.value.toUpperCase();
+      setPendingHexRgbInput(nextValue);
+      setValidationMessage('');
 
-    const normalized = normalizeColorHex(nextValue);
-    if (!normalized) {
-      return;
-    }
+      const normalizedRgb = normalizeRgbHexInput(nextValue);
+      const normalizedAlpha = normalizeAlphaHexInput(pendingAlphaHexInput);
+      if (!normalizedRgb || !normalizedAlpha) {
+        return;
+      }
 
-    syncFromRgba(hexToRgba(normalized));
-  }, [syncFromRgba]);
+      syncFromRgba(hexToRgba(`${normalizedRgb}${normalizedAlpha}`));
+    },
+    [pendingAlphaHexInput, syncFromRgba]
+  );
+
+  const handleAlphaHexInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const nextValue = event.target.value.toUpperCase();
+      setPendingAlphaHexInput(nextValue);
+      setValidationMessage('');
+
+      const normalizedRgb = normalizeRgbHexInput(pendingHexRgbInput);
+      const normalizedAlpha = normalizeAlphaHexInput(nextValue);
+      if (!normalizedRgb || !normalizedAlpha) {
+        return;
+      }
+
+      syncFromRgba(hexToRgba(`${normalizedRgb}${normalizedAlpha}`));
+    },
+    [pendingHexRgbInput, syncFromRgba]
+  );
 
   const handleRgbaChannelChange = useCallback(
     (channel: keyof RgbaChannels, value: string) => {
@@ -191,20 +252,41 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
     [pendingHsva, syncFromHsva]
   );
 
+  const normalizedPendingRgb = normalizeRgbHexInput(pendingHexRgbInput);
+  const normalizedPendingAlpha = normalizeAlphaHexInput(pendingAlphaHexInput);
+  const normalizedPendingColor =
+    normalizedPendingRgb !== null && normalizedPendingAlpha !== null
+      ? `${normalizedPendingRgb}${normalizedPendingAlpha}`
+      : null;
+  const hasDuplicatePaletteColor =
+    normalizedPendingColor !== null &&
+    normalizedPendingColor !== paletteEditTarget &&
+    palette.includes(normalizedPendingColor);
+  const effectiveValidationMessage =
+    validationMessage || (hasDuplicatePaletteColor ? 'パレットに同じ色がすでにあります' : '');
+
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
-      const normalized = normalizeColorHex(pendingHexInput);
-      if (!normalized) {
-        setValidationMessage('カラーコードは #RRGGBB または #RRGGBBAA 形式で入力してください');
+      if (!normalizedPendingRgb) {
+        setValidationMessage('HEX は #RRGGBB 形式で入力してください');
+        return;
+      }
+      if (!normalizedPendingAlpha) {
+        setValidationMessage('A は 00〜FF の 2 桁で入力してください');
+        return;
+      }
+      if (hasDuplicatePaletteColor) {
+        setValidationMessage('パレットに同じ色がすでにあります');
         return;
       }
 
-      onApply(normalized);
+      const nextColor = `${normalizedPendingRgb}${normalizedPendingAlpha}`;
+      onApply(nextColor);
       onClose();
     },
-    [onApply, onClose, pendingHexInput]
+    [hasDuplicatePaletteColor, normalizedPendingAlpha, normalizedPendingColor, normalizedPendingRgb, onApply, onClose]
   );
 
   return (
@@ -242,22 +324,44 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
                   </div>
                 </div>
               </div>
-              <div className="mb-4">
-                <label htmlFor="palette-color-hex-input" className="form-label">HEX</label>
-                <input
-                  ref={inputRef}
-                  id="palette-color-hex-input"
-                  type="text"
-                  inputMode="text"
-                  autoCapitalize="characters"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  className={`form-control font-monospace ${validationMessage ? 'is-invalid' : ''}`}
-                  value={pendingHexInput}
-                  onChange={handleHexInputChange}
-                  placeholder="#RRGGBBAA"
-                />
-                {validationMessage ? <div className="invalid-feedback">{validationMessage}</div> : null}
+              <div className="row g-3 mb-4">
+                <div className="col-sm-8">
+                  <label htmlFor="palette-color-hex-input" className="form-label">HEX</label>
+                  <input
+                    ref={inputRef}
+                    id="palette-color-hex-input"
+                    type="text"
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className={`form-control font-monospace ${effectiveValidationMessage ? 'is-invalid' : ''}`}
+                    value={pendingHexRgbInput}
+                    onChange={handleHexRgbInputChange}
+                    placeholder="#RRGGBB"
+                  />
+                </div>
+                <div className="col-sm-4">
+                  <label htmlFor="palette-color-alpha-hex-input" className="form-label">A</label>
+                  <input
+                    id="palette-color-alpha-hex-input"
+                    type="text"
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className={`form-control font-monospace ${effectiveValidationMessage ? 'is-invalid' : ''}`}
+                    value={pendingAlphaHexInput}
+                    onChange={handleAlphaHexInputChange}
+                    placeholder="FF"
+                    maxLength={2}
+                  />
+                </div>
+                {effectiveValidationMessage ? (
+                  <div className="col-12">
+                    <div className="invalid-feedback d-block">{effectiveValidationMessage}</div>
+                  </div>
+                ) : null}
               </div>
               <div className="small text-uppercase text-secondary fw-semibold mb-2">RGBA</div>
               {(['r', 'g', 'b', 'a'] as const).map((channel) => (
@@ -370,7 +474,7 @@ export function PaletteColorModal({ isOpen, selectedColor, onApply, onClose }: P
                   <span>キャンセル</span>
                 </span>
               </button>
-              <button type="submit" className="btn btn-primary">
+              <button type="submit" className="btn btn-primary" disabled={hasDuplicatePaletteColor}>
                 <span className="d-inline-flex align-items-center gap-2">
                   <i className="fa-solid fa-check" aria-hidden="true" />
                   <span>適用</span>

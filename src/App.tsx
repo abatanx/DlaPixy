@@ -1464,17 +1464,21 @@ export function App() {
     zoomOut
   ]);
 
-  const addSelectedColorToPalette = useCallback(() => {
-    if (palette.includes(selectedColor)) {
-      setStatusText('選択色はすでにパレットにあります', 'warning');
-      return;
-    }
+  const addPaletteColor = useCallback(
+    (nextColor: string) => {
+      if (palette.includes(nextColor)) {
+        setStatusText('同じ色はすでにパレットにあります', 'warning');
+        return;
+      }
 
-    pushUndo();
-    setPalette((prev) => [...prev, selectedColor]);
-    setHasUnsavedChanges(true);
-    setStatusText(`パレットに追加しました: ${selectedColor.toUpperCase()}`, 'success');
-  }, [palette, pushUndo, selectedColor, setStatusText]);
+      pushUndo();
+      setSelectedColor(nextColor);
+      setPalette((prev) => [...prev, nextColor]);
+      setHasUnsavedChanges(true);
+      setStatusText(`パレットに追加しました: ${nextColor.toUpperCase()}`, 'success');
+    },
+    [palette, pushUndo, setStatusText]
+  );
 
   const removeSelectedColorFromPalette = useCallback(() => {
     if (!palette.includes(selectedColor)) {
@@ -1487,6 +1491,56 @@ export function App() {
     setHasUnsavedChanges(true);
     setStatusText(`パレットから削除しました: ${selectedColor.toUpperCase()}`, 'success');
   }, [palette, pushUndo, selectedColor, setStatusText]);
+
+  const applySelectedColorChange = useCallback(
+    (nextColor: string) => {
+      if (nextColor === selectedColor) {
+        return;
+      }
+
+      if (!palette.includes(selectedColor)) {
+        setSelectedColor(nextColor);
+        return;
+      }
+
+      const previousColor = hexToRgba(selectedColor);
+      const updatedColor = hexToRgba(nextColor);
+      const nextPixels = clonePixels(pixels);
+      let replacedPixelCount = 0;
+
+      for (let index = 0; index < nextPixels.length; index += 4) {
+        if (
+          nextPixels[index] !== previousColor.r ||
+          nextPixels[index + 1] !== previousColor.g ||
+          nextPixels[index + 2] !== previousColor.b ||
+          nextPixels[index + 3] !== previousColor.a
+        ) {
+          continue;
+        }
+
+        nextPixels[index] = updatedColor.r;
+        nextPixels[index + 1] = updatedColor.g;
+        nextPixels[index + 2] = updatedColor.b;
+        nextPixels[index + 3] = updatedColor.a;
+        replacedPixelCount += 1;
+      }
+
+      const nextPalette = Array.from(
+        new Set(palette.map((color) => (color === selectedColor ? nextColor : color)))
+      );
+
+      pushUndo();
+      setSelectedColor(nextColor);
+      setPalette(nextPalette);
+      setPixels(replacedPixelCount > 0 ? nextPixels : pixels);
+      setHasUnsavedChanges(true);
+      setStatusText(
+        `パレット色を更新しました: ${selectedColor.toUpperCase()} -> ${nextColor.toUpperCase()}${replacedPixelCount > 0 ? ` / ${replacedPixelCount}px` : ''}`,
+        'success'
+      );
+    },
+    [palette, pixels, pushUndo, selectedColor, setStatusText]
+  );
 
   const createSavePayload = useCallback(() => {
     const canvas = document.createElement('canvas');
@@ -1764,9 +1818,10 @@ export function App() {
             selection={selection}
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
+            applySelectedColorChange={applySelectedColorChange}
             palette={palette}
             setHoveredPaletteColor={setHoveredPaletteColor}
-            addSelectedColorToPalette={addSelectedColorToPalette}
+            addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
           />
 
