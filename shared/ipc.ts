@@ -4,4 +4,7 @@ export type MenuAction =
   | { type: 'save-as' }
   | { type: 'open-recent'; filePath: string }
   | { type: 'canvas-size' }
-  | { type: 'grid-spacing' };
+  | { type: 'grid-spacing' }
+  | { type: 'palette-import-replace' }
+  | { type: 'palette-import-append' }
+  | { type: 'palette-export' };

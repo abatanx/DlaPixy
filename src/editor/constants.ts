@@ -1,4 +1,6 @@
-import type { PaletteEntry } from './types';
+import { PALETTE_CAPTION_MAX_LENGTH as SHARED_PALETTE_CAPTION_MAX_LENGTH, type PaletteEntry } from '../../shared/palette';
+
+export const PALETTE_CAPTION_MAX_LENGTH = SHARED_PALETTE_CAPTION_MAX_LENGTH;
 
 // グリッド線の選択肢（ピクセル間隔）。0 は「なし」を表す。
 export const GRID_SPACING_OPTIONS = [0, 8, 16, 32] as const;
@@ -18,9 +20,6 @@ export const MAX_UNDO = 40;
 export const MIN_CANVAS_SIZE = 8;
 // キャンバスサイズの上限。
 export const MAX_CANVAS_SIZE = 1024;
-// パレットキャプションの最大文字数。
-export const PALETTE_CAPTION_MAX_LENGTH = 4;
-
 const WEB_SAFE_CHANNELS = ['00', '33', '66', '99', 'CC', 'FF'] as const;
 
 // 初期パレットカラーは Web Safe Color 216 色。

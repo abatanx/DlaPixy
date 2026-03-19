@@ -1,10 +1,6 @@
 import type { MenuAction } from '../shared/ipc';
+import type { PaletteEntry } from '../shared/palette';
 export {};
-
-type PaletteEntry = {
-  color: string;
-  caption: string;
-};
 
 declare global {
   interface Window {
@@ -33,6 +29,24 @@ declare global {
           palette: PaletteEntry[];
           lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
         } | null;
+      }>;
+      importGplPalette: (args?: { mode?: 'replace' | 'append' }) => Promise<{
+        canceled: boolean;
+        filePath?: string;
+        mode?: 'replace' | 'append';
+        error?: 'not-found' | 'read-failed' | 'parse-failed';
+        message?: string;
+        palette?: PaletteEntry[];
+      }>;
+      exportGplPalette: (args: {
+        palette: PaletteEntry[];
+        suggestedFileName?: string;
+        paletteName?: string;
+      }) => Promise<{
+        canceled: boolean;
+        filePath?: string;
+        error?: 'serialize-failed' | 'write-failed';
+        message?: string;
       }>;
       copyImageDataUrl: (dataUrl: string) => Promise<{ ok: boolean }>;
       confirmOpenWithUnsaved: () => Promise<{ action: 'save-open' | 'discard-open' | 'cancel' }>;

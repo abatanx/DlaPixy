@@ -8,12 +8,9 @@ import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
 import * as pngText from 'png-chunk-text';
 import type { MenuAction } from '../shared/ipc';
+import { parseGplPalette, serializeGplPalette } from '../shared/palette-gpl';
+import type { PaletteEntry } from '../shared/palette';
 import { buildApplicationMenu, type AppPreferences } from './menu';
-
-type PaletteEntry = {
-  color: string;
-  caption: string;
-};
 
 type EditorMeta = {
   version: number;
@@ -105,6 +102,11 @@ function addRecentFile(filePath: string): void {
   preferences.lastDirectory = path.dirname(filePath);
   void savePreferences();
   rebuildApplicationMenu();
+}
+
+function rememberLastDirectory(targetPath: string): void {
+  preferences.lastDirectory = path.dirname(targetPath);
+  void savePreferences();
 }
 
 function rebuildApplicationMenu(): void {
@@ -269,6 +271,88 @@ ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
     metadata
   };
 });
+
+ipcMain.handle('palette:import-gpl', async (_, args?: { mode?: 'replace' | 'append' }) => {
+  const initialDir = await resolveInitialDirectory();
+  const result = await dialog.showOpenDialog({
+    defaultPath: initialDir,
+    properties: ['openFile'],
+    filters: [{ name: 'GPL Palette', extensions: ['gpl'] }]
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { canceled: true };
+  }
+
+  const filePath = result.filePaths[0];
+
+  let rawText: string;
+  try {
+    rawText = await fs.readFile(filePath, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { canceled: false, error: 'not-found' as const, filePath };
+    }
+    return { canceled: false, error: 'read-failed' as const, filePath };
+  }
+
+  try {
+    const parsed = parseGplPalette(rawText);
+    rememberLastDirectory(filePath);
+    return {
+      canceled: false,
+      filePath,
+      mode: args?.mode ?? 'replace',
+      palette: parsed.entries
+    };
+  } catch (error) {
+    return {
+      canceled: false,
+      error: 'parse-failed' as const,
+      filePath,
+      message: error instanceof Error ? error.message : 'GPL の解析に失敗しました'
+    };
+  }
+});
+
+ipcMain.handle(
+  'palette:export-gpl',
+  async (_, args: { palette: PaletteEntry[]; suggestedFileName?: string; paletteName?: string }) => {
+    let content: string;
+    try {
+      content = serializeGplPalette(args.palette, { name: args.paletteName });
+    } catch (error) {
+      return {
+        canceled: false,
+        error: 'serialize-failed' as const,
+        message: error instanceof Error ? error.message : 'GPL の書き出し内容を生成できませんでした'
+      };
+    }
+
+    const initialDir = await resolveInitialDirectory();
+    const result = await dialog.showSaveDialog({
+      filters: [{ name: 'GPL Palette', extensions: ['gpl'] }],
+      defaultPath: path.join(initialDir, args.suggestedFileName ?? 'palette.gpl')
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { canceled: true };
+    }
+
+    try {
+      await fs.writeFile(result.filePath, content, 'utf8');
+      rememberLastDirectory(result.filePath);
+      return { canceled: false, filePath: result.filePath };
+    } catch (error) {
+      return {
+        canceled: false,
+        error: 'write-failed' as const,
+        filePath: result.filePath,
+        message: error instanceof Error ? error.message : 'GPL の書き出しに失敗しました'
+      };
+    }
+  }
+);
 
 ipcMain.handle('dialog:confirmOpenWithUnsaved', async () => {
   const focusedWindow = BrowserWindow.getFocusedWindow();

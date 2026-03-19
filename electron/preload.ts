@@ -1,10 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { MenuAction } from '../shared/ipc';
-
-type PaletteEntry = {
-  color: string;
-  caption: string;
-};
+import type { PaletteEntry } from '../shared/palette';
 
 type EditorMeta = {
   version: number;
@@ -19,6 +15,9 @@ contextBridge.exposeInMainWorld('pixelApi', {
   savePng: (args: { base64Png: string; metadata: EditorMeta; filePath?: string; saveAs?: boolean }) =>
     ipcRenderer.invoke('png:save', args),
   openPng: (args?: { filePath?: string }) => ipcRenderer.invoke('png:open', args),
+  importGplPalette: (args?: { mode?: 'replace' | 'append' }) => ipcRenderer.invoke('palette:import-gpl', args),
+  exportGplPalette: (args: { palette: PaletteEntry[]; suggestedFileName?: string; paletteName?: string }) =>
+    ipcRenderer.invoke('palette:export-gpl', args),
   copyImageDataUrl: (dataUrl: string) => ipcRenderer.invoke('clipboard:writeImageDataUrl', dataUrl),
   confirmOpenWithUnsaved: () => ipcRenderer.invoke('dialog:confirmOpenWithUnsaved'),
   onMenuAction: (handler: (action: MenuAction) => void) => {

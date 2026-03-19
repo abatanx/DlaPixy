@@ -49,6 +49,12 @@ npm run dist
 - 初期パレットは Web Safe Color 216 色を使う
 - パレット項目は短いキャプション（最大4文字）を持てて、各スウォッチの下に小さく表示する
   - 既存スウォッチをダブルクリックすると、その色を選択しつつ色編集モーダルを開く
+- GPL パレットのインポート / エクスポート
+  - ネイティブ `Palette` メニューに `インポート（置換）` / `インポート（追加）` / `エクスポート` を追加
+  - `.gpl` を Electron の native dialog 経由で読み込み、置換または追加で適用できる
+  - すべて不透明色なら標準 GPL として書き出す
+  - alpha を含む場合は Aseprite 互換の `Channels: RGBA` 付き GPL として書き出す
+  - GPL の色名は DlaPixy の caption に対応づけ、`Untitled` は import 時に空 caption 扱いにする
 - ツール
   - 描画（Pencil）
   - 消しゴム（Eraser）
@@ -126,6 +132,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - `src/App.tsx`
   - エディター本体の状態管理と処理オーケストレーション
   - キャンバス操作ハンドラとキーボードショートカット
+  - ネイティブ `Palette` メニューの action を受けて GPL パレット import/export を適用する
 - `src/components/EditorSidebar.tsx`
   - 左サイドバーのコンテナ。プレビュー部とパレット部を組み立てる
 - `src/components/sidebar/SidebarPreviewSection.tsx`
@@ -151,16 +158,22 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 共通型定義（`Tool` / `Selection` / `EditorMeta`）
 - `src/editor/utils.ts`
   - ピクセル処理・選択処理のユーティリティ
+- `shared/palette.ts`
+  - 実行環境共通のパレット型と正規化 helper
+- `shared/palette-gpl.ts`
+  - Electron main process と renderer の前提で共有する GPL parser / serializer
 - `src/styles.css`
   - レイアウト、スクロール制御、ツールバー見た目
 - `src/main.tsx`
   - Bootstrap / FontAwesomeのCSS読込
 - `electron/main.ts`
   - Electronウィンドウ、IPC、PNG保存/読込、メタ埋め込み
+  - GPL パレット import/export の native dialog とファイルI/O
 - `electron/menu.ts`
-  - ネイティブ File/Canvas メニュー構築とメニューアクション配線
+  - ネイティブ File/Canvas/Palette メニュー構築とメニューアクション配線
 - `electron/preload.ts`
   - `window.pixelApi` ブリッジ
+  - GPL パレット import/export IPC を renderer に公開
 - `electron/types.d.ts`
   - Renderer側 `window.pixelApi` 型定義
 
@@ -172,18 +185,21 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - `tsconfig.electron.json`: Electron main/preload（`electron/**`）
   - ルート `tsconfig.json` は IDE が project を認識しやすくするための参照用
 - 実行環境をまたぐ共通型は `shared/**/*.ts` に置く。
-  - 現状の例: `shared/ipc.ts` の `MenuAction`
+  - 現状の例: `shared/ipc.ts` の `MenuAction`、`shared/palette.ts`、`shared/palette-gpl.ts`
 - キャンバスサイズ変更はネイティブ `Canvas` メニューから開く renderer モーダルで行う。
 - キャンバスサイズ変更は左上基準で既存ピクセルを保持する。
   - 拡大時: 既存ピクセルを保持し、追加領域は透明で埋める
   - 縮小時: 新しい範囲外のピクセルを切り捨てる
   - サイズ変更時は選択状態 / 浮動貼り付け状態を解除する
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
+- パレット import/export はネイティブ `Palette` メニューから開き、ダイアログは Electron main process 側で扱う。
 - パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。
 - パレット色モーダルのプレビューは、変更前の色と現在編集中の色を横並びで表示し、近くに `Delta HSV` 差分を出す。
 - パレット項目は `{ color, caption }[]` で保持する。
 - パレットキャプションの最大文字数は `src/editor/constants.ts` の `PALETTE_CAPTION_MAX_LENGTH` で管理する。
 - 描画色とパレット色は alpha 付き `#RRGGBBAA` も扱え、従来の `#RRGGBB` は読込時に正規化する。
+- GPL import は標準 RGB 行と Aseprite 互換の `Channels: RGBA` を受け付ける。
+- GPL export は可能なら標準 RGB を使い、alpha があるときだけ Aseprite 互換 RGBA GPL へ切り替える。
 - 既存パレット色を編集したときは、キャンバス上の一致ピクセルも新しい色へ置換し、Undo 1 回で戻せる。
 - 既存パレット色の編集中に、調整後の色が別のパレット色と重複する場合は `適用` できない。
 - パレットグリッド末尾の `+` セルから同じモーダルを追加モードで開き、重複しない新規パレット色を追加できる。

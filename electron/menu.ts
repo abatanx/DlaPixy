@@ -81,19 +81,42 @@ function buildCanvasMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): 
   };
 }
 
+function buildPaletteMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): MenuItemConstructorOptions {
+  return {
+    label: 'Palette',
+    submenu: [
+      {
+        label: 'インポート（置換）...',
+        click: () => sendMenuAction({ type: 'palette-import-replace' })
+      },
+      {
+        label: 'インポート（追加）...',
+        click: () => sendMenuAction({ type: 'palette-import-append' })
+      },
+      { type: 'separator' },
+      {
+        label: 'エクスポート...',
+        click: () => sendMenuAction({ type: 'palette-export' })
+      }
+    ]
+  };
+}
+
 export function buildApplicationMenu(args: BuildApplicationMenuArgs): void {
   const fileMenu = buildFileMenuTemplate(args);
   const canvasMenu = buildCanvasMenuTemplate(args);
+  const paletteMenu = buildPaletteMenuTemplate(args);
   const template: MenuItemConstructorOptions[] = process.platform === 'darwin'
     ? [
         { role: 'appMenu' },
         fileMenu,
         canvasMenu,
+        paletteMenu,
         { role: 'editMenu' },
         { role: 'viewMenu' },
         { role: 'windowMenu' }
       ]
-    : [fileMenu, canvasMenu, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }];
+    : [fileMenu, canvasMenu, paletteMenu, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }

@@ -49,6 +49,12 @@ npm run dist
 - Initial palette uses the 216 Web Safe Colors
 - Palette entries can store a short caption (up to 4 characters), shown under each swatch
   - Double-clicking an existing palette swatch selects it and opens the color edit modal
+- GPL palette import/export
+  - Native `Palette` menu includes `Import (Replace)`, `Import (Append)`, and `Export`
+  - Imports `.gpl` via Electron native dialog and applies palette as replace/append
+  - Exports current palette as standard GPL when all colors are opaque
+  - Exports Aseprite-compatible `Channels: RGBA` GPL when any palette entry has alpha
+  - GPL color names map to DlaPixy captions; `Untitled` is treated as empty caption on import
 - Tools:
   - Pencil
   - Eraser
@@ -126,6 +132,7 @@ Current metadata shape:
 - `src/App.tsx`
   - Main editor state and behavior orchestration
   - Canvas interaction handlers and keyboard shortcuts
+  - Handles native `Palette` menu actions and applies GPL palette import/export results
 - `src/components/EditorSidebar.tsx`
   - Left sidebar container that composes preview and palette sections
 - `src/components/sidebar/SidebarPreviewSection.tsx`
@@ -151,16 +158,22 @@ Current metadata shape:
   - Shared editor types (`Tool`, `Selection`, `EditorMeta`)
 - `src/editor/utils.ts`
   - Pixel/selection utility functions used by `App.tsx`
+- `shared/palette.ts`
+  - Cross-runtime palette type + normalization helpers
+- `shared/palette-gpl.ts`
+  - GPL parser/serializer shared by Electron main process and renderer expectations
 - `src/styles.css`
   - Layout, non-page-scroll, canvas stage, toolbar styling
 - `src/main.tsx`
   - Bootstrap + FontAwesome CSS import
 - `electron/main.ts`
   - Electron window, IPC, PNG save/load, metadata embedding
+  - Native GPL palette import/export dialogs and file I/O
 - `electron/menu.ts`
-  - Native File/Canvas menu construction and menu action wiring
+  - Native File/Canvas/Palette menu construction and menu action wiring
 - `electron/preload.ts`
   - `window.pixelApi` bridge
+  - Exposes GPL palette import/export IPC to renderer
 - `electron/types.d.ts`
   - Renderer typings for `window.pixelApi`
 
@@ -172,18 +185,21 @@ Current metadata shape:
   - `tsconfig.electron.json`: Electron main/preload (`electron/**`)
   - Root `tsconfig.json` is a solution-style reference entry for IDE project discovery.
 - Shared cross-runtime types live in `shared/**/*.ts`.
-  - Current example: `shared/ipc.ts` for `MenuAction`
+  - Current examples: `shared/ipc.ts` for `MenuAction`, `shared/palette.ts`, `shared/palette-gpl.ts`
 - Canvas size change is opened from native `Canvas` menu and edited in renderer modal.
 - Canvas size change preserves existing pixels with a top-left anchor:
   - expand: keep pixels, fill new area with transparency
   - shrink: crop pixels outside the new bounds
   - selection / floating paste are cleared on resize
 - Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
+- Palette import/export is opened from native `Palette` menu and uses Electron main-process dialogs.
 - Palette color selection is edited in a renderer modal instead of the native browser color picker.
 - The palette color modal preview shows both the original color and the current editing color side by side, with a nearby `Delta HSV` diff.
 - Palette entries are stored as `{ color, caption }[]`.
 - Palette caption max length is managed by `PALETTE_CAPTION_MAX_LENGTH` in `src/editor/constants.ts`.
 - Selected drawing color and palette entries can carry alpha (`#RRGGBBAA`), while legacy `#RRGGBB` values are normalized on load.
+- GPL import accepts standard RGB lines and Aseprite-style `Channels: RGBA` lines.
+- GPL export writes standard RGB when possible, and falls back to Aseprite-compatible RGBA GPL only when alpha is present.
 - Editing an existing palette color also replaces matching pixels on the canvas with the new color in one undoable operation.
 - While editing an existing palette color, Apply is disabled if the adjusted color already exists elsewhere in the palette.
 - The last cell in the palette grid is a `+` action that opens the same modal in create mode and adds a new unique palette color.

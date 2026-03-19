@@ -56,6 +56,30 @@ type UndoSnapshot = {
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 
+function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every(
+    (entry, index) => entry.color === right[index]?.color && entry.caption === right[index]?.caption
+  );
+}
+
+function getFileNameFromPath(filePath?: string): string | null {
+  if (!filePath) {
+    return null;
+  }
+  const parts = filePath.split(/[\\/]/);
+  const fileName = parts[parts.length - 1]?.trim();
+  return fileName || null;
+}
+
+function replaceFileExtension(fileName: string, nextExtension: string): string {
+  const baseName = fileName.replace(/\.[^.]+$/, '') || fileName;
+  return `${baseName}${nextExtension}`;
+}
+
 function hasHoveredPixelInfoSameContent(
   left: NonNullable<HoveredPixelInfo>,
   right: NonNullable<HoveredPixelInfo>
@@ -1677,6 +1701,112 @@ export function App() {
     [palette, pixels, pushUndo, selectedColor, setStatusText]
   );
 
+  const applyImportedPalette = useCallback(
+    (importedPalette: PaletteEntry[], mode: 'replace' | 'append', filePath?: string) => {
+      const normalizedImported = normalizePaletteEntries(importedPalette);
+      if (normalizedImported.length === 0) {
+        setStatusText('インポートできる色がありませんでした', 'warning');
+        return;
+      }
+
+      const nextPalette =
+        mode === 'append'
+          ? normalizePaletteEntries([...clonePaletteEntries(palette), ...clonePaletteEntries(normalizedImported)])
+          : clonePaletteEntries(normalizedImported);
+
+      if (hasSamePaletteEntries(palette, nextPalette)) {
+        setStatusText(
+          mode === 'append'
+            ? '追加できる新しい色がありませんでした'
+            : '読み込んだパレットは現在の内容と同じです',
+          'warning'
+        );
+        return;
+      }
+
+      const nextSelectedColor = nextPalette.some((entry) => entry.color === selectedColor)
+        ? selectedColor
+        : nextPalette[0]?.color ?? selectedColor;
+      const importedCount =
+        mode === 'append' ? Math.max(0, nextPalette.length - palette.length) : nextPalette.length;
+      const sourceLabel = getFileNameFromPath(filePath) ?? 'palette.gpl';
+
+      pushUndo();
+      setPalette(nextPalette);
+      setSelectedColor(nextSelectedColor);
+      setHasUnsavedChanges(true);
+      setStatusText(
+        mode === 'append'
+          ? `パレットを追加インポートしました: ${sourceLabel} / +${importedCount} colors`
+          : `パレットを置換インポートしました: ${sourceLabel} / ${importedCount} colors`,
+        'success'
+      );
+    },
+    [palette, pushUndo, selectedColor, setStatusText]
+  );
+
+  const importGplPalette = useCallback(
+    async (mode: 'replace' | 'append') => {
+      try {
+        const result = await window.pixelApi.importGplPalette({ mode });
+        if (result.canceled) {
+          setStatusText('パレットのインポートをキャンセルしました', 'warning');
+          return;
+        }
+        if (result.error) {
+          const label = result.filePath ? `: ${result.filePath}` : '';
+          const detail = result.message ? ` / ${result.message}` : '';
+          if (result.error === 'not-found') {
+            setStatusText(`パレットファイルが見つかりません${label}`, 'error');
+            return;
+          }
+          if (result.error === 'read-failed') {
+            setStatusText(`パレットの読み込みに失敗しました${label}`, 'error');
+            return;
+          }
+          setStatusText(`GPL の解析に失敗しました${label}${detail}`, 'error');
+          return;
+        }
+        if (!result.palette) {
+          setStatusText('パレットのインポート結果が空です', 'error');
+          return;
+        }
+        applyImportedPalette(result.palette, result.mode ?? mode, result.filePath);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '不明なエラー';
+        setStatusText(`パレットのインポートに失敗しました: ${message}`, 'error');
+      }
+    },
+    [applyImportedPalette, setStatusText]
+  );
+
+  const exportGplPalette = useCallback(async () => {
+    try {
+      const currentFileName = getFileNameFromPath(currentFilePath);
+      const suggestedFileName = replaceFileExtension(currentFileName ?? 'palette', '.gpl');
+      const result = await window.pixelApi.exportGplPalette({
+        palette: clonePaletteEntries(palette),
+        suggestedFileName,
+        paletteName: currentFileName ? currentFileName.replace(/\.[^.]+$/, '') : 'DlaPixy Palette'
+      });
+
+      if (result.canceled) {
+        setStatusText('パレットのエクスポートをキャンセルしました', 'warning');
+        return;
+      }
+      if (result.error) {
+        const detail = result.message ? `: ${result.message}` : '';
+        setStatusText(`パレットのエクスポートに失敗しました${detail}`, 'error');
+        return;
+      }
+
+      setStatusText(`パレットをエクスポートしました: ${result.filePath ?? suggestedFileName}`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '不明なエラー';
+      setStatusText(`パレットのエクスポートに失敗しました: ${message}`, 'error');
+    }
+  }, [currentFilePath, palette, setStatusText]);
+
   const createSavePayload = useCallback(() => {
     const canvas = document.createElement('canvas');
     canvas.width = canvasSize;
@@ -1932,6 +2062,15 @@ export function App() {
         case 'grid-spacing':
           openGridSpacingModal();
           break;
+        case 'palette-import-replace':
+          void importGplPalette('replace');
+          break;
+        case 'palette-import-append':
+          void importGplPalette('append');
+          break;
+        case 'palette-export':
+          void exportGplPalette();
+          break;
         default:
           break;
       }
@@ -1939,7 +2078,7 @@ export function App() {
     return () => {
       unsubscribe();
     };
-  }, [loadPng, openCanvasSizeModal, openGridSpacingModal, saveAsPng, savePng]);
+  }, [exportGplPalette, importGplPalette, loadPng, openCanvasSizeModal, openGridSpacingModal, saveAsPng, savePng]);
 
   return (
     <div className="app-layout">

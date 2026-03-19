@@ -1,5 +1,12 @@
-import { PALETTE_CAPTION_MAX_LENGTH } from './constants';
-import type { PaletteEntry, Selection } from './types';
+import {
+  normalizeColorHex,
+  normalizePaletteCaption,
+  normalizePaletteEntries,
+  type PaletteEntry
+} from '../../shared/palette';
+import type { Selection } from './types';
+
+export { normalizeColorHex, normalizePaletteCaption, normalizePaletteEntries };
 
 // RGB値を16進カラー文字列（#rrggbb）に変換する。
 export function rgbaToHex(r: number, g: number, b: number): string {
@@ -11,44 +18,6 @@ export function rgbaToHex8(r: number, g: number, b: number, a: number): string {
   return `#${[r, g, b, a]
     .map((n) => clamp(Math.round(n), 0, 255).toString(16).padStart(2, '0'))
     .join('')}`;
-}
-
-// 16進カラー文字列を #rrggbbaa の正規形へ変換する。#rrggbb も受け付ける。
-export function normalizeColorHex(value: string): string | null {
-  const normalized = value.trim().replace(/^#/, '');
-  if (/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    return `#${normalized.toLowerCase()}ff`;
-  }
-  if (/^[0-9a-fA-F]{8}$/.test(normalized)) {
-    return `#${normalized.toLowerCase()}`;
-  }
-  return null;
-}
-
-// パレットキャプションを設定された最大文字数に整形する。
-export function normalizePaletteCaption(value: string): string {
-  return Array.from(value.trim()).slice(0, PALETTE_CAPTION_MAX_LENGTH).join('');
-}
-
-// パレット配列を正規化する。
-export function normalizePaletteEntries(entries: PaletteEntry[]): PaletteEntry[] {
-  const seenColors = new Set<string>();
-  const normalizedEntries: PaletteEntry[] = [];
-
-  for (const entry of entries) {
-    const color = entry && typeof entry === 'object' && typeof entry.color === 'string' ? normalizeColorHex(entry.color) : null;
-    if (!color || seenColors.has(color)) {
-      continue;
-    }
-
-    seenColors.add(color);
-    normalizedEntries.push({
-      color,
-      caption: typeof entry.caption === 'string' ? normalizePaletteCaption(entry.caption) : ''
-    });
-  }
-
-  return normalizedEntries;
 }
 
 // 色配列から空キャプション付きのパレット配列を作る。
