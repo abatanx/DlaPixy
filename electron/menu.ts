@@ -83,7 +83,7 @@ function buildCanvasMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): 
 
 function buildPaletteMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): MenuItemConstructorOptions {
   return {
-    label: 'パレット',
+    label: 'Palette',
     submenu: [
       {
         label: 'インポート（置換）...',

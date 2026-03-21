@@ -2327,7 +2327,7 @@ export function App() {
             aria-label="キャンバスサイズ変更を開く"
             title="キャンバスサイズ変更を開く"
           >
-            キャンバス: {canvasSize}x{canvasSize}
+            キャンバス:{canvasSize}x{canvasSize}
           </button>
           <button
             type="button"
@@ -2336,11 +2336,11 @@ export function App() {
             aria-label="グリッド線間隔変更を開く"
             title="グリッド線間隔変更を開く"
           >
-            グリッド線: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px 間隔`}
+            グリッド線:{gridSpacing === 0 ? 'なし' : `${gridSpacing}px 間隔`}
           </button>
-          <span>表示倍率: {zoom}x</span>
+          <span>倍率:{zoom}x</span>
           <span>
-            現在ファイル: {currentFilePath ?? '未保存'}
+            ファイル:{currentFilePath ?? '未保存'}
             {hasUnsavedChanges ? ' *' : ''}
           </span>
         </div>

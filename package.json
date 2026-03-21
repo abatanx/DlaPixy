@@ -2,7 +2,7 @@
   "name": "dlapixy",
   "version": "0.1.0",
   "description": "DlaPixy (Electron + React + TypeScript + Bootstrap 5.3)",
-  "main": "dist-electron/main.js",
+  "main": "dist-electron/electron/main.js",
   "author": "",
   "license": "MIT",
   "scripts": {
