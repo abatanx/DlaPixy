@@ -3,12 +3,13 @@ import Modal from 'bootstrap/js/dist/modal';
 
 type UseBootstrapModalOptions = {
   isOpen: boolean;
+  keyboard?: boolean;
   onShown?: () => void;
   onHidden?: () => void;
 };
 
 // Bootstrap Modal の初期化と show/hide を React 側に寄せる。
-export function useBootstrapModal({ isOpen, onShown, onHidden }: UseBootstrapModalOptions) {
+export function useBootstrapModal({ isOpen, keyboard = false, onShown, onHidden }: UseBootstrapModalOptions) {
   const modalRef = useRef<HTMLDivElement | null>(null);
   const modalInstanceRef = useRef<Modal | null>(null);
   const onShownRef = useRef(onShown);
@@ -27,7 +28,7 @@ export function useBootstrapModal({ isOpen, onShown, onHidden }: UseBootstrapMod
 
     const instance = new Modal(modalElement, {
       backdrop: 'static',
-      keyboard: false
+      keyboard
     });
     modalInstanceRef.current = instance;
 
@@ -47,7 +48,7 @@ export function useBootstrapModal({ isOpen, onShown, onHidden }: UseBootstrapMod
       instance.dispose();
       modalInstanceRef.current = null;
     };
-  }, []);
+  }, [keyboard]);
 
   useEffect(() => {
     const instance = modalInstanceRef.current;

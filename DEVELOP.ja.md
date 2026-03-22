@@ -50,7 +50,7 @@ npm run dist
   - 左サイドの固定「状態」表示は廃止
 - キャンバスサイズとグリッドを分離
   - キャンバス: 初期 `256x256`（変更はネイティブ `Canvas` メニューのモーダルから）
-  - グリッド線間隔: `なし / 8 / 16 / 32 / カスタム`
+  - グリッド線間隔: 数値入力 `0..canvasSize`（`0` = なし）
 - 初期パレットは Web Safe Color 216 色を使う
 - パレット項目は短いキャプション（最大4文字）を持てて、各スウォッチの下に小さく表示する
   - 既存スウォッチをダブルクリックすると、その色を選択しつつ色編集モーダルを開く
@@ -152,7 +152,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - `src/components/modals/CanvasSizeModal.tsx`
   - キャンバスサイズ変更モーダルのUIと入力検証/適用トリガー
 - `src/components/modals/GridSpacingModal.tsx`
-  - グリッド線間隔変更モーダルのUI、プリセット/カスタム入力処理
+  - グリッド線間隔変更モーダルのUI。単一の数値入力で `0` はなし、`Enter` で適用、`Esc` でキャンセル
 - `src/components/modals/PaletteColorModal.tsx`
   - `#RRGGBB` と別枠 `AA` の HEX入力、および RGBA / HSV で選択色を編集する renderer モーダル
 - `src/components/modals/useBootstrapModal.ts`
@@ -196,7 +196,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 拡大時: 既存ピクセルを保持し、追加領域は透明で埋める
   - 縮小時: 新しい範囲外のピクセルを切り捨てる
   - サイズ変更時は選択状態 / 浮動貼り付け状態を解除する
-- グリッド線間隔変更もネイティブ `Canvas` メニューから開き、カスタム値は `1..canvasSize` の範囲で扱う。
+- グリッド線間隔変更もネイティブ `Canvas` メニューから開き、値は `0..canvasSize` の範囲で扱う（`0` はなし）。
 - パレット import/export はネイティブ `Palette` メニューから開き、ダイアログは Electron main process 側で扱う。
 - パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。
 - パレット色モーダルのプレビューは、変更前の色と現在編集中の色を横並びで表示し、近くに `Delta HSV` 差分を出す。

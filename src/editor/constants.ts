@@ -2,8 +2,6 @@ import { PALETTE_CAPTION_MAX_LENGTH as SHARED_PALETTE_CAPTION_MAX_LENGTH, type P
 
 export const PALETTE_CAPTION_MAX_LENGTH = SHARED_PALETTE_CAPTION_MAX_LENGTH;
 
-// グリッド線の選択肢（ピクセル間隔）。0 は「なし」を表す。
-export const GRID_SPACING_OPTIONS = [0, 8, 16, 32] as const;
 // 初期グリッド間隔（なし）。
 export const DEFAULT_GRID_SPACING = 0;
 // 初期キャンバスサイズ（正方形）。

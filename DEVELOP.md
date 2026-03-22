@@ -50,7 +50,7 @@ npm run dist
   - Sidebar fixed status row removed
 - Canvas size is independent from grid:
   - Canvas: default `256x256` (change from native `Canvas` menu modal)
-  - Grid overlay spacing: `none / 8 / 16 / 32 / custom`
+  - Grid overlay spacing: numeric input `0..canvasSize` (`0` = none)
 - Initial palette uses the 216 Web Safe Colors
 - Palette entries can store a short caption (up to 4 characters), shown under each swatch
   - Double-clicking an existing palette swatch selects it and opens the color edit modal
@@ -152,7 +152,7 @@ Current metadata shape:
 - `src/components/modals/CanvasSizeModal.tsx`
   - Canvas size modal UI and validation/apply trigger
 - `src/components/modals/GridSpacingModal.tsx`
-  - Grid spacing modal UI, preset/custom input handling
+  - Grid spacing modal UI with single numeric input (`0` = none, `Enter` to apply, `Esc` to cancel)
 - `src/components/modals/PaletteColorModal.tsx`
   - Selected color editor modal with `#RRGGBB` + separate `AA` hex input, plus RGBA + HSV controls
 - `src/components/modals/useBootstrapModal.ts`
@@ -196,7 +196,7 @@ Current metadata shape:
   - expand: keep pixels, fill new area with transparency
   - shrink: crop pixels outside the new bounds
   - selection / floating paste are cleared on resize
-- Grid spacing change is also opened from native `Canvas` menu; custom values are allowed in range `1..canvasSize`.
+- Grid spacing change is also opened from native `Canvas` menu; values are allowed in range `0..canvasSize` (`0` = none).
 - Palette import/export is opened from native `Palette` menu and uses Electron main-process dialogs.
 - Palette color selection is edited in a renderer modal instead of the native browser color picker.
 - The palette color modal preview shows both the original color and the current editing color side by side, with a nearby `Delta HSV` diff.
