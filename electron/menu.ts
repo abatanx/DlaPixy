@@ -86,17 +86,21 @@ function buildPaletteMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs):
     label: 'Palette',
     submenu: [
       {
-        label: 'インポート（置換）...',
+        label: 'インポート（GPL/すべて置換）...',
         click: () => sendMenuAction({ type: 'palette-import-replace' })
       },
       {
-        label: 'インポート（追加）...',
+        label: 'インポート（GPL/追加）...',
         click: () => sendMenuAction({ type: 'palette-import-append' })
       },
       { type: 'separator' },
       {
-        label: 'エクスポート...',
-        click: () => sendMenuAction({ type: 'palette-export' })
+        label: 'エクスポート（標準 GPL）...',
+        click: () => sendMenuAction({ type: 'palette-export', format: 'rgb' })
+      },
+      {
+        label: 'エクスポート（Aseprite向け RGBA GPL）...',
+        click: () => sendMenuAction({ type: 'palette-export', format: 'rgba' })
       }
     ]
   };

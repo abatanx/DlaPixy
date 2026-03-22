@@ -8,7 +8,7 @@ import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
 import * as pngText from 'png-chunk-text';
 import type { MenuAction } from '../shared/ipc';
-import { parseGplPalette, serializeGplPalette } from '../shared/palette-gpl';
+import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
 import { buildApplicationMenu, type AppPreferences } from './menu';
 
@@ -317,10 +317,18 @@ ipcMain.handle('palette:import-gpl', async (_, args?: { mode?: 'replace' | 'appe
 
 ipcMain.handle(
   'palette:export-gpl',
-  async (_, args: { palette: PaletteEntry[]; suggestedFileName?: string; paletteName?: string }) => {
+  async (
+    _,
+    args: {
+      palette: PaletteEntry[];
+      format?: GplExportFormat;
+      suggestedFileName?: string;
+      paletteName?: string;
+    }
+  ) => {
     let content: string;
     try {
-      content = serializeGplPalette(args.palette, { name: args.paletteName });
+      content = serializeGplPalette(args.palette, { name: args.paletteName, format: args.format });
     } catch (error) {
       return {
         canceled: false,

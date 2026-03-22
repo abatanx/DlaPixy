@@ -1,3 +1,5 @@
+import type { GplExportFormat } from './palette-gpl';
+
 export type MenuAction =
   | { type: 'open' }
   | { type: 'save' }
@@ -7,4 +9,4 @@ export type MenuAction =
   | { type: 'grid-spacing' }
   | { type: 'palette-import-replace' }
   | { type: 'palette-import-append' }
-  | { type: 'palette-export' };
+  | { type: 'palette-export'; format: GplExportFormat };

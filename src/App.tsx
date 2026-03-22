@@ -13,6 +13,7 @@ import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
 import { GridSpacingModal } from './components/modals/GridSpacingModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
 import type { MenuAction as FileMenuAction } from '../shared/ipc';
+import type { GplExportFormat } from '../shared/palette-gpl';
 import {
   DEFAULT_CANVAS_SIZE,
   DEFAULT_GRID_SPACING,
@@ -1780,12 +1781,17 @@ export function App() {
     [applyImportedPalette, setStatusText]
   );
 
-  const exportGplPalette = useCallback(async () => {
+  const exportGplPalette = useCallback(async (format: GplExportFormat) => {
     try {
       const currentFileName = getFileNameFromPath(currentFilePath);
-      const suggestedFileName = replaceFileExtension(currentFileName ?? 'palette', '.gpl');
+      const suggestedFileName = replaceFileExtension(
+        currentFileName ?? 'palette',
+        format === 'rgba' ? '-rgba.gpl' : '.gpl'
+      );
+      const exportLabel = format === 'rgba' ? 'Aseprite向け RGBA GPL' : '標準 GPL';
       const result = await window.pixelApi.exportGplPalette({
         palette: clonePaletteEntries(palette),
+        format,
         suggestedFileName,
         paletteName: currentFileName ? currentFileName.replace(/\.[^.]+$/, '') : 'DlaPixy Palette'
       });
@@ -1800,7 +1806,10 @@ export function App() {
         return;
       }
 
-      setStatusText(`パレットをエクスポートしました: ${result.filePath ?? suggestedFileName}`, 'success');
+      setStatusText(
+        `パレットを${exportLabel}でエクスポートしました: ${result.filePath ?? suggestedFileName}`,
+        'success'
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : '不明なエラー';
       setStatusText(`パレットのエクスポートに失敗しました: ${message}`, 'error');
@@ -2069,7 +2078,7 @@ export function App() {
           void importGplPalette('append');
           break;
         case 'palette-export':
-          void exportGplPalette();
+          void exportGplPalette(action.format);
           break;
         default:
           break;

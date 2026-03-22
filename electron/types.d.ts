@@ -1,4 +1,5 @@
 import type { MenuAction } from '../shared/ipc';
+import type { GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
 export {};
 
@@ -40,6 +41,7 @@ declare global {
       }>;
       exportGplPalette: (args: {
         palette: PaletteEntry[];
+        format: GplExportFormat;
         suggestedFileName?: string;
         paletteName?: string;
       }) => Promise<{

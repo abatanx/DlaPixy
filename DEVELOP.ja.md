@@ -20,6 +20,11 @@ npm run build
 npm run dist
 ```
 
+- `npm run dev` は最初に `build:electron` を実行してから、以下を起動する。
+  - Vite dev server
+  - `electron/**` / `shared/**` 向けの `tsc -w`
+  - `dist-electron/**` 更新時の Electron 自動再起動
+
 ## 4. 実装済み機能
 - 色変換ヘルパーを追加
   - `rgbaToHsva`（`RGBA 0-255` -> `HSVA H:0-360, S/V:0-100, A:0-1`）
@@ -50,10 +55,10 @@ npm run dist
 - パレット項目は短いキャプション（最大4文字）を持てて、各スウォッチの下に小さく表示する
   - 既存スウォッチをダブルクリックすると、その色を選択しつつ色編集モーダルを開く
 - GPL パレットのインポート / エクスポート
-  - ネイティブ `Palette` メニューに `インポート（置換）` / `インポート（追加）` / `エクスポート` を追加
+  - ネイティブ `Palette` メニューに `インポート（GPL/すべて置換）` / `インポート（GPL/追加）` / `エクスポート（標準 GPL）` / `エクスポート（Aseprite向け RGBA GPL）` を追加
   - `.gpl` を Electron の native dialog 経由で読み込み、置換または追加で適用できる
-  - すべて不透明色なら標準 GPL として書き出す
-  - alpha を含む場合は Aseprite 互換の `Channels: RGBA` 付き GPL として書き出す
+  - `エクスポート（標準 GPL）` は 3ch の GPL を書き出し、alpha を含むパレットは拒否する
+  - `エクスポート（Aseprite向け RGBA GPL）` は常に Aseprite 互換の `Channels: RGBA` 付き GPL を書き出す
   - GPL の色名は DlaPixy の caption に対応づけ、`Untitled` は import 時に空 caption 扱いにする
 - ツール
   - 描画（Pencil）
@@ -199,7 +204,9 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - パレットキャプションの最大文字数は `src/editor/constants.ts` の `PALETTE_CAPTION_MAX_LENGTH` で管理する。
 - 描画色とパレット色は alpha 付き `#RRGGBBAA` も扱え、従来の `#RRGGBB` は読込時に正規化する。
 - GPL import は標準 RGB 行と Aseprite 互換の `Channels: RGBA` を受け付ける。
-- GPL export は可能なら標準 RGB を使い、alpha があるときだけ Aseprite 互換 RGBA GPL へ切り替える。
+- GPL export はメニューで形式を明示選択する。
+  - `エクスポート（標準 GPL）`: 3ch GPL のみ。alpha を含むパレットは拒否する
+  - `エクスポート（Aseprite向け RGBA GPL）`: 常に Aseprite 互換の `Channels: RGBA` を書き出す
 - 既存パレット色を編集したときは、キャンバス上の一致ピクセルも新しい色へ置換し、Undo 1 回で戻せる。
 - 既存パレット色の編集中に、調整後の色が別のパレット色と重複する場合は `適用` できない。
 - パレットグリッド末尾の `+` セルから同じモーダルを追加モードで開き、重複しない新規パレット色を追加できる。

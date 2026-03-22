@@ -20,6 +20,11 @@ npm run build
 npm run dist
 ```
 
+- `npm run dev` runs `build:electron` first, then starts:
+  - Vite dev server
+  - `tsc -w` for `electron/**` and `shared/**`
+  - Electron auto-restart when `dist-electron/**` changes
+
 ## 4. Implemented Features
 - Color conversion helpers:
   - `rgbaToHsva` (`RGBA 0-255` -> `HSVA H:0-360, S/V:0-100, A:0-1`)
@@ -50,10 +55,10 @@ npm run dist
 - Palette entries can store a short caption (up to 4 characters), shown under each swatch
   - Double-clicking an existing palette swatch selects it and opens the color edit modal
 - GPL palette import/export
-  - Native `Palette` menu includes `Import (Replace)`, `Import (Append)`, and `Export`
+  - Native `Palette` menu includes `Import (GPL / Replace All)`, `Import (GPL / Append)`, `Export (Standard GPL)`, and `Export (Aseprite RGBA GPL)`
   - Imports `.gpl` via Electron native dialog and applies palette as replace/append
-  - Exports current palette as standard GPL when all colors are opaque
-  - Exports Aseprite-compatible `Channels: RGBA` GPL when any palette entry has alpha
+  - `Export (Standard GPL)` writes 3-channel GPL and rejects palettes that contain alpha
+  - `Export (Aseprite RGBA GPL)` always writes Aseprite-compatible `Channels: RGBA` GPL
   - GPL color names map to DlaPixy captions; `Untitled` is treated as empty caption on import
 - Tools:
   - Pencil
@@ -199,7 +204,9 @@ Current metadata shape:
 - Palette caption max length is managed by `PALETTE_CAPTION_MAX_LENGTH` in `src/editor/constants.ts`.
 - Selected drawing color and palette entries can carry alpha (`#RRGGBBAA`), while legacy `#RRGGBB` values are normalized on load.
 - GPL import accepts standard RGB lines and Aseprite-style `Channels: RGBA` lines.
-- GPL export writes standard RGB when possible, and falls back to Aseprite-compatible RGBA GPL only when alpha is present.
+- GPL export is split into explicit menu actions:
+  - `Export (Standard GPL)`: 3-channel GPL only; rejects palettes that contain alpha
+  - `Export (Aseprite RGBA GPL)`: always writes Aseprite-compatible `Channels: RGBA`
 - Editing an existing palette color also replaces matching pixels on the canvas with the new color in one undoable operation.
 - While editing an existing palette color, Apply is disabled if the adjusted color already exists elsewhere in the palette.
 - The last cell in the palette grid is a `+` action that opens the same modal in create mode and adds a new unique palette color.

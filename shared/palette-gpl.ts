@@ -9,6 +9,8 @@ const GPL_HEADER = 'GIMP Palette';
 const ASEPRITE_ALPHA_HEADER = 'Channels: RGBA';
 const DEFAULT_EXPORT_NAME = 'DlaPixy Palette';
 const DEFAULT_EXPORT_ENTRY_NAME = 'Untitled';
+export type GplExportFormat = 'rgb' | 'rgba';
+type GplSerializeFormat = GplExportFormat | 'auto';
 
 type ParsedGplPalette = {
   entries: PaletteEntry[];
@@ -131,6 +133,7 @@ export function serializeGplPalette(
   entries: PaletteEntry[],
   options?: {
     name?: string;
+    format?: GplSerializeFormat;
   }
 ): string {
   const normalizedEntries = normalizePaletteEntries(entries);
@@ -142,12 +145,19 @@ export function serializeGplPalette(
     const color = normalizeColorHex(entry.color);
     return color ? color.slice(7, 9) !== 'ff' : false;
   });
+  const format = options?.format ?? 'auto';
+
+  if (format === 'rgb' && hasAlpha) {
+    throw new Error('alpha を含むパレットは標準 GPL で書き出せません。Aseprite向け RGBA GPL を選んでください');
+  }
+
+  const includeAlphaChannel = format === 'rgba' || (format === 'auto' && hasAlpha);
 
   const lines = [
     GPL_HEADER,
     `Name: ${normalizeExportName(options?.name)}`,
     'Columns: 0',
-    ...(hasAlpha ? [ASEPRITE_ALPHA_HEADER] : []),
+    ...(includeAlphaChannel ? [ASEPRITE_ALPHA_HEADER] : []),
     '#'
   ];
 
@@ -163,7 +173,7 @@ export function serializeGplPalette(
     const name = normalizeExportEntryName(entry.caption);
 
     lines.push(
-      hasAlpha
+      includeAlphaChannel
         ? `${formatChannel(r)} ${formatChannel(g)} ${formatChannel(b)} ${formatChannel(a)} ${name}`
         : `${formatChannel(r)} ${formatChannel(g)} ${formatChannel(b)} ${name}`
     );
