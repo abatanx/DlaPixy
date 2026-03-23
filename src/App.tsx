@@ -25,7 +25,7 @@ import {
   MIN_CANVAS_SIZE,
   MIN_ZOOM
 } from './editor/constants';
-import type { EditorMeta, HoveredPixelInfo, PaletteEntry, Selection, Tool } from './editor/types';
+import type { AnimationFrame, EditorMeta, HoveredPixelInfo, PaletteEntry, Selection, Tool } from './editor/types';
 import {
   blitBlockOnCanvas,
   clampCanvasSize,
@@ -56,6 +56,9 @@ type UndoSnapshot = {
 
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
+const DEFAULT_ANIMATION_PREVIEW_FPS = 6;
+const MIN_ANIMATION_PREVIEW_FPS = 1;
+const MAX_ANIMATION_PREVIEW_FPS = 24;
 
 function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boolean {
   if (left.length !== right.length) {
@@ -100,6 +103,55 @@ function hasHoveredPixelInfoSameContent(
   );
 }
 
+function createRegionPreviewDataUrl(
+  pixels: Uint8ClampedArray,
+  canvasSize: number,
+  region: { x: number; y: number; w: number; h: number },
+  repeatX = 1,
+  repeatY = 1
+): string {
+  if (region.w <= 0 || region.h <= 0) {
+    return '';
+  }
+
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = region.w;
+  sourceCanvas.height = region.h;
+  const sctx = sourceCanvas.getContext('2d');
+  if (!sctx) {
+    return '';
+  }
+
+  const sourceImageData = sctx.createImageData(region.w, region.h);
+  for (let y = 0; y < region.h; y += 1) {
+    for (let x = 0; x < region.w; x += 1) {
+      const srcIdx = ((region.y + y) * canvasSize + (region.x + x)) * 4;
+      const dstIdx = (y * region.w + x) * 4;
+      sourceImageData.data[dstIdx] = pixels[srcIdx];
+      sourceImageData.data[dstIdx + 1] = pixels[srcIdx + 1];
+      sourceImageData.data[dstIdx + 2] = pixels[srcIdx + 2];
+      sourceImageData.data[dstIdx + 3] = pixels[srcIdx + 3];
+    }
+  }
+  sctx.putImageData(sourceImageData, 0, 0);
+
+  const previewCanvas = document.createElement('canvas');
+  previewCanvas.width = region.w * Math.max(1, repeatX);
+  previewCanvas.height = region.h * Math.max(1, repeatY);
+  const pctx = previewCanvas.getContext('2d');
+  if (!pctx) {
+    return sourceCanvas.toDataURL('image/png');
+  }
+
+  pctx.imageSmoothingEnabled = false;
+  for (let ty = 0; ty < Math.max(1, repeatY); ty += 1) {
+    for (let tx = 0; tx < Math.max(1, repeatX); tx += 1) {
+      pctx.drawImage(sourceCanvas, tx * region.w, ty * region.h);
+    }
+  }
+  return previewCanvas.toDataURL('image/png');
+}
+
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
   // ---- UI / editor state ----
@@ -112,6 +164,11 @@ export function App() {
   const [tool, setTool] = useState<Tool>('pencil');
   const [selection, setSelection] = useState<Selection>(null);
   const [lastTilePreviewSelection, setLastTilePreviewSelection] = useState<Selection>(null);
+  const [animationFrames, setAnimationFrames] = useState<AnimationFrame[]>([]);
+  const [animationPreviewIndex, setAnimationPreviewIndex] = useState<number>(0);
+  const [animationPreviewFps, setAnimationPreviewFpsRaw] = useState<number>(DEFAULT_ANIMATION_PREVIEW_FPS);
+  const [isAnimationPreviewPlaying, setIsAnimationPreviewPlaying] = useState<boolean>(false);
+  const [isAnimationPreviewLoop, setIsAnimationPreviewLoop] = useState<boolean>(true);
   const [statusText, setStatusTextRaw] = useState<string>('準備OK');
   const [toastType, setToastType] = useState<ToastType>('info');
   const [isToastVisible, setIsToastVisible] = useState<boolean>(false);
@@ -137,6 +194,7 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
+  const animationFrameIdRef = useRef<number>(1);
 
   useEffect(() => {
     document.title = `DlaPixy${hasUnsavedChanges ? ' *' : ''}`;
@@ -223,45 +281,15 @@ export function App() {
     if (!tilePreviewSelection) {
       return '';
     }
-
-    const sourceCanvas = document.createElement('canvas');
-    sourceCanvas.width = tilePreviewSelection.w;
-    sourceCanvas.height = tilePreviewSelection.h;
-    const sctx = sourceCanvas.getContext('2d');
-    if (!sctx) {
-      return '';
-    }
-
-    const sourceImageData = sctx.createImageData(tilePreviewSelection.w, tilePreviewSelection.h);
-    for (let y = 0; y < tilePreviewSelection.h; y += 1) {
-      for (let x = 0; x < tilePreviewSelection.w; x += 1) {
-        const srcIdx = ((tilePreviewSelection.y + y) * canvasSize + (tilePreviewSelection.x + x)) * 4;
-        const dstIdx = (y * tilePreviewSelection.w + x) * 4;
-        sourceImageData.data[dstIdx] = pixels[srcIdx];
-        sourceImageData.data[dstIdx + 1] = pixels[srcIdx + 1];
-        sourceImageData.data[dstIdx + 2] = pixels[srcIdx + 2];
-        sourceImageData.data[dstIdx + 3] = pixels[srcIdx + 3];
-      }
-    }
-    sctx.putImageData(sourceImageData, 0, 0);
-
-    const tileCanvas = document.createElement('canvas');
-    tileCanvas.width = tilePreviewSelection.w * 3;
-    tileCanvas.height = tilePreviewSelection.h * 3;
-    const tctx = tileCanvas.getContext('2d');
-    if (!tctx) {
-      return '';
-    }
-
-    tctx.imageSmoothingEnabled = false;
-    for (let ty = 0; ty < 3; ty += 1) {
-      for (let tx = 0; tx < 3; tx += 1) {
-        tctx.drawImage(sourceCanvas, tx * tilePreviewSelection.w, ty * tilePreviewSelection.h);
-      }
-    }
-
-    return tileCanvas.toDataURL('image/png');
+    return createRegionPreviewDataUrl(pixels, canvasSize, tilePreviewSelection, 3, 3);
   }, [canvasSize, pixels, tilePreviewSelection]);
+  const animationPreviewFrame = animationFrames[animationPreviewIndex] ?? null;
+  const animationPreviewDataUrl = useMemo(() => {
+    if (!animationPreviewFrame) {
+      return '';
+    }
+    return createRegionPreviewDataUrl(pixels, canvasSize, animationPreviewFrame);
+  }, [animationPreviewFrame, canvasSize, pixels]);
 
   const pushUndo = useCallback(() => {
     // Keep immutable snapshots; cap history size to avoid unbounded memory growth.
@@ -276,6 +304,57 @@ export function App() {
       undoStackRef.current.shift();
     }
   }, [canvasSize, palette, pixels, selectedColor, selection]);
+
+  const resetAnimationFrames = useCallback(() => {
+    setAnimationFrames([]);
+    setAnimationPreviewIndex(0);
+    setIsAnimationPreviewPlaying(false);
+  }, []);
+
+  useEffect(() => {
+    if (animationFrames.length === 0) {
+      if (animationPreviewIndex !== 0) {
+        setAnimationPreviewIndex(0);
+      }
+      if (isAnimationPreviewPlaying) {
+        setIsAnimationPreviewPlaying(false);
+      }
+      return;
+    }
+
+    if (animationPreviewIndex >= animationFrames.length) {
+      setAnimationPreviewIndex(animationFrames.length - 1);
+    }
+  }, [animationFrames.length, animationPreviewIndex, isAnimationPreviewPlaying]);
+
+  useEffect(() => {
+    if (!isAnimationPreviewPlaying || animationFrames.length <= 1) {
+      return;
+    }
+
+    const delay = Math.max(80, Math.round(1000 / animationPreviewFps));
+    const timer = window.setInterval(() => {
+      setAnimationPreviewIndex((prev) => {
+        if (prev + 1 < animationFrames.length) {
+          return prev + 1;
+        }
+        return isAnimationPreviewLoop ? 0 : prev;
+      });
+    }, delay);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [animationFrames.length, animationPreviewFps, isAnimationPreviewLoop, isAnimationPreviewPlaying]);
+
+  useEffect(() => {
+    if (!isAnimationPreviewPlaying || isAnimationPreviewLoop || animationFrames.length <= 1) {
+      return;
+    }
+    if (animationPreviewIndex >= animationFrames.length - 1) {
+      setIsAnimationPreviewPlaying(false);
+    }
+  }, [animationFrames.length, animationPreviewIndex, isAnimationPreviewLoop, isAnimationPreviewPlaying]);
 
   const drawCanvas = useCallback(
     (sourcePixels: Uint8ClampedArray, maybeSelection: Selection) => {
@@ -1231,11 +1310,12 @@ export function App() {
     setPixels((prev) => resizeCanvasPixels(prev, canvasSize, normalized));
     setSelection(null);
     setLastTilePreviewSelection(null);
+    resetAnimationFrames();
     clearFloatingPaste();
     setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
     setHasUnsavedChanges(true);
     setIsCanvasSizeModalOpen(false);
-  }, [canvasSize, clearFloatingPaste, pushUndo, setStatusText]);
+  }, [canvasSize, clearFloatingPaste, pushUndo, resetAnimationFrames, setStatusText]);
 
   const openCanvasSizeModal = useCallback(() => {
     setIsCanvasSizeModalOpen(true);
@@ -1322,10 +1402,134 @@ export function App() {
     setLastTilePreviewSelection(previous.selection);
     setPalette(clonePaletteEntries(previous.palette));
     setSelectedColor(previous.selectedColor);
+    if (previous.canvasSize !== canvasSize) {
+      resetAnimationFrames();
+    }
     clearFloatingPaste();
     setHasUnsavedChanges(true);
     setStatusText('1手戻しました', 'success');
-  }, [clearFloatingPaste]);
+  }, [canvasSize, clearFloatingPaste, resetAnimationFrames]);
+
+  const addAnimationFrame = useCallback(() => {
+    if (!selection) {
+      setStatusText('アニメーション追加: 先に矩形選択してください', 'warning');
+      return;
+    }
+
+    const nextFrame: AnimationFrame = {
+      id: `af-${animationFrameIdRef.current}`,
+      x: selection.x,
+      y: selection.y,
+      w: selection.w,
+      h: selection.h
+    };
+    animationFrameIdRef.current += 1;
+
+    setAnimationFrames((prev) => [...prev, nextFrame]);
+    setAnimationPreviewIndex(animationFrames.length);
+    setStatusText(
+      `アニメーションフレームを追加しました: #${animationFrames.length + 1} (${selection.w}x${selection.h})`,
+      'success'
+    );
+  }, [animationFrames.length, selection, setStatusText]);
+
+  const clearAnimationFrames = useCallback(() => {
+    if (animationFrames.length === 0) {
+      setStatusText('アニメーションフレームは空です', 'warning');
+      return;
+    }
+    resetAnimationFrames();
+    setStatusText('アニメーションフレームをすべてクリアしました', 'success');
+  }, [animationFrames.length, resetAnimationFrames, setStatusText]);
+
+  const removeAnimationFrame = useCallback(
+    (frameId: string) => {
+      const removeIndex = animationFrames.findIndex((frame) => frame.id === frameId);
+      if (removeIndex < 0) {
+        return;
+      }
+
+      const nextLength = animationFrames.length - 1;
+      setAnimationFrames((prev) => prev.filter((frame) => frame.id !== frameId));
+      setAnimationPreviewIndex((current) => {
+        if (nextLength <= 0) {
+          return 0;
+        }
+        if (current > removeIndex) {
+          return current - 1;
+        }
+        return Math.min(current, nextLength - 1);
+      });
+      if (nextLength < 2) {
+        setIsAnimationPreviewPlaying(false);
+      }
+      setStatusText('アニメーションフレームを削除しました', 'success');
+    },
+    [animationFrames, setStatusText]
+  );
+
+  const moveAnimationFrame = useCallback(
+    (frameId: string, direction: 'up' | 'down') => {
+      const sourceIndex = animationFrames.findIndex((frame) => frame.id === frameId);
+      if (sourceIndex < 0) {
+        return;
+      }
+
+      const targetIndex = direction === 'up' ? sourceIndex - 1 : sourceIndex + 1;
+      if (targetIndex < 0 || targetIndex >= animationFrames.length) {
+        return;
+      }
+
+      setAnimationFrames((prev) => {
+        const next = [...prev];
+        const [movedFrame] = next.splice(sourceIndex, 1);
+        next.splice(targetIndex, 0, movedFrame);
+        return next;
+      });
+      setAnimationPreviewIndex((current) => {
+        if (current === sourceIndex) {
+          return targetIndex;
+        }
+        if (current === targetIndex) {
+          return sourceIndex;
+        }
+        return current;
+      });
+      setStatusText('アニメーションフレームの順序を変更しました', 'success');
+    },
+    [animationFrames, setStatusText]
+  );
+
+  const selectAnimationFrame = useCallback((index: number) => {
+    if (index < 0 || index >= animationFrames.length) {
+      return;
+    }
+    setAnimationPreviewIndex(index);
+  }, [animationFrames.length]);
+
+  const toggleAnimationPreviewPlayback = useCallback(() => {
+    if (animationFrames.length < 2) {
+      setStatusText('アニメーション再生には 2 フレーム以上必要です', 'warning');
+      return;
+    }
+
+    if (isAnimationPreviewPlaying) {
+      setIsAnimationPreviewPlaying(false);
+      setStatusText('アニメーション再生を停止しました', 'info');
+      return;
+    }
+
+    if (!isAnimationPreviewLoop && animationPreviewIndex >= animationFrames.length - 1) {
+      setAnimationPreviewIndex(0);
+    }
+    setIsAnimationPreviewPlaying(true);
+    setStatusText('アニメーション再生を開始しました', 'info');
+  }, [animationFrames.length, animationPreviewIndex, isAnimationPreviewLoop, isAnimationPreviewPlaying, setStatusText]);
+
+  const updateAnimationPreviewFps = useCallback((value: number) => {
+    const normalized = Number.isFinite(value) ? Math.trunc(value) : DEFAULT_ANIMATION_PREVIEW_FPS;
+    setAnimationPreviewFpsRaw(Math.max(MIN_ANIMATION_PREVIEW_FPS, Math.min(MAX_ANIMATION_PREVIEW_FPS, normalized)));
+  }, []);
 
   const deleteSelection = useCallback(() => {
     if (!selection) {
@@ -1581,6 +1785,10 @@ export function App() {
           setTool('select');
           setStatusText('ツール: 矩形選択', 'info');
           break;
+        case 'KeyA':
+          event.preventDefault();
+          addAnimationFrame();
+          break;
         case 'KeyF':
           event.preventDefault();
           freezeHoveredPixelInfo();
@@ -1605,6 +1813,7 @@ export function App() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [
+    addAnimationFrame,
     cancelFloatingPaste,
     copySelection,
     doUndo,
@@ -1973,6 +2182,8 @@ export function App() {
       setCanvasSize(targetCanvasSize);
       setPixels(new Uint8ClampedArray(imageData.data));
       setSelection(null);
+      setLastTilePreviewSelection(null);
+      resetAnimationFrames();
       clearFloatingPaste();
       undoStackRef.current = [];
       setCurrentFilePath(result.filePath);
@@ -2009,7 +2220,7 @@ export function App() {
       const message = error instanceof Error ? error.message : '不明なエラー';
       setStatusText(`読み込みに失敗しました: ${message}`, 'error');
     }
-  }, [clearFloatingPaste, confirmBeforeOpen]);
+  }, [clearFloatingPaste, confirmBeforeOpen, resetAnimationFrames]);
 
   useEffect(() => {
     const isEditableElement = (target: EventTarget | null): boolean => {
@@ -2099,6 +2310,20 @@ export function App() {
             selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
             tilePreviewSelection={tilePreviewSelection}
             selection={selection}
+            animationPreviewDataUrl={animationPreviewDataUrl}
+            animationFrames={animationFrames}
+            animationPreviewIndex={animationPreviewIndex}
+            animationPreviewFps={animationPreviewFps}
+            isAnimationPreviewPlaying={isAnimationPreviewPlaying}
+            isAnimationPreviewLoop={isAnimationPreviewLoop}
+            addAnimationFrame={addAnimationFrame}
+            clearAnimationFrames={clearAnimationFrames}
+            selectAnimationFrame={selectAnimationFrame}
+            moveAnimationFrame={moveAnimationFrame}
+            removeAnimationFrame={removeAnimationFrame}
+            toggleAnimationPreviewPlayback={toggleAnimationPreviewPlayback}
+            setAnimationPreviewFps={updateAnimationPreviewFps}
+            setAnimationPreviewLoop={setIsAnimationPreviewLoop}
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
             applySelectedColorChange={applySelectedColorChange}
@@ -2296,6 +2521,8 @@ export function App() {
               <EditorToolbar
                 tool={tool}
                 setTool={setTool}
+                canAddAnimationFrame={selection !== null}
+                addAnimationFrame={addAnimationFrame}
                 zoom={zoom}
                 zoomIn={zoomIn}
                 zoomOut={zoomOut}

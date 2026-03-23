@@ -90,10 +90,19 @@ npm run dist
   - `Canvas`, `Grid`, `Zoom`, and `Current File` status are shown in the bottom footer instead of the sidebar
   - Tapping/clicking `Canvas` or `Grid` in the footer opens the existing change modal
 - 1x PNG preview panel
+  - Large previews stay scrollable instead of shrinking to fit
 - Selection 3x3 tile preview panel (under 1x preview)
   - Uses current selection, or keeps showing last selection when selection is cleared
   - Real-time updates while editing pixels
   - Auto-fit to parent width (responsive scale)
+  - Preview area is displayed in a square (`1:1`) viewport
+- Animation preview panel (under Tiling)
+  - `A` or the right toolbar button adds the current selection as an animation frame
+  - When a frame is added, the sidebar automatically switches to the `Animation Preview` tab
+  - Sidebar preview supports play/stop, FPS, loop toggle, clear all, delete, and up/down reorder
+  - Animation controls are compact, icon-first Bootstrap buttons
+  - `Preview / Tiling / Animation Preview` are grouped as Bootstrap-style tabs with short FontAwesome-based labels
+  - Preview area is displayed in a square (`1:1`) viewport
 - Zoom controls
 - Space + drag pan behavior (Photoshop-like hand tool)
 - Page-level scroll disabled (only stage/internal scroll)
@@ -114,6 +123,7 @@ npm run dist
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
+  - `A`: Add current selection to animation preview frames
   - `F`: Add/update hovered pixel in reference line, and select matching palette color if present
   - `1..9`: Select color from numbered reference line
   - `Enter`: Finalize floating paste/move
@@ -141,14 +151,15 @@ Current metadata shape:
 - `src/components/EditorSidebar.tsx`
   - Left sidebar container that composes preview and palette sections
 - `src/components/sidebar/SidebarPreviewSection.tsx`
-  - Preview section for 1x preview and tiling preview
+  - Preview section for 1x preview, tiling preview, and animation preview
+  - These three preview blocks are switched by Bootstrap-style tabs
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - Palette section for color selector trigger and palette grid; memoized to reduce rerenders during canvas edits
   - Palette grid is compact + independently scrollable so large palettes (hundreds of colors) stay usable
 - `src/components/sidebar/types.ts`
   - Shared prop types for sidebar sections
 - `src/components/EditorToolbar.tsx`
-  - Right toolbar UI (tool switch, zoom, undo, copy/paste/delete/clear)
+  - Right toolbar UI (tool switch, animation frame add, zoom, undo, copy/paste/delete/clear)
 - `src/components/modals/CanvasSizeModal.tsx`
   - Canvas size modal UI and validation/apply trigger
 - `src/components/modals/GridSpacingModal.tsx`

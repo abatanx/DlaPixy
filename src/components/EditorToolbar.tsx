@@ -4,6 +4,8 @@ import type { Tool } from '../editor/types';
 type EditorToolbarProps = {
   tool: Tool;
   setTool: (tool: Tool) => void;
+  canAddAnimationFrame: boolean;
+  addAnimationFrame: () => void;
   zoom: number;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -18,6 +20,8 @@ type EditorToolbarProps = {
 export function EditorToolbar({
   tool,
   setTool,
+  canAddAnimationFrame,
+  addAnimationFrame,
   zoom,
   zoomIn,
   zoomOut,
@@ -71,6 +75,18 @@ export function EditorToolbar({
         <span className="editor-btn-inner">
           <i className="fa-regular fa-square" aria-hidden="true" />
           <span className="editor-shortcut">V</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        className="btn btn-sm editor-tool-btn"
+        onClick={addAnimationFrame}
+        disabled={!canAddAnimationFrame}
+        title="選択範囲をアニメーションフレームに追加 (A)"
+      >
+        <span className="editor-btn-inner">
+          <i className="fa-solid fa-film" aria-hidden="true" />
+          <span className="editor-shortcut">A</span>
         </span>
       </button>
 

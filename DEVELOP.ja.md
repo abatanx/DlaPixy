@@ -90,11 +90,20 @@ npm run dist
   - `キャンバス`, `グリッド線`, `表示倍率`, `現在ファイル` は sidebar ではなく画面下部 footer に表示
   - footer の `キャンバス` / `グリッド線` を押すと既存の変更モーダルを開く
 - 1x PNGプレビュー
+  - 大きい画像でも縮小し切らず、必要に応じてスクロールで確認できる
 - 選択範囲 3x3 タイルプレビュー（1xプレビュー下）
   - 現在の選択範囲を表示
   - 選択解除後も最終選択範囲を保持して表示継続
   - 編集内容をリアルタイム反映
   - 親ノード幅いっぱいに自動拡大/縮小
+  - プレビュー表示領域は正方形（`1:1`）で見せる
+- アニメーションプレビューパネル（Tiling の下）
+  - `A` または右ツールバーのボタンで現在の選択範囲をフレーム追加
+  - フレーム追加時は自動で `Animation Preview` タブへ切り替える
+  - サイドバー上で再生/停止、FPS、ループ、全クリア、削除、上下並び替えに対応
+  - 操作部は Bootstrap のコンパクトなアイコン中心ボタンで表示
+  - `Preview / Tiling / Animation Preview` は FontAwesome 付きの短い Bootstrap 風タブで切り替える
+  - プレビュー表示領域は正方形（`1:1`）で見せる
 - 拡大/縮小
 - Space押下中のパン（手ツール挙動）
 - 画面全体スクロール禁止（編集領域のみスクロール）
@@ -115,6 +124,7 @@ npm run dist
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + C`: 選択範囲コピー
   - `Cmd/Ctrl + V`: 貼り付け
+  - `A`: 現在の選択範囲をアニメーションプレビューへ追加
   - `F`: ホバー中ピクセルを参照ラインへ追加/更新し、パレット登録色ならその色を選択
   - `1..9`: 番号付き参照ラインの色を選択
   - `Enter`: 浮動貼り付け/移動を確定
@@ -141,14 +151,15 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - `src/components/EditorSidebar.tsx`
   - 左サイドバーのコンテナ。プレビュー部とパレット部を組み立てる
 - `src/components/sidebar/SidebarPreviewSection.tsx`
-  - 1xプレビューとタイルプレビューを担当するプレビューセクション
+  - 1xプレビュー / タイルプレビュー / アニメーションプレビューを担当するプレビューセクション
+  - 3つのプレビューは Bootstrap 風のタブ切り替えで表示する
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - 色セレクタ起点とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
   - パレット一覧はコンパクト表示 + 独立スクロールにして、大量色でも使いやすくしている
 - `src/components/sidebar/types.ts`
   - サイドバー各セクションで共有する props 型
 - `src/components/EditorToolbar.tsx`
-  - 右ツールバーUI（ツール切替、ズーム、Undo、コピー/貼り付け/削除/クリア）
+  - 右ツールバーUI（ツール切替、アニメーションフレーム追加、ズーム、Undo、コピー/貼り付け/削除/クリア）
 - `src/components/modals/CanvasSizeModal.tsx`
   - キャンバスサイズ変更モーダルのUIと入力検証/適用トリガー
 - `src/components/modals/GridSpacingModal.tsx`

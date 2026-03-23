@@ -344,19 +344,162 @@ body {
   padding: 0.25rem;
 }
 
+.preview-scroll-wrap {
+  max-width: 100%;
+}
+
+.preview-scroll-content {
+  width: max-content;
+  min-width: 100%;
+}
+
+.preview-scroll-image {
+  max-width: none;
+}
+
+.sidebar-preview-tabs .nav-link {
+  font-size: 0.74rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sidebar-preview-tab-label {
+  line-height: 1;
+}
+
+.sidebar-preview-tab-content {
+  border: 1px solid #cbd5e1;
+  border-top: 0;
+  border-radius: 0 0 0.5rem 0.5rem;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 0.6rem;
+}
+
 .preview-image {
   display: block;
   image-rendering: pixelated;
 }
 
 .tile-preview-wrap {
-  max-height: 180px;
+  aspect-ratio: 1 / 1;
+  max-height: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tile-preview-image {
   width: 100%;
-  height: auto;
+  height: 100%;
   max-width: none;
+  object-fit: contain;
+}
+
+.animation-preview-wrap {
+  aspect-ratio: 1 / 1;
+  max-height: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.animation-preview-image {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+}
+
+.animation-preview-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.animation-preview-icon-button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.animation-preview-fps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.animation-preview-fps .fa-gauge-high {
+  font-size: 0.82rem;
+}
+
+.animation-preview-fps input {
+  width: 3.4rem;
+}
+
+.animation-frame-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.animation-frame-item {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.animation-frame-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.45rem;
+  background: #ffffff;
+  color: #334155;
+  padding: 0.35rem 0.45rem;
+  text-align: left;
+}
+
+.animation-frame-item.active .animation-frame-main {
+  border-color: #0f172a;
+  background: #f8fafc;
+}
+
+.animation-frame-number {
+  flex: 0 0 auto;
+  width: 1.3rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.animation-frame-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: #475569;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.animation-frame-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
 }
 
 .preview-placeholder {

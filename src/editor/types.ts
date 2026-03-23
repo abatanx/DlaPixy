@@ -6,6 +6,14 @@ export type PaletteEntry = SharedPaletteEntry;
 
 export type Selection = { x: number; y: number; w: number; h: number } | null;
 
+export type AnimationFrame = {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 export type HoveredPixelInfo = {
   x: number;
   y: number;

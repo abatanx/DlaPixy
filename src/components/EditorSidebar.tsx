@@ -10,6 +10,20 @@ export const EditorSidebar = memo(function EditorSidebar({
   selectionTilePreviewDataUrl,
   tilePreviewSelection,
   selection,
+  animationPreviewDataUrl,
+  animationFrames,
+  animationPreviewIndex,
+  animationPreviewFps,
+  isAnimationPreviewPlaying,
+  isAnimationPreviewLoop,
+  addAnimationFrame,
+  clearAnimationFrames,
+  selectAnimationFrame,
+  moveAnimationFrame,
+  removeAnimationFrame,
+  toggleAnimationPreviewPlayback,
+  setAnimationPreviewFps,
+  setAnimationPreviewLoop,
   selectedColor,
   setSelectedColor,
   applySelectedColorChange,
@@ -29,6 +43,20 @@ export const EditorSidebar = memo(function EditorSidebar({
             selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
             tilePreviewSelection={tilePreviewSelection}
             selection={selection}
+            animationPreviewDataUrl={animationPreviewDataUrl}
+            animationFrames={animationFrames}
+            animationPreviewIndex={animationPreviewIndex}
+            animationPreviewFps={animationPreviewFps}
+            isAnimationPreviewPlaying={isAnimationPreviewPlaying}
+            isAnimationPreviewLoop={isAnimationPreviewLoop}
+            addAnimationFrame={addAnimationFrame}
+            clearAnimationFrames={clearAnimationFrames}
+            selectAnimationFrame={selectAnimationFrame}
+            moveAnimationFrame={moveAnimationFrame}
+            removeAnimationFrame={removeAnimationFrame}
+            toggleAnimationPreviewPlayback={toggleAnimationPreviewPlayback}
+            setAnimationPreviewFps={setAnimationPreviewFps}
+            setAnimationPreviewLoop={setAnimationPreviewLoop}
           />
           <SidebarPaletteSection
             selectedColor={selectedColor}
