@@ -850,17 +850,28 @@ body {
   gap: 1rem;
 }
 
+.kmeans-quantize-preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .kmeans-quantize-preview-card {
   min-width: 0;
 }
 
 .kmeans-quantize-preview-surface {
   min-height: 14rem;
-  max-height: 20rem;
+  height: min(24rem, 60vh);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: auto;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: scroll;
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 rgba(226, 232, 240, 0.9);
   padding: 0.75rem;
   border: 1px solid #dbe3ee;
   border-radius: 0.75rem;
@@ -874,10 +885,30 @@ body {
   background-size: 16px 16px;
 }
 
+.kmeans-quantize-preview-surface::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.kmeans-quantize-preview-surface::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.9);
+  border-radius: 999px;
+}
+
+.kmeans-quantize-preview-surface::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border: 2px solid rgba(226, 232, 240, 0.9);
+  border-radius: 999px;
+}
+
+.kmeans-quantize-preview-surface::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 .kmeans-quantize-preview-image {
   image-rendering: pixelated;
-  max-width: 100%;
-  max-height: 18rem;
+  max-width: none;
+  max-height: none;
   flex: 0 0 auto;
 }
 

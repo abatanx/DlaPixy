@@ -7,6 +7,21 @@ import {
 } from '../../editor/kmeans-quantize';
 import { useBootstrapModal } from './useBootstrapModal';
 
+const MIN_PREVIEW_ZOOM = 1;
+const MAX_PREVIEW_ZOOM = 48;
+
+function getDefaultPreviewZoom(source: QuantizeSelectionSource | null): number {
+  if (!source) {
+    return 1;
+  }
+  const longestSide = Math.max(source.width, source.height, 1);
+  return Math.max(MIN_PREVIEW_ZOOM, Math.min(MAX_PREVIEW_ZOOM, Math.floor(256 / longestSide) || 1));
+}
+
+function clampPreviewZoom(value: number): number {
+  return Math.max(MIN_PREVIEW_ZOOM, Math.min(MAX_PREVIEW_ZOOM, Math.trunc(value)));
+}
+
 type KMeansQuantizeModalProps = {
   isOpen: boolean;
   selection: { x: number; y: number; w: number; h: number } | null;
@@ -27,14 +42,20 @@ export function KMeansQuantizeModal({
   onValidationError
 }: KMeansQuantizeModalProps) {
   const [pendingColorCount, setPendingColorCount] = useState<string>(String(initialColorCount));
+  const [previewZoom, setPreviewZoom] = useState<number>(getDefaultPreviewZoom(source));
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const sourceSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const resultSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const isSyncingScrollRef = useRef<boolean>(false);
+  const pendingScrollRatioRef = useRef<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
     setPendingColorCount(String(initialColorCount));
-  }, [initialColorCount, isOpen]);
+    setPreviewZoom(getDefaultPreviewZoom(source));
+  }, [initialColorCount, isOpen, source]);
 
   const handleShown = useCallback(() => {
     inputRef.current?.focus();
@@ -79,6 +100,81 @@ export function KMeansQuantizeModal({
     }
     return createImagePreviewDataUrl(previewResult.pixels, source.width, source.height);
   }, [previewResult, source]);
+
+  const zoomedWidth = source ? source.width * previewZoom : 0;
+  const zoomedHeight = source ? source.height * previewZoom : 0;
+
+  const getScrollRatio = useCallback((element: HTMLDivElement | null) => {
+    if (!element) {
+      return { left: 0, top: 0 };
+    }
+
+    const maxLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+    const maxTop = Math.max(0, element.scrollHeight - element.clientHeight);
+    return {
+      left: maxLeft > 0 ? element.scrollLeft / maxLeft : 0,
+      top: maxTop > 0 ? element.scrollTop / maxTop : 0
+    };
+  }, []);
+
+  const applyScrollRatio = useCallback((ratio: { left: number; top: number }) => {
+    isSyncingScrollRef.current = true;
+    [sourceSurfaceRef.current, resultSurfaceRef.current].forEach((element) => {
+      if (!element) {
+        return;
+      }
+
+      const maxLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+      const maxTop = Math.max(0, element.scrollHeight - element.clientHeight);
+      element.scrollLeft = ratio.left * maxLeft;
+      element.scrollTop = ratio.top * maxTop;
+    });
+    window.requestAnimationFrame(() => {
+      isSyncingScrollRef.current = false;
+    });
+  }, []);
+
+  const updatePreviewZoom = useCallback(
+    (nextZoom: number) => {
+      pendingScrollRatioRef.current = getScrollRatio(sourceSurfaceRef.current);
+      setPreviewZoom(clampPreviewZoom(nextZoom));
+    },
+    [getScrollRatio]
+  );
+
+  const resetPreviewZoom = useCallback(() => {
+    updatePreviewZoom(getDefaultPreviewZoom(source));
+  }, [source, updatePreviewZoom]);
+
+  useEffect(() => {
+    if (!isOpen || !pendingScrollRatioRef.current) {
+      return;
+    }
+    applyScrollRatio(pendingScrollRatioRef.current);
+    pendingScrollRatioRef.current = null;
+  }, [applyScrollRatio, isOpen, previewZoom]);
+
+  const syncPreviewScroll = useCallback(
+    (origin: 'source' | 'result') => {
+      if (isSyncingScrollRef.current) {
+        return;
+      }
+
+      const activeElement = origin === 'source' ? sourceSurfaceRef.current : resultSurfaceRef.current;
+      const targetElement = origin === 'source' ? resultSurfaceRef.current : sourceSurfaceRef.current;
+      if (!activeElement || !targetElement) {
+        return;
+      }
+
+      isSyncingScrollRef.current = true;
+      targetElement.scrollLeft = activeElement.scrollLeft;
+      targetElement.scrollTop = activeElement.scrollTop;
+      window.requestAnimationFrame(() => {
+        isSyncingScrollRef.current = false;
+      });
+    },
+    []
+  );
 
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -155,17 +251,54 @@ export function KMeansQuantizeModal({
                   </div>
                 </div>
                 <div className="col-12 col-lg-8">
+                  <div className="kmeans-quantize-preview-toolbar mb-3">
+                    <div className="btn-group btn-group-sm" role="group" aria-label="preview zoom controls">
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={() => updatePreviewZoom(previewZoom - 1)}
+                        disabled={previewZoom <= MIN_PREVIEW_ZOOM}
+                        title="縮小"
+                        aria-label="縮小"
+                      >
+                        <i className="fa-solid fa-magnifying-glass-minus" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={resetPreviewZoom}
+                        title="見やすい倍率に戻す"
+                      >
+                        {previewZoom}x
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={() => updatePreviewZoom(previewZoom + 1)}
+                        disabled={previewZoom >= MAX_PREVIEW_ZOOM}
+                        title="拡大"
+                        aria-label="拡大"
+                      >
+                        <i className="fa-solid fa-magnifying-glass-plus" aria-hidden="true" />
+                      </button>
+                    </div>
+                    <span className="form-text m-0">スクロールは左右同期</span>
+                  </div>
                   <div className="kmeans-quantize-preview-grid">
                     <section className="kmeans-quantize-preview-card">
                       <h3 className="fs-6 mb-2">元画像</h3>
-                      <div className="kmeans-quantize-preview-surface">
+                      <div
+                        ref={sourceSurfaceRef}
+                        className="kmeans-quantize-preview-surface"
+                        onScroll={() => syncPreviewScroll('source')}
+                      >
                         {sourcePreviewDataUrl ? (
                           <img
                             src={sourcePreviewDataUrl}
                             alt="K-Means減色前プレビュー"
                             className="kmeans-quantize-preview-image"
-                            width={source?.width}
-                            height={source?.height}
+                            width={zoomedWidth}
+                            height={zoomedHeight}
                           />
                         ) : (
                           <div className="preview-placeholder">プレビューなし</div>
@@ -174,14 +307,18 @@ export function KMeansQuantizeModal({
                     </section>
                     <section className="kmeans-quantize-preview-card">
                       <h3 className="fs-6 mb-2">減色後</h3>
-                      <div className="kmeans-quantize-preview-surface">
+                      <div
+                        ref={resultSurfaceRef}
+                        className="kmeans-quantize-preview-surface"
+                        onScroll={() => syncPreviewScroll('result')}
+                      >
                         {resultPreviewDataUrl ? (
                           <img
                             src={resultPreviewDataUrl}
                             alt="K-Means減色後プレビュー"
                             className="kmeans-quantize-preview-image"
-                            width={source?.width}
-                            height={source?.height}
+                            width={zoomedWidth}
+                            height={zoomedHeight}
                           />
                         ) : (
                           <div className="preview-placeholder">プレビューなし</div>

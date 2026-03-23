@@ -64,6 +64,8 @@ npm run dist
   - Native `Palette -> K-Meansで減色する...` opens a renderer modal
   - Quantization targets only the current rectangular selection
   - Modal previews before/after and accepts target color count
+  - Before/after previews share the same zoom level and synchronized scroll position
+  - The preview panes keep scrollbars visible instead of auto-hiding
   - Uses Lab-distance K-Means while preserving original alpha
   - After apply, palette swatches are synchronized to actual canvas usage in the same undo step
 - Tools:
