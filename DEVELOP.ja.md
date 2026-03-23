@@ -117,6 +117,9 @@ npm run dist
   - 操作部は Bootstrap のコンパクトなアイコン中心ボタンで表示
   - `Preview / Tiling / Animation Preview` は FontAwesome 付きの短い Bootstrap 風タブで切り替える
   - プレビュー表示領域は正方形（`1:1`）で見せる
+- 左サイドバーのレイアウト
+  - `SidebarPreviewSection` と `SidebarPaletteSection` は別カードで表示し、視覚的に分離する
+  - Preview 側は Bootstrap タブを維持しつつ、内側のカードっぽい装飾は薄くしてフラットに見せる
 - 拡大/縮小
 - Space押下中のパン（手ツール挙動）
 - 画面全体スクロール禁止（編集領域のみスクロール）

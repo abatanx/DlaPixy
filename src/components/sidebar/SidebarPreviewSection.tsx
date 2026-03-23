@@ -35,7 +35,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
   }, [animationFrames.length]);
 
   return (
-    <div className="sidebar-preview-section flex-shrink-0 mb-3">
+    <div className="sidebar-preview-section flex-shrink-0">
       <ul className="nav nav-tabs sidebar-preview-tabs" role="tablist">
         <li className="nav-item" role="presentation">
           <button
@@ -119,7 +119,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
               <div className="preview-placeholder">矩形選択するとここに3x3タイル表示</div>
             )}
           </div>
-          <div className="form-text mt-2">
+          <div className="form-text mt-2 text-center">
             {tilePreviewSelection
               ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'}`
               : '選択範囲なし'}
@@ -202,7 +202,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
               <span className="visually-hidden">全クリア</span>
             </button>
           </div>
-          <div className="form-text mt-2">
+          <div className="form-text mt-2 text-center">
             {animationFrames.length > 0
               ? `${animationFrames.length} frames / ${animationPreviewFps} FPS / ${isAnimationPreviewPlaying ? '再生中' : '停止中'}`
               : 'フレーム未登録'}

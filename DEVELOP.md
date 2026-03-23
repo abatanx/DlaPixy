@@ -116,6 +116,9 @@ npm run dist
   - Animation controls are compact, icon-first Bootstrap buttons
   - `Preview / Tiling / Animation Preview` are grouped as Bootstrap-style tabs with short FontAwesome-based labels
   - Preview area is displayed in a square (`1:1`) viewport
+- Left sidebar layout
+  - `SidebarPreviewSection` and `SidebarPaletteSection` are rendered as separate cards for clearer visual separation
+  - The preview card keeps Bootstrap tabs but removes nested card-like chrome inside the section for a flatter look
 - Zoom controls
 - Space + drag pan behavior (Photoshop-like hand tool)
 - Page-level scroll disabled (only stage/internal scroll)

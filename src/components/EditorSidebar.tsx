@@ -34,9 +34,9 @@ export const EditorSidebar = memo(function EditorSidebar({
   paletteColorModalRequest
 }: EditorSidebarProps) {
   return (
-    <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar d-flex h-100">
-      <div className="card shadow-sm editor-sidebar-card w-100 h-100 d-flex flex-column">
-        <div className="card-body editor-sidebar-body d-flex flex-column overflow-hidden">
+    <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar d-flex flex-column h-100">
+      <div className="card shadow-sm editor-sidebar-card editor-sidebar-preview-card w-100">
+        <div className="card-body editor-sidebar-body">
           <SidebarPreviewSection
             canvasSize={canvasSize}
             previewDataUrl={previewDataUrl}
@@ -58,6 +58,10 @@ export const EditorSidebar = memo(function EditorSidebar({
             setAnimationPreviewFps={setAnimationPreviewFps}
             setAnimationPreviewLoop={setAnimationPreviewLoop}
           />
+        </div>
+      </div>
+      <div className="card shadow-sm editor-sidebar-card editor-sidebar-palette-card w-100 d-flex flex-column">
+        <div className="card-body editor-sidebar-body d-flex flex-column overflow-hidden">
           <SidebarPaletteSection
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}

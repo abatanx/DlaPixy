@@ -40,7 +40,9 @@ body {
 }
 
 .editor-sidebar {
+  gap: 0.75rem;
   max-height: 100%;
+  min-height: 0;
 }
 
 .editor-sidebar-card {
@@ -48,8 +50,17 @@ body {
   min-height: 0;
 }
 
+.editor-sidebar-preview-card {
+  flex: 0 0 auto;
+}
+
+.editor-sidebar-palette-card {
+  flex: 1 1 0;
+}
+
 .editor-sidebar-body {
   min-height: 0;
+  padding: 0.9rem;
 }
 
 .canvas-stage {
@@ -335,13 +346,19 @@ body {
   padding-top: 0.2rem;
 }
 
+.sidebar-preview-section {
+  display: flex;
+  flex-direction: column;
+}
+
 .preview-wrap {
   overflow: auto;
   max-height: 220px;
-  border: 1px solid #cbd5e1;
-  border-radius: 0.5rem;
-  background-color: #ffffff;
-  padding: 0.25rem;
+  scrollbar-gutter: stable;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 0.45rem;
+  background: rgba(248, 250, 252, 0.72);
+  padding: 0.2rem;
 }
 
 .preview-scroll-wrap {
@@ -369,11 +386,10 @@ body {
 }
 
 .sidebar-preview-tab-content {
-  border: 1px solid #cbd5e1;
-  border-top: 0;
-  border-radius: 0 0 0.5rem 0.5rem;
-  background: rgba(255, 255, 255, 0.78);
-  padding: 0.6rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.65rem 0 0;
 }
 
 .preview-image {
