@@ -69,6 +69,10 @@ npm run dist
   - Uses Lab-distance K-Means while preserving original alpha
   - After apply, palette swatches are synchronized to actual canvas usage in the same undo step
 - Tools:
+  - Select is the initial active tool on startup
+  - Select is placed at the top of the right toolbar, separated from drawing tools
+  - The animation-frame add button is also separated from drawing tools with its own toolbar separator
+  - Zoom controls are placed at the bottom of the right toolbar
   - Pencil
   - Eraser
   - Fill (flood fill)
@@ -79,6 +83,7 @@ npm run dist
   - Copy selection
   - Delete selection
   - Paste selection
+  - With Select tool active, clicking empty space in `canvas-stage` clears the current selection
   - Click (without drag) with Select tool chooses one tile aligned to current grid spacing
   - Selection is cleared only when clicking outside the selected area with Select tool; other tool operations keep selection
   - When selection is active, Pencil/Eraser/Fill/Clear are constrained to selected pixels only
@@ -129,6 +134,7 @@ npm run dist
   - `-` (`Minus`, `NumpadSubtract`): Zoom out
 - Edit:
   - `Cmd/Ctrl + Z`: Undo
+  - `Cmd/Ctrl + A`: Select entire canvas
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
   - `A`: Add current selection to animation preview frames

@@ -170,7 +170,7 @@ export function App() {
   const [pixels, setPixels] = useState<Uint8ClampedArray>(() => createEmptyPixels(DEFAULT_CANVAS_SIZE));
   const [palette, setPalette] = useState<PaletteEntry[]>(INITIAL_PALETTE);
   const [selectedColor, setSelectedColor] = useState<string>(INITIAL_SELECTED_COLOR);
-  const [tool, setTool] = useState<Tool>('pencil');
+  const [tool, setTool] = useState<Tool>('select');
   const [selection, setSelection] = useState<Selection>(null);
   const [lastTilePreviewSelection, setLastTilePreviewSelection] = useState<Selection>(null);
   const [animationFrames, setAnimationFrames] = useState<AnimationFrame[]>([]);
@@ -1309,6 +1309,25 @@ export function App() {
     setHoveredPixelInfo(null);
   }, [onMouseUp]);
 
+  const onCanvasStageMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (event.target !== event.currentTarget) {
+        return;
+      }
+      if (isSpacePressed || isPanning) {
+        return;
+      }
+      if (tool !== 'select' || !selection || floatingPasteRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      setSelection(null);
+      setStatusText('選択を解除しました', 'success');
+    },
+    [isPanning, isSpacePressed, selection, setStatusText, tool]
+  );
+
   const applyCanvasSize = useCallback((normalized: number) => {
     if (normalized === canvasSize) {
       setIsCanvasSizeModalOpen(false);
@@ -1746,6 +1765,17 @@ export function App() {
     setStatusText(`選択範囲を貼り付けました (${pasteWidth}x${pasteHeight}) - Enterで確定 / Escでキャンセル`, 'success');
   }, [canvasSize, pixels, pushUndo, selection, tool]);
 
+  const selectEntireCanvas = useCallback(() => {
+    if (floatingPasteRef.current) {
+      setStatusText('全選択の前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+      return;
+    }
+
+    setTool('select');
+    setSelection({ x: 0, y: 0, w: canvasSize, h: canvasSize });
+    setStatusText(`キャンバス全体を選択しました (${canvasSize}x${canvasSize})`, 'success');
+  }, [canvasSize, setStatusText]);
+
   useEffect(() => {
     const isEditableElement = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) {
@@ -1774,6 +1804,11 @@ export function App() {
       if (withSystemKey && event.key.toLowerCase() === 'v') {
         event.preventDefault();
         pasteSelection();
+        return;
+      }
+      if (withSystemKey && event.key.toLowerCase() === 'a') {
+        event.preventDefault();
+        selectEntireCanvas();
         return;
       }
 
@@ -1921,6 +1956,7 @@ export function App() {
     finalizeFloatingPaste,
     freezeHoveredPixelInfo,
     pasteSelection,
+    selectEntireCanvas,
     selectReferenceByNumber,
     selection,
     zoomIn,
@@ -2452,6 +2488,7 @@ export function App() {
               <div
                 ref={canvasStageRef}
                 className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''}`}
+                onMouseDown={onCanvasStageMouseDown}
               >
                 <canvas
                   ref={canvasRef}

@@ -35,6 +35,20 @@ export function EditorToolbar({
     <div className="editor-toolbar" role="toolbar" aria-label="editor controls">
       <button
         type="button"
+        className={`btn btn-sm editor-tool-btn ${tool === 'select' ? 'active' : ''}`}
+        onClick={() => setTool('select')}
+        title="矩形選択"
+      >
+        <span className="editor-btn-inner">
+          <i className="fa-regular fa-square" aria-hidden="true" />
+          <span className="editor-shortcut">V</span>
+        </span>
+      </button>
+
+      <div className="editor-toolbar-separator" />
+
+      <button
+        type="button"
         className={`btn btn-sm editor-tool-btn ${tool === 'pencil' ? 'active' : ''}`}
         onClick={() => setTool('pencil')}
         title="描画ツール"
@@ -66,17 +80,9 @@ export function EditorToolbar({
           <span className="editor-shortcut">G</span>
         </span>
       </button>
-      <button
-        type="button"
-        className={`btn btn-sm editor-tool-btn ${tool === 'select' ? 'active' : ''}`}
-        onClick={() => setTool('select')}
-        title="矩形選択"
-      >
-        <span className="editor-btn-inner">
-          <i className="fa-regular fa-square" aria-hidden="true" />
-          <span className="editor-shortcut">V</span>
-        </span>
-      </button>
+
+      <div className="editor-toolbar-separator" />
+
       <button
         type="button"
         className="btn btn-sm editor-tool-btn"
@@ -88,6 +94,27 @@ export function EditorToolbar({
           <i className="fa-solid fa-film" aria-hidden="true" />
           <span className="editor-shortcut">A</span>
         </span>
+      </button>
+
+      <div className="editor-toolbar-separator" />
+
+      <button type="button" className="btn btn-sm editor-tool-btn" onClick={doUndo} title="Undo (Cmd/Ctrl+Z)">
+        <span className="editor-btn-inner">
+          <i className="fa-solid fa-rotate-left" aria-hidden="true" />
+          <span className="editor-shortcut">Z</span>
+        </span>
+      </button>
+      <button type="button" className="btn btn-sm editor-tool-btn" onClick={() => void copySelection()} title="選択範囲をコピー">
+        <i className="fa-regular fa-copy" aria-hidden="true" />
+      </button>
+      <button type="button" className="btn btn-sm editor-tool-btn" onClick={pasteSelection} title="貼り付け (Cmd/Ctrl+V)">
+        <i className="fa-regular fa-paste" aria-hidden="true" />
+      </button>
+      <button type="button" className="btn btn-sm editor-tool-btn" onClick={deleteSelection} title="選択範囲を削除">
+        <i className="fa-regular fa-trash-can" aria-hidden="true" />
+      </button>
+      <button type="button" className="btn btn-sm editor-tool-btn" onClick={clearCanvas} title="クリア">
+        <i className="fa-solid fa-broom" aria-hidden="true" />
       </button>
 
       <div className="editor-toolbar-separator" />
@@ -117,27 +144,6 @@ export function EditorToolbar({
         </span>
       </button>
       <div className="editor-zoom-label">{zoom}x</div>
-
-      <div className="editor-toolbar-separator" />
-
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={doUndo} title="Undo (Cmd/Ctrl+Z)">
-        <span className="editor-btn-inner">
-          <i className="fa-solid fa-rotate-left" aria-hidden="true" />
-          <span className="editor-shortcut">Z</span>
-        </span>
-      </button>
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={() => void copySelection()} title="選択範囲をコピー">
-        <i className="fa-regular fa-copy" aria-hidden="true" />
-      </button>
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={pasteSelection} title="貼り付け (Cmd/Ctrl+V)">
-        <i className="fa-regular fa-paste" aria-hidden="true" />
-      </button>
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={deleteSelection} title="選択範囲を削除">
-        <i className="fa-regular fa-trash-can" aria-hidden="true" />
-      </button>
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={clearCanvas} title="クリア">
-        <i className="fa-solid fa-broom" aria-hidden="true" />
-      </button>
     </div>
   );
 }
