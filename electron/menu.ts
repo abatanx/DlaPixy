@@ -95,6 +95,11 @@ function buildPaletteMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs):
       },
       { type: 'separator' },
       {
+        label: 'K-Meansで減色する...',
+        click: () => sendMenuAction({ type: 'palette-kmeans-quantize' })
+      },
+      { type: 'separator' },
+      {
         label: 'エクスポート（標準 GPL）...',
         click: () => sendMenuAction({ type: 'palette-export', format: 'rgb' })
       },

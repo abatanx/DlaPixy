@@ -60,6 +60,12 @@ npm run dist
   - `Export (Standard GPL)` writes 3-channel GPL and rejects palettes that contain alpha
   - `Export (Aseprite RGBA GPL)` always writes Aseprite-compatible `Channels: RGBA` GPL
   - GPL color names map to DlaPixy captions; `Untitled` is treated as empty caption on import
+- Selection-only K-Means quantization
+  - Native `Palette -> K-Meansで減色する...` opens a renderer modal
+  - Quantization targets only the current rectangular selection
+  - Modal previews before/after and accepts target color count
+  - Uses Lab-distance K-Means while preserving original alpha
+  - After apply, palette swatches are synchronized to actual canvas usage in the same undo step
 - Tools:
   - Pencil
   - Eraser
@@ -164,12 +170,18 @@ Current metadata shape:
   - Canvas size modal UI and validation/apply trigger
 - `src/components/modals/GridSpacingModal.tsx`
   - Grid spacing modal UI with single numeric input (`0` = none, `Enter` to apply, `Esc` to cancel)
+- `src/components/modals/KMeansQuantizeModal.tsx`
+  - Selection-only K-Means quantize modal with target color count input and before/after previews
 - `src/components/modals/PaletteColorModal.tsx`
   - Selected color editor modal with `#RRGGBB` + separate `AA` hex input, plus RGBA + HSV controls
 - `src/components/modals/useBootstrapModal.ts`
   - Shared Bootstrap modal lifecycle hook for renderer modals
 - `src/editor/constants.ts`
   - Editor constants (grid/canvas/zoom limits, default palette)
+- `src/editor/kmeans-quantize.ts`
+  - Selection extraction + Lab-distance K-Means quantization helpers
+- `src/editor/preview.ts`
+  - Renderer preview helpers for region/block PNG Data URLs
 - `src/editor/types.ts`
   - Shared editor types (`Tool`, `Selection`, `EditorMeta`)
 - `src/editor/utils.ts`
@@ -209,11 +221,13 @@ Current metadata shape:
   - selection / floating paste are cleared on resize
 - Grid spacing change is also opened from native `Canvas` menu; values are allowed in range `0..canvasSize` (`0` = none).
 - Palette import/export is opened from native `Palette` menu and uses Electron main-process dialogs.
+- Selection quantization is triggered from native `Palette -> K-Meansで減色する...`, but the input UI lives in a renderer modal.
 - Palette color selection is edited in a renderer modal instead of the native browser color picker.
 - The palette color modal preview shows both the original color and the current editing color side by side, with a nearby `Delta HSV` diff.
 - Palette entries are stored as `{ color, caption }[]`.
 - Palette caption max length is managed by `PALETTE_CAPTION_MAX_LENGTH` in `src/editor/constants.ts`.
 - Selected drawing color and palette entries can carry alpha (`#RRGGBBAA`), while legacy `#RRGGBB` values are normalized on load.
+- K-Means quantization currently uses RGB->Lab distance for clustering and keeps each pixel's original alpha unchanged.
 - GPL import accepts standard RGB lines and Aseprite-style `Channels: RGBA` lines.
 - GPL export is split into explicit menu actions:
   - `Export (Standard GPL)`: 3-channel GPL only; rejects palettes that contain alpha

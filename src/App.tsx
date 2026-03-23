@@ -11,6 +11,7 @@ import { EditorSidebar } from './components/EditorSidebar';
 import { EditorToolbar } from './components/EditorToolbar';
 import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
 import { GridSpacingModal } from './components/modals/GridSpacingModal';
+import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
 import type { MenuAction as FileMenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
@@ -26,6 +27,14 @@ import {
   MIN_ZOOM
 } from './editor/constants';
 import type { AnimationFrame, EditorMeta, HoveredPixelInfo, PaletteEntry, Selection, Tool } from './editor/types';
+import {
+  extractSelectionPixels,
+  quantizeSelectionWithKMeans,
+  suggestKMeansColorCount,
+  type QuantizeSelectionResult,
+  type QuantizeSelectionSource
+} from './editor/kmeans-quantize';
+import { createRegionPreviewDataUrl } from './editor/preview';
 import {
   blitBlockOnCanvas,
   clampCanvasSize,
@@ -52,6 +61,14 @@ type UndoSnapshot = {
   selection: Selection;
   palette: PaletteEntry[];
   selectedColor: string;
+};
+
+type SelectionRect = Exclude<Selection, null>;
+
+type KMeansQuantizeRequest = {
+  selection: SelectionRect;
+  source: QuantizeSelectionSource;
+  initialColorCount: number;
 };
 
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
@@ -103,53 +120,45 @@ function hasHoveredPixelInfoSameContent(
   );
 }
 
-function createRegionPreviewDataUrl(
+function collectUsedColorsFromPixels(pixels: Uint8ClampedArray): string[] {
+  const usedColors: string[] = [];
+  const seen = new Set<string>();
+
+  for (let index = 0; index < pixels.length; index += 4) {
+    const alpha = pixels[index + 3];
+    if (alpha === 0) {
+      continue;
+    }
+
+    const color = rgbaToHex8(pixels[index], pixels[index + 1], pixels[index + 2], alpha);
+    if (seen.has(color)) {
+      continue;
+    }
+    seen.add(color);
+    usedColors.push(color);
+  }
+
+  return usedColors;
+}
+
+function buildPaletteFromCanvasPixels(
   pixels: Uint8ClampedArray,
-  canvasSize: number,
-  region: { x: number; y: number; w: number; h: number },
-  repeatX = 1,
-  repeatY = 1
-): string {
-  if (region.w <= 0 || region.h <= 0) {
-    return '';
-  }
+  currentPalette: PaletteEntry[]
+): PaletteEntry[] {
+  const usedColors = collectUsedColorsFromPixels(pixels);
+  const usedSet = new Set(usedColors);
+  const nextPalette = currentPalette.filter((entry) => usedSet.has(entry.color));
+  const seenColors = new Set(nextPalette.map((entry) => entry.color));
 
-  const sourceCanvas = document.createElement('canvas');
-  sourceCanvas.width = region.w;
-  sourceCanvas.height = region.h;
-  const sctx = sourceCanvas.getContext('2d');
-  if (!sctx) {
-    return '';
-  }
-
-  const sourceImageData = sctx.createImageData(region.w, region.h);
-  for (let y = 0; y < region.h; y += 1) {
-    for (let x = 0; x < region.w; x += 1) {
-      const srcIdx = ((region.y + y) * canvasSize + (region.x + x)) * 4;
-      const dstIdx = (y * region.w + x) * 4;
-      sourceImageData.data[dstIdx] = pixels[srcIdx];
-      sourceImageData.data[dstIdx + 1] = pixels[srcIdx + 1];
-      sourceImageData.data[dstIdx + 2] = pixels[srcIdx + 2];
-      sourceImageData.data[dstIdx + 3] = pixels[srcIdx + 3];
+  for (const color of usedColors) {
+    if (seenColors.has(color)) {
+      continue;
     }
-  }
-  sctx.putImageData(sourceImageData, 0, 0);
-
-  const previewCanvas = document.createElement('canvas');
-  previewCanvas.width = region.w * Math.max(1, repeatX);
-  previewCanvas.height = region.h * Math.max(1, repeatY);
-  const pctx = previewCanvas.getContext('2d');
-  if (!pctx) {
-    return sourceCanvas.toDataURL('image/png');
+    seenColors.add(color);
+    nextPalette.push({ color, caption: '' });
   }
 
-  pctx.imageSmoothingEnabled = false;
-  for (let ty = 0; ty < Math.max(1, repeatY); ty += 1) {
-    for (let tx = 0; tx < Math.max(1, repeatX); tx += 1) {
-      pctx.drawImage(sourceCanvas, tx * region.w, ty * region.h);
-    }
-  }
-  return previewCanvas.toDataURL('image/png');
+  return normalizePaletteEntries(nextPalette);
 }
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
@@ -184,6 +193,7 @@ export function App() {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isCanvasSizeModalOpen, setIsCanvasSizeModalOpen] = useState<boolean>(false);
   const [isGridSpacingModalOpen, setIsGridSpacingModalOpen] = useState<boolean>(false);
+  const [kMeansQuantizeRequest, setKMeansQuantizeRequest] = useState<KMeansQuantizeRequest | null>(null);
 
   const setStatusText = useCallback((text: string, type: ToastType) => {
     setStatusTextRaw(text);
@@ -1340,6 +1350,97 @@ export function App() {
     setIsGridSpacingModalOpen(false);
   }, []);
 
+  const openKMeansQuantizeModal = useCallback(() => {
+    if (floatingPasteRef.current) {
+      setStatusText('減色の前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+      return;
+    }
+
+    const normalizedSelection = clampSelectionToCanvas(selection, canvasSize);
+    if (!normalizedSelection) {
+      setStatusText('K-Means減色: 先に矩形選択してください', 'warning');
+      return;
+    }
+
+    const source = extractSelectionPixels(pixels, canvasSize, normalizedSelection);
+    if (source.visiblePixelCount === 0) {
+      setStatusText('選択範囲に可視ピクセルがありません', 'warning');
+      return;
+    }
+    if (source.uniqueVisibleColorCount <= 1) {
+      setStatusText('選択範囲の可視色数が 1 色以下のため減色できません', 'warning');
+      return;
+    }
+
+    setKMeansQuantizeRequest({
+      selection: normalizedSelection,
+      source,
+      initialColorCount: suggestKMeansColorCount(source.uniqueVisibleColorCount)
+    });
+  }, [canvasSize, pixels, selection, setStatusText]);
+
+  const closeKMeansQuantizeModal = useCallback(() => {
+    setKMeansQuantizeRequest(null);
+  }, []);
+
+  const applyKMeansQuantize = useCallback(
+    (result: QuantizeSelectionResult) => {
+      if (!kMeansQuantizeRequest) {
+        return;
+      }
+
+      const { selection: requestSelection } = kMeansQuantizeRequest;
+      const nextPixels = clonePixels(pixels);
+      let changedPixelCount = 0;
+
+      for (let y = 0; y < requestSelection.h; y += 1) {
+        for (let x = 0; x < requestSelection.w; x += 1) {
+          const sourceIndex = (y * requestSelection.w + x) * 4;
+          const targetIndex = ((requestSelection.y + y) * canvasSize + (requestSelection.x + x)) * 4;
+          const isSamePixel =
+            nextPixels[targetIndex] === result.pixels[sourceIndex] &&
+            nextPixels[targetIndex + 1] === result.pixels[sourceIndex + 1] &&
+            nextPixels[targetIndex + 2] === result.pixels[sourceIndex + 2] &&
+            nextPixels[targetIndex + 3] === result.pixels[sourceIndex + 3];
+
+          if (!isSamePixel) {
+            changedPixelCount += 1;
+          }
+
+          nextPixels[targetIndex] = result.pixels[sourceIndex];
+          nextPixels[targetIndex + 1] = result.pixels[sourceIndex + 1];
+          nextPixels[targetIndex + 2] = result.pixels[sourceIndex + 2];
+          nextPixels[targetIndex + 3] = result.pixels[sourceIndex + 3];
+        }
+      }
+
+      const nextPalette = buildPaletteFromCanvasPixels(nextPixels, palette);
+      if (changedPixelCount === 0 && hasSamePaletteEntries(palette, nextPalette)) {
+        setStatusText('減色結果は現在の内容と同じです', 'warning');
+        return;
+      }
+
+      const previousPaletteColors = new Set(palette.map((entry) => entry.color));
+      const nextPaletteColors = new Set(nextPalette.map((entry) => entry.color));
+      const removedColorCount = palette.filter((entry) => !nextPaletteColors.has(entry.color)).length;
+      const addedColorCount = nextPalette.filter((entry) => !previousPaletteColors.has(entry.color)).length;
+      const nextSelectedColor = nextPalette.some((entry) => entry.color === selectedColor)
+        ? selectedColor
+        : nextPalette[0]?.color ?? selectedColor;
+
+      pushUndo();
+      setPixels(nextPixels);
+      setPalette(nextPalette);
+      setSelectedColor(nextSelectedColor);
+      setHasUnsavedChanges(true);
+      setStatusText(
+        `選択範囲を K-Means で減色しました: ${result.resultColorCount} 色 / パレット +${addedColorCount} -${removedColorCount}`,
+        'success'
+      );
+    },
+    [canvasSize, kMeansQuantizeRequest, palette, pixels, pushUndo, selectedColor, setStatusText]
+  );
+
   const zoomIn = useCallback(() => {
     setZoom((prev) => {
       const next = Math.min(MAX_ZOOM, prev + 1);
@@ -2282,6 +2383,9 @@ export function App() {
         case 'grid-spacing':
           openGridSpacingModal();
           break;
+        case 'palette-kmeans-quantize':
+          openKMeansQuantizeModal();
+          break;
         case 'palette-import-replace':
           void importGplPalette('replace');
           break;
@@ -2298,7 +2402,16 @@ export function App() {
     return () => {
       unsubscribe();
     };
-  }, [exportGplPalette, importGplPalette, loadPng, openCanvasSizeModal, openGridSpacingModal, saveAsPng, savePng]);
+  }, [
+    exportGplPalette,
+    importGplPalette,
+    loadPng,
+    openCanvasSizeModal,
+    openGridSpacingModal,
+    openKMeansQuantizeModal,
+    saveAsPng,
+    savePng
+  ]);
 
   return (
     <div className="app-layout">
@@ -2551,6 +2664,15 @@ export function App() {
           canvasSize={canvasSize}
           onApply={applyGridSpacing}
           onClose={closeGridSpacingModal}
+          onValidationError={(message) => setStatusText(message, 'warning')}
+        />
+        <KMeansQuantizeModal
+          isOpen={kMeansQuantizeRequest !== null}
+          selection={kMeansQuantizeRequest?.selection ?? null}
+          source={kMeansQuantizeRequest?.source ?? null}
+          initialColorCount={kMeansQuantizeRequest?.initialColorCount ?? 1}
+          onApply={applyKMeansQuantize}
+          onClose={closeKMeansQuantizeModal}
           onValidationError={(message) => setStatusText(message, 'warning')}
         />
       </div>

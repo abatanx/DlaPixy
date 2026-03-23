@@ -7,6 +7,7 @@ export type MenuAction =
   | { type: 'open-recent'; filePath: string }
   | { type: 'canvas-size' }
   | { type: 'grid-spacing' }
+  | { type: 'palette-kmeans-quantize' }
   | { type: 'palette-import-replace' }
   | { type: 'palette-import-append' }
   | { type: 'palette-export'; format: GplExportFormat };

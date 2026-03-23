@@ -60,6 +60,12 @@ npm run dist
   - `エクスポート（標準 GPL）` は 3ch の GPL を書き出し、alpha を含むパレットは拒否する
   - `エクスポート（Aseprite向け RGBA GPL）` は常に Aseprite 互換の `Channels: RGBA` 付き GPL を書き出す
   - GPL の色名は DlaPixy の caption に対応づけ、`Untitled` は import 時に空 caption 扱いにする
+- 選択範囲専用の K-Means 減色
+  - ネイティブ `Palette -> K-Meansで減色する...` で renderer モーダルを開く
+  - 現在の矩形選択だけを対象に減色する
+  - モーダル内で `目標色数` を指定し、減色前後プレビューを確認してから適用する
+  - Lab 距離ベースの K-Means を使い、alpha は元の値を維持する
+  - 適用時に、実際のキャンバス使用色へ合わせてスウォッチも同じ undo 単位で同期する
 - ツール
   - 描画（Pencil）
   - 消しゴム（Eraser）
@@ -164,12 +170,18 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - キャンバスサイズ変更モーダルのUIと入力検証/適用トリガー
 - `src/components/modals/GridSpacingModal.tsx`
   - グリッド線間隔変更モーダルのUI。単一の数値入力で `0` はなし、`Enter` で適用、`Esc` でキャンセル
+- `src/components/modals/KMeansQuantizeModal.tsx`
+  - 選択範囲専用の K-Means 減色モーダル。目標色数入力と減色前後プレビューを提供
 - `src/components/modals/PaletteColorModal.tsx`
   - `#RRGGBB` と別枠 `AA` の HEX入力、および RGBA / HSV で選択色を編集する renderer モーダル
 - `src/components/modals/useBootstrapModal.ts`
   - renderer モーダル共通の Bootstrap ライフサイクル hook
 - `src/editor/constants.ts`
   - グリッド/キャンバス/ズーム制約、デフォルトパレットなど定数
+- `src/editor/kmeans-quantize.ts`
+  - 選択範囲抽出と Lab 距離ベース K-Means 減色 helper
+- `src/editor/preview.ts`
+  - 領域/ブロックの PNG Data URL プレビュー helper
 - `src/editor/types.ts`
   - 共通型定義（`Tool` / `Selection` / `EditorMeta`）
 - `src/editor/utils.ts`
@@ -209,11 +221,13 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - サイズ変更時は選択状態 / 浮動貼り付け状態を解除する
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、値は `0..canvasSize` の範囲で扱う（`0` はなし）。
 - パレット import/export はネイティブ `Palette` メニューから開き、ダイアログは Electron main process 側で扱う。
+- 選択範囲の減色起動はネイティブ `Palette -> K-Meansで減色する...` だが、条件入力 UI 自体は renderer モーダルで扱う。
 - パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。
 - パレット色モーダルのプレビューは、変更前の色と現在編集中の色を横並びで表示し、近くに `Delta HSV` 差分を出す。
 - パレット項目は `{ color, caption }[]` で保持する。
 - パレットキャプションの最大文字数は `src/editor/constants.ts` の `PALETTE_CAPTION_MAX_LENGTH` で管理する。
 - 描画色とパレット色は alpha 付き `#RRGGBBAA` も扱え、従来の `#RRGGBB` は読込時に正規化する。
+- K-Means 減色は現状 RGB->Lab 距離でクラスタリングし、各ピクセルの alpha は変更しない。
 - GPL import は標準 RGB 行と Aseprite 互換の `Channels: RGBA` を受け付ける。
 - GPL export はメニューで形式を明示選択する。
   - `エクスポート（標準 GPL）`: 3ch GPL のみ。alpha を含むパレットは拒否する
