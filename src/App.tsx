@@ -12,6 +12,7 @@ import { EditorToolbar } from './components/EditorToolbar';
 import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
 import { GridSpacingModal } from './components/modals/GridSpacingModal';
 import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
+import { ZoomModal } from './components/modals/ZoomModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
 import type { MenuAction as FileMenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
@@ -193,6 +194,7 @@ export function App() {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isCanvasSizeModalOpen, setIsCanvasSizeModalOpen] = useState<boolean>(false);
   const [isGridSpacingModalOpen, setIsGridSpacingModalOpen] = useState<boolean>(false);
+  const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
   const [kMeansQuantizeRequest, setKMeansQuantizeRequest] = useState<KMeansQuantizeRequest | null>(null);
 
   const setStatusText = useCallback((text: string, type: ToastType) => {
@@ -1369,6 +1371,19 @@ export function App() {
     setIsGridSpacingModalOpen(false);
   }, []);
 
+  const applyZoom = useCallback((value: number) => {
+    setZoom(value);
+    setStatusText(`表示倍率: ${value}x`, 'success');
+  }, []);
+
+  const openZoomModal = useCallback(() => {
+    setIsZoomModalOpen(true);
+  }, []);
+
+  const closeZoomModal = useCallback(() => {
+    setIsZoomModalOpen(false);
+  }, []);
+
   const openKMeansQuantizeModal = useCallback(() => {
     if (floatingPasteRef.current) {
       setStatusText('減色の前に Enter で確定するか Esc でキャンセルしてください', 'warning');
@@ -2389,6 +2404,22 @@ export function App() {
       if (key === 'o') {
         event.preventDefault();
         void loadPng();
+        return;
+      }
+      if (key === 'r') {
+        event.preventDefault();
+        openZoomModal();
+        return;
+      }
+      if (key === 'i') {
+        event.preventDefault();
+        openCanvasSizeModal();
+        return;
+      }
+      if (key === 'g') {
+        event.preventDefault();
+        openGridSpacingModal();
+        return;
       }
     };
 
@@ -2396,7 +2427,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [loadPng, saveAsPng, savePng]);
+  }, [loadPng, openCanvasSizeModal, openGridSpacingModal, openZoomModal, saveAsPng, savePng]);
 
   useEffect(() => {
     const unsubscribe = window.pixelApi.onMenuAction((action: FileMenuAction) => {
@@ -2703,6 +2734,13 @@ export function App() {
           onClose={closeGridSpacingModal}
           onValidationError={(message) => setStatusText(message, 'warning')}
         />
+        <ZoomModal
+          isOpen={isZoomModalOpen}
+          zoom={zoom}
+          onApply={applyZoom}
+          onClose={closeZoomModal}
+          onValidationError={(message) => setStatusText(message, 'warning')}
+        />
         <KMeansQuantizeModal
           isOpen={kMeansQuantizeRequest !== null}
           selection={kMeansQuantizeRequest?.selection ?? null}
@@ -2719,21 +2757,29 @@ export function App() {
             type="button"
             className="app-footer-action"
             onClick={openCanvasSizeModal}
-            aria-label="キャンバスサイズ変更を開く"
-            title="キャンバスサイズ変更を開く"
+            aria-label="キャンバスサイズ変更を開く (⌘I)"
+            title="キャンバスサイズ変更を開く (⌘I)"
           >
-            キャンバス:{canvasSize}x{canvasSize}
+            キャンバス(⌘I):{canvasSize}x{canvasSize}
           </button>
           <button
             type="button"
             className="app-footer-action"
             onClick={openGridSpacingModal}
-            aria-label="グリッド線間隔変更を開く"
-            title="グリッド線間隔変更を開く"
+            aria-label="グリッド線間隔変更を開く (⌘G)"
+            title="グリッド線間隔変更を開く (⌘G)"
           >
-            グリッド線:{gridSpacing === 0 ? 'なし' : `${gridSpacing}px 間隔`}
+            グリッド線(⌘G):{gridSpacing === 0 ? 'なし' : `${gridSpacing}px 間隔`}
           </button>
-          <span>倍率:{zoom}x</span>
+          <button
+            type="button"
+            className="app-footer-action"
+            onClick={openZoomModal}
+            aria-label="表示倍率変更を開く (⌘R)"
+            title="表示倍率変更を開く (⌘R)"
+          >
+            倍率(⌘R):{zoom}x
+          </button>
           <span>
             ファイル:{currentFilePath ?? '未保存'}
             {hasUnsavedChanges ? ' *' : ''}

@@ -97,11 +97,20 @@ npm run dist
   - Recent files are capped, deduplicated, and missing paths are removed on selection
 - Native Canvas menu
   - `Canvas -> Change Canvas Size...` opens modal dialog in renderer
+  - `Cmd/Ctrl + I` also opens the canvas size modal
+  - The canvas size modal supports `Esc` to cancel
   - `Canvas -> Change Grid Spacing...` opens modal dialog in renderer
+  - `Cmd/Ctrl + G` also opens the grid spacing modal
   - Sidebar no longer shows persistent canvas size / grid spacing inputs
 - Footer status row
   - `Canvas`, `Grid`, `Zoom`, and `Current File` status are shown in the bottom footer instead of the sidebar
-  - Tapping/clicking `Canvas` or `Grid` in the footer opens the existing change modal
+  - Tapping/clicking `Canvas`, `Grid`, or `Zoom` in the footer opens the existing change modal
+  - The `Canvas` footer label shows the shortcut with the macOS-style `⌘I` notation
+  - The `Grid` footer label shows the shortcut with the macOS-style `⌘G` notation
+  - The `Zoom` footer label shows the shortcut with the macOS-style `⌘R` notation
+- Zoom modal
+  - `Cmd/Ctrl + R` opens a renderer modal for explicit zoom input
+  - Modal range is `1..12`, with `Enter` to apply and `Esc` to cancel
 - 1x PNG preview panel
   - Large previews stay scrollable instead of shrinking to fit
 - Selection 3x3 tile preview panel (under 1x preview)
@@ -140,6 +149,9 @@ npm run dist
   - `Cmd/Ctrl + A`: Select entire canvas
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
+  - `Cmd/Ctrl + I`: Open canvas size modal
+  - `Cmd/Ctrl + G`: Open grid spacing modal
+  - `Cmd/Ctrl + R`: Open zoom modal
   - `A`: Add current selection to animation preview frames
   - `F`: Add/update hovered pixel in reference line, and select matching palette color if present
   - `1..9`: Select color from numbered reference line
@@ -181,6 +193,8 @@ Current metadata shape:
   - Canvas size modal UI and validation/apply trigger
 - `src/components/modals/GridSpacingModal.tsx`
   - Grid spacing modal UI with single numeric input (`0` = none, `Enter` to apply, `Esc` to cancel)
+- `src/components/modals/ZoomModal.tsx`
+  - Zoom modal UI with single numeric input (`1..12`, `Enter` to apply, `Esc` to cancel)
 - `src/components/modals/KMeansQuantizeModal.tsx`
   - Selection-only K-Means quantize modal with target color count input and before/after previews
 - `src/components/modals/PaletteColorModal.tsx`

@@ -1,32 +1,25 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { MAX_CANVAS_SIZE, MIN_CANVAS_SIZE } from '../../editor/constants';
-import { clampCanvasSize } from '../../editor/utils';
+import { MAX_ZOOM, MIN_ZOOM } from '../../editor/constants';
 import { useBootstrapModal } from './useBootstrapModal';
 
-type CanvasSizeModalProps = {
+type ZoomModalProps = {
   isOpen: boolean;
-  canvasSize: number;
+  zoom: number;
   onApply: (value: number) => void;
   onClose: () => void;
   onValidationError: (message: string) => void;
 };
 
-export function CanvasSizeModal({
-  isOpen,
-  canvasSize,
-  onApply,
-  onClose,
-  onValidationError
-}: CanvasSizeModalProps) {
-  const [pendingCanvasSize, setPendingCanvasSize] = useState<string>(String(canvasSize));
+export function ZoomModal({ isOpen, zoom, onApply, onClose, onValidationError }: ZoomModalProps) {
+  const [pendingZoom, setPendingZoom] = useState<string>(String(zoom));
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
-    setPendingCanvasSize(String(canvasSize));
-  }, [canvasSize, isOpen]);
+    setPendingZoom(String(zoom));
+  }, [isOpen, zoom]);
 
   const handleShown = useCallback(() => {
     inputRef.current?.focus();
@@ -34,9 +27,9 @@ export function CanvasSizeModal({
   }, []);
 
   const handleHidden = useCallback(() => {
-    setPendingCanvasSize(String(canvasSize));
+    setPendingZoom(String(zoom));
     onClose();
-  }, [canvasSize, onClose]);
+  }, [onClose, zoom]);
 
   const modalRef = useBootstrapModal({
     isOpen,
@@ -49,52 +42,50 @@ export function CanvasSizeModal({
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
-      const parsed = Number.parseInt(pendingCanvasSize, 10);
+      const parsed = Number.parseInt(pendingZoom, 10);
       if (!Number.isFinite(parsed)) {
-        onValidationError('キャンバスサイズは数値で指定してください');
+        onValidationError('表示倍率は数値で指定してください');
+        return;
+      }
+      if (parsed < MIN_ZOOM || parsed > MAX_ZOOM) {
+        onValidationError(`表示倍率は ${MIN_ZOOM} から ${MAX_ZOOM} の範囲で指定してください`);
         return;
       }
 
-      onApply(clampCanvasSize(parsed, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE));
+      onApply(parsed);
       onClose();
     },
-    [onApply, onClose, onValidationError, pendingCanvasSize]
+    [onApply, onClose, onValidationError, pendingZoom]
   );
 
   return (
-    <div
-      ref={modalRef}
-      className="modal fade"
-      tabIndex={-1}
-      aria-labelledby="canvas-size-modal-title"
-      aria-hidden="true"
-    >
+    <div ref={modalRef} className="modal fade" tabIndex={-1} aria-labelledby="zoom-modal-title" aria-hidden="true">
       <div className="modal-dialog modal-dialog-centered">
         <div className="modal-content shadow">
           <form onSubmit={handleSubmit}>
             <div className="modal-header">
               <div>
-                <h2 id="canvas-size-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
-                  <i className="fa-regular fa-square" aria-hidden="true" />
-                  <span>キャンバスサイズ変更</span>
+                <h2 id="zoom-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
+                  <i className="fa-solid fa-magnifying-glass-plus" aria-hidden="true" />
+                  <span>表示倍率変更</span>
                 </h2>
               </div>
               <button type="button" className="btn-close" aria-label="閉じる" onClick={onClose} />
             </div>
             <div className="modal-body py-4">
-              <label htmlFor="canvas-size-input" className="form-label">正方形キャンバスサイズ (px)</label>
+              <label htmlFor="zoom-input" className="form-label">表示倍率 (x)</label>
               <input
                 ref={inputRef}
-                id="canvas-size-input"
+                id="zoom-input"
                 type="number"
-                min={MIN_CANVAS_SIZE}
-                max={MAX_CANVAS_SIZE}
+                min={MIN_ZOOM}
+                max={MAX_ZOOM}
                 className="form-control"
-                value={pendingCanvasSize}
-                onChange={(event) => setPendingCanvasSize(event.target.value)}
+                value={pendingZoom}
+                onChange={(event) => setPendingZoom(event.target.value)}
               />
               <div className="form-text">
-                現在値: {canvasSize}x{canvasSize} / 範囲: {MIN_CANVAS_SIZE} - {MAX_CANVAS_SIZE} / Enter で適用 / Esc でキャンセル
+                現在値: {zoom}x / 範囲: {MIN_ZOOM} - {MAX_ZOOM} / Enter で適用 / Esc でキャンセル
               </div>
             </div>
             <div className="modal-footer">
