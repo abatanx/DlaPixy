@@ -93,6 +93,11 @@ npm run dist
   - Copy selection
   - Delete selection
   - Paste selection
+  - `Y` or the right toolbar button opens a selection rotation modal for the active selection
+  - Inside the rotation modal, arrow keys rotate-scroll the preview by `1px` with wraparound
+  - The rotation modal also has `90° left / 90° right` buttons, enabled only for square selections
+  - The rotation modal also has horizontal / vertical flip buttons, available for rectangular selections too
+  - The canvas is updated only when `OK` is pressed; `Cancel` / `Esc` discards the preview changes
   - With Select tool active, clicking empty space in `canvas-stage` clears the current selection
   - Click (without drag) with Select tool chooses one tile aligned to current grid spacing
   - Selection is cleared only when clicking outside the selected area with Select tool; other tool operations keep selection
@@ -170,6 +175,7 @@ npm run dist
   - `Cmd/Ctrl + G`: Open grid spacing modal
   - `Cmd/Ctrl + R`: Open zoom modal
   - `T`: Add current selection to animation preview frames
+  - `Y`: Open selection rotation modal for the current selection
   - `F`: Add/update hovered pixel in reference line, and select matching palette color if present
   - `S`: Center the hovered pixel in the canvas viewport
   - `1..9`: Select color from numbered reference line
@@ -215,6 +221,8 @@ Current metadata shape:
   - Zoom modal UI with single numeric input (`1..12`, `Enter` to apply, `Esc` to cancel)
 - `src/components/modals/KMeansQuantizeModal.tsx`
   - Selection-only K-Means quantize modal with target color count input and before/after previews
+- `src/components/modals/SelectionRotateModal.tsx`
+  - Selection rotation modal with preview, arrow-key rotation, and `OK` / `Cancel`
 - `src/components/modals/PaletteColorModal.tsx`
   - Selected color editor modal with `#RRGGBB` + separate `AA` hex input, plus RGBA + HSV controls
 - `src/components/modals/useBootstrapModal.ts`
@@ -223,6 +231,8 @@ Current metadata shape:
   - Editor constants (grid/canvas/zoom limits, default palette)
 - `src/editor/kmeans-quantize.ts`
   - Selection extraction + Lab-distance K-Means quantization helpers
+- `src/editor/selection-rotate.ts`
+  - Selection block extraction, wraparound rotation, and apply helpers for the rotation modal
 - `src/editor/palette-sync.ts`
   - Shared palette usage analysis + swatch synchronization helpers
   - Owns summarized usage labels and first-match jump target selection data

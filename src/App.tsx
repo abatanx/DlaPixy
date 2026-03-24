@@ -14,6 +14,7 @@ import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
 import { ConfirmModal } from './components/modals/ConfirmModal';
 import { GridSpacingModal } from './components/modals/GridSpacingModal';
 import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
+import { SelectionRotateModal } from './components/modals/SelectionRotateModal';
 import { ZoomModal } from './components/modals/ZoomModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
 import type { MenuAction as FileMenuAction } from '../shared/ipc';
@@ -44,6 +45,12 @@ import {
   type PaletteUsageAnalysis
 } from './editor/palette-sync';
 import { createRegionPreviewDataUrl } from './editor/preview';
+import {
+  applySelectionPixelBlock,
+  extractSelectionPixelBlock,
+  hasSamePixelBlock,
+  type SelectionPixelBlock
+} from './editor/selection-rotate';
 import {
   blitBlockOnCanvas,
   clampCanvasSize,
@@ -77,6 +84,11 @@ type KMeansQuantizeRequest = {
   selection: SelectionRect;
   source: QuantizeSelectionSource;
   initialColorCount: number;
+};
+
+type SelectionRotateRequest = {
+  selection: SelectionRect;
+  source: SelectionPixelBlock;
 };
 
 type PaletteRemovalRequest = {
@@ -186,6 +198,7 @@ export function App() {
   const [isGridSpacingModalOpen, setIsGridSpacingModalOpen] = useState<boolean>(false);
   const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
   const [kMeansQuantizeRequest, setKMeansQuantizeRequest] = useState<KMeansQuantizeRequest | null>(null);
+  const [selectionRotateRequest, setSelectionRotateRequest] = useState<SelectionRotateRequest | null>(null);
 
   const setStatusText = useCallback((text: string, type: ToastType) => {
     setStatusTextRaw(text);
@@ -1658,6 +1671,54 @@ export function App() {
     setIsZoomModalOpen(false);
   }, []);
 
+  const openSelectionRotateModal = useCallback(() => {
+    if (floatingPasteRef.current) {
+      setStatusText('ローテーションの前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+      return;
+    }
+
+    const normalizedSelection = clampSelectionToCanvas(selection, canvasSize);
+    if (!normalizedSelection) {
+      setStatusText('ローテーション: 先に矩形選択してください', 'warning');
+      return;
+    }
+
+    setSelectionRotateRequest({
+      selection: normalizedSelection,
+      source: extractSelectionPixelBlock(pixels, canvasSize, normalizedSelection)
+    });
+  }, [canvasSize, pixels, selection, setStatusText]);
+
+  const closeSelectionRotateModal = useCallback(() => {
+    setSelectionRotateRequest(null);
+  }, []);
+
+  const applySelectionRotate = useCallback(
+    (result: SelectionPixelBlock) => {
+      if (!selectionRotateRequest) {
+        return;
+      }
+
+      if (hasSamePixelBlock(selectionRotateRequest.source.pixels, result.pixels)) {
+        setStatusText('ローテーションの変更がありません', 'warning');
+        return;
+      }
+
+      pushUndo();
+      setPixels((prev) =>
+        applySelectionPixelBlock(prev, canvasSize, selectionRotateRequest.selection, result.pixels)
+      );
+      setSelection(selectionRotateRequest.selection);
+      setLastTilePreviewSelection(selectionRotateRequest.selection);
+      setHasUnsavedChanges(true);
+      setStatusText(
+        `ローテーションを適用しました: ${selectionRotateRequest.selection.w}x${selectionRotateRequest.selection.h}`,
+        'success'
+      );
+    },
+    [canvasSize, pushUndo, selectionRotateRequest, setStatusText]
+  );
+
   const openKMeansQuantizeModal = useCallback(() => {
     if (floatingPasteRef.current) {
       setStatusText('減色の前に Enter で確定するか Esc でキャンセルしてください', 'warning');
@@ -2071,6 +2132,9 @@ export function App() {
       if (isEditableElement(event.target)) {
         return;
       }
+      if (selectionRotateRequest) {
+        return;
+      }
 
       const withSystemKey = event.metaKey || event.ctrlKey;
       if (withSystemKey && event.key.toLowerCase() === 'z') {
@@ -2207,6 +2271,10 @@ export function App() {
           event.preventDefault();
           addAnimationFrame();
           break;
+        case 'KeyY':
+          event.preventDefault();
+          openSelectionRotateModal();
+          break;
         case 'Equal':
         case 'NumpadAdd':
         case 'KeyD':
@@ -2249,8 +2317,10 @@ export function App() {
     focusHoveredPixel,
     freezeHoveredPixelInfo,
     pasteSelection,
+    openSelectionRotateModal,
     selectEntireCanvas,
     selectReferenceByNumber,
+    selectionRotateRequest,
     selection,
     zoomIn,
     zoomOut
@@ -2722,6 +2792,9 @@ export function App() {
       if (isEditableElement(event.target)) {
         return;
       }
+      if (selectionRotateRequest) {
+        return;
+      }
 
       const key = event.key.toLowerCase();
       if (key === 's') {
@@ -2759,7 +2832,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [loadPng, openCanvasSizeModal, openGridSpacingModal, openZoomModal, saveAsPng, savePng]);
+  }, [loadPng, openCanvasSizeModal, openGridSpacingModal, openZoomModal, saveAsPng, savePng, selectionRotateRequest]);
 
   useEffect(() => {
     const unsubscribe = window.pixelApi.onMenuAction((action: FileMenuAction) => {
@@ -3038,6 +3111,8 @@ export function App() {
                 setTool={setTool}
                 canAddAnimationFrame={selection !== null}
                 addAnimationFrame={addAnimationFrame}
+                canRotateSelection={selection !== null}
+                openSelectionRotateModal={openSelectionRotateModal}
                 zoom={zoom}
                 zoomIn={zoomIn}
                 zoomOut={zoomOut}
@@ -3082,6 +3157,14 @@ export function App() {
           initialColorCount={kMeansQuantizeRequest?.initialColorCount ?? 1}
           onApply={applyKMeansQuantize}
           onClose={closeKMeansQuantizeModal}
+          onValidationError={(message) => setStatusText(message, 'warning')}
+        />
+        <SelectionRotateModal
+          isOpen={selectionRotateRequest !== null}
+          selection={selectionRotateRequest?.selection ?? null}
+          source={selectionRotateRequest?.source ?? null}
+          onApply={applySelectionRotate}
+          onClose={closeSelectionRotateModal}
           onValidationError={(message) => setStatusText(message, 'warning')}
         />
         <ConfirmModal

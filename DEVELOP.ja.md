@@ -93,6 +93,11 @@ npm run dist
   - コピー
   - 削除
   - 貼り付け
+  - `Y` または右ツールバーのボタンで、現在の選択範囲をローテーションモーダルで編集できる
+  - ローテーションモーダル内ではカーソルキーで `1px` の循環移動を行う
+  - ローテーションモーダルには `90° 左 / 90° 右` ボタンもあり、正方形選択のときだけ有効になる
+  - ローテーションモーダルには水平 / 垂直フリップボタンもあり、長方形選択でも利用できる
+  - 本体キャンバスへの反映は `OK` 時だけで、`Cancel` / `Esc` では破棄する
   - Select ツール中は `canvas-stage` の余白クリックで現在の選択範囲を解除できる
   - Selectツールでドラッグせずクリックした場合、現在のグリッド間隔に沿った1タイルを選択
   - 矩形選択の解除は、Selectツールで選択範囲外をクリックした場合のみ（他ツール操作では選択維持）
@@ -171,6 +176,7 @@ npm run dist
   - `Cmd/Ctrl + G`: グリッド線間隔変更モーダルを開く
   - `Cmd/Ctrl + R`: 表示倍率モーダルを開く
   - `T`: 現在の選択範囲をアニメーションプレビューへ追加
+  - `Y`: 現在の選択範囲に対するローテーションモーダルを開く
   - `F`: ホバー中ピクセルを参照ラインへ追加/更新し、パレット登録色ならその色を選択
   - `S`: ホバー中ピクセルがキャンバス中央に来るようにスクロール
   - `1..9`: 番号付き参照ラインの色を選択
@@ -215,6 +221,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 表示倍率変更モーダルのUI。単一の数値入力で `1..12`、`Enter` で適用、`Esc` でキャンセル
 - `src/components/modals/KMeansQuantizeModal.tsx`
   - 選択範囲専用の K-Means 減色モーダル。目標色数入力と減色前後プレビューを提供
+- `src/components/modals/SelectionRotateModal.tsx`
+  - 選択範囲ローテーションモーダル。プレビュー、カーソルキー操作、`OK` / `Cancel` を担当
 - `src/components/modals/PaletteColorModal.tsx`
   - `#RRGGBB` と別枠 `AA` の HEX入力、および RGBA / HSV で選択色を編集する renderer モーダル
 - `src/components/modals/useBootstrapModal.ts`
@@ -223,6 +231,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - グリッド/キャンバス/ズーム制約、デフォルトパレットなど定数
 - `src/editor/kmeans-quantize.ts`
   - 選択範囲抽出と Lab 距離ベース K-Means 減色 helper
+- `src/editor/selection-rotate.ts`
+  - ローテーションモーダル向けの選択範囲切り出し、循環移動、適用 helper
 - `src/editor/palette-sync.ts`
   - パレット使用数解析とスウォッチ同期の共通 helper
   - 使用数ラベル生成と、同色ピクセルへのジャンプ先情報を持つ
