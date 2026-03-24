@@ -10,6 +10,7 @@ import {
 import { EditorSidebar } from './components/EditorSidebar';
 import { EditorToolbar } from './components/EditorToolbar';
 import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
+import { ConfirmModal } from './components/modals/ConfirmModal';
 import { GridSpacingModal } from './components/modals/GridSpacingModal';
 import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
 import { ZoomModal } from './components/modals/ZoomModal';
@@ -75,6 +76,11 @@ type KMeansQuantizeRequest = {
   selection: SelectionRect;
   source: QuantizeSelectionSource;
   initialColorCount: number;
+};
+
+type PaletteRemovalRequest = {
+  color: string;
+  usedPixelCount: number;
 };
 
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
@@ -161,6 +167,7 @@ export function App() {
   const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
   const [draggingReferenceKey, setDraggingReferenceKey] = useState<string | null>(null);
   const [paletteColorModalRequest, setPaletteColorModalRequest] = useState<PaletteColorModalRequest>(null);
+  const [paletteRemovalRequest, setPaletteRemovalRequest] = useState<PaletteRemovalRequest | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
@@ -2027,6 +2034,62 @@ export function App() {
     [palette, pushUndo, setStatusText]
   );
 
+  const removePaletteColor = useCallback(
+    (colorToRemove: string, clearUsedPixels: boolean) => {
+      const selectedPaletteIndex = palette.findIndex((entry) => entry.color === colorToRemove);
+      if (selectedPaletteIndex < 0) {
+        setPaletteRemovalRequest(null);
+        setStatusText('削除対象の色はパレットにありません', 'warning');
+        return;
+      }
+
+      const nextPalette = palette.filter((_entry, index) => index !== selectedPaletteIndex);
+      const nextSelectedColor = resolveNextSelectedColor(nextPalette, selectedColor);
+      let nextPixels = pixels;
+      let clearedPixelCount = 0;
+
+      if (clearUsedPixels) {
+        const targetColor = hexToRgba(colorToRemove);
+        const clearedPixels = clonePixels(pixels);
+
+        for (let index = 0; index < clearedPixels.length; index += 4) {
+          if (
+            clearedPixels[index] !== targetColor.r ||
+            clearedPixels[index + 1] !== targetColor.g ||
+            clearedPixels[index + 2] !== targetColor.b ||
+            clearedPixels[index + 3] !== targetColor.a
+          ) {
+            continue;
+          }
+
+          clearedPixels[index] = 0;
+          clearedPixels[index + 1] = 0;
+          clearedPixels[index + 2] = 0;
+          clearedPixels[index + 3] = 0;
+          clearedPixelCount += 1;
+        }
+
+        nextPixels = clearedPixels;
+      }
+
+      pushUndo();
+      setPalette(nextPalette);
+      setSelectedColor(nextSelectedColor);
+      if (clearUsedPixels) {
+        setPixels(nextPixels);
+      }
+      setPaletteRemovalRequest(null);
+      setHasUnsavedChanges(true);
+      setStatusText(
+        clearUsedPixels && clearedPixelCount > 0
+          ? `使用中の色をクリアして削除しました: ${colorToRemove.toUpperCase()} / ${clearedPixelCount.toLocaleString()}px`
+          : `パレットから削除しました: ${colorToRemove.toUpperCase()}`,
+        'success'
+      );
+    },
+    [palette, pixels, pushUndo, selectedColor, setStatusText]
+  );
+
   const removeSelectedColorFromPalette = useCallback(() => {
     const selectedPaletteIndex = palette.findIndex((entry) => entry.color === selectedColor);
     if (selectedPaletteIndex < 0) {
@@ -2034,11 +2097,17 @@ export function App() {
       return;
     }
 
-    pushUndo();
-    setPalette((prev) => prev.filter((_entry, index) => index !== selectedPaletteIndex));
-    setHasUnsavedChanges(true);
-    setStatusText(`パレットから削除しました: ${selectedColor.toUpperCase()}`, 'success');
-  }, [palette, pushUndo, selectedColor, setStatusText]);
+    const usedPixelCount = paletteUsage.byColor[selectedColor]?.count ?? 0;
+    if (usedPixelCount > 0) {
+      setPaletteRemovalRequest({
+        color: selectedColor,
+        usedPixelCount
+      });
+      return;
+    }
+
+    removePaletteColor(selectedColor, false);
+  }, [palette, paletteUsage.byColor, removePaletteColor, selectedColor, setStatusText]);
 
   const applySelectedColorChange = useCallback(
     ({ color: nextColor, caption: nextCaption, locked: nextLocked }: PaletteEntry) => {
@@ -2777,6 +2846,28 @@ export function App() {
           onClose={closeKMeansQuantizeModal}
           onValidationError={(message) => setStatusText(message, 'warning')}
         />
+        <ConfirmModal
+          isOpen={paletteRemovalRequest !== null}
+          title="使用中の色を削除しますか？"
+          confirmLabel="クリアして削除"
+          onConfirm={() => {
+            if (!paletteRemovalRequest) {
+              return;
+            }
+            removePaletteColor(paletteRemovalRequest.color, true);
+          }}
+          onClose={() => setPaletteRemovalRequest(null)}
+        >
+          <p className="mb-2">
+            <span className="font-monospace">{paletteRemovalRequest?.color.toUpperCase() ?? '-'}</span>
+            {' '}はキャンバス上で{' '}
+            <strong>{paletteRemovalRequest?.usedPixelCount.toLocaleString() ?? '0'} px</strong>
+            {' '}使用されています。
+          </p>
+          <p className="mb-0 text-body-secondary">
+            この色を削除すると、該当するピクセルはすべて透明になります。続けてよければ削除してください。
+          </p>
+        </ConfirmModal>
       </div>
       <footer className="container-fluid app-footer font-monospace small border-top">
         <div className="app-footer-status">

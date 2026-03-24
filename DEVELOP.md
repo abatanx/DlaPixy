@@ -60,6 +60,7 @@ npm run dist
 - Swatch panel usage overlay
   - While `Ctrl/Cmd` is held, each swatch shows current canvas usage count as an overlaid summarized label
   - Clicking a swatch during that overlay mode scrolls the canvas to the first matching pixel (`for y` then `for x`) and sets a `1x1` selection there
+  - Removing a swatch that is still used opens a confirmation modal; confirming clears all matching canvas pixels to transparent before removing the swatch
 - Palette sync behavior is now driven by shared helper logic
   - K-Means sync uses reusable `removeUnusedColors` / `addUsedColors` options
   - PNG load merges metadata palette entries with actually used canvas colors
