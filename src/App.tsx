@@ -872,6 +872,17 @@ export function App() {
     [paletteUsage.byColor, scrollCanvasStageToCell, setStatusText, updateHoveredPixelInfo]
   );
 
+  const focusHoveredPixel = useCallback((): boolean => {
+    if (!hoveredPixelInfo) {
+      setStatusText('中心移動: キャンバス上にカーソルを置いてから S を押してください', 'warning');
+      return false;
+    }
+
+    scrollCanvasStageToCell({ x: hoveredPixelInfo.x, y: hoveredPixelInfo.y });
+    setStatusText(`カーソル位置を中央へ移動しました: (${hoveredPixelInfo.x}, ${hoveredPixelInfo.y})`, 'success');
+    return true;
+  }, [hoveredPixelInfo, scrollCanvasStageToCell, setStatusText]);
+
   const getPixelInfoFields = useCallback((info: NonNullable<HoveredPixelInfo>) => {
     const syncedInfo = syncReferencePixelInfo(info);
     return {
@@ -1956,7 +1967,12 @@ export function App() {
             setStatusText('選択を解除しました', 'success');
           }
           break;
-        case 'KeyB':
+        case 'KeyQ':
+          event.preventDefault();
+          setTool('select');
+          setStatusText('ツール: 矩形選択', 'info');
+          break;
+        case 'KeyW':
           event.preventDefault();
           setTool('pencil');
           setStatusText('ツール: 描画', 'info');
@@ -1966,33 +1982,38 @@ export function App() {
           setTool('eraser');
           setStatusText('ツール: 消しゴム', 'info');
           break;
-        case 'KeyG':
+        case 'KeyP':
           event.preventDefault();
           setTool('fill');
           setStatusText('ツール: 塗りつぶし', 'info');
           break;
-        case 'KeyV':
-          event.preventDefault();
-          setTool('select');
-          setStatusText('ツール: 矩形選択', 'info');
-          break;
-        case 'KeyA':
+        case 'KeyT':
           event.preventDefault();
           addAnimationFrame();
           break;
-        case 'KeyF':
-          event.preventDefault();
-          freezeHoveredPixelInfo();
-          break;
         case 'Equal':
         case 'NumpadAdd':
+        case 'KeyD':
+        case 'BracketRight':
+        case 'Period':
           event.preventDefault();
           zoomIn();
           break;
         case 'Minus':
         case 'NumpadSubtract':
+        case 'KeyA':
+        case 'BracketLeft':
+        case 'Comma':
           event.preventDefault();
           zoomOut();
+          break;
+        case 'KeyF':
+          event.preventDefault();
+          freezeHoveredPixelInfo();
+          break;
+        case 'KeyS':
+          event.preventDefault();
+          focusHoveredPixel();
           break;
         default:
           break;
@@ -2009,6 +2030,7 @@ export function App() {
     copySelection,
     doUndo,
     finalizeFloatingPaste,
+    focusHoveredPixel,
     freezeHoveredPixelInfo,
     pasteSelection,
     selectEntireCanvas,
