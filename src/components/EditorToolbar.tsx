@@ -6,6 +6,8 @@ type EditorToolbarProps = {
   setTool: (tool: Tool) => void;
   canAddAnimationFrame: boolean;
   addAnimationFrame: () => void;
+  canRotateSelection: boolean;
+  openSelectionRotateModal: () => void;
   zoom: number;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -22,6 +24,8 @@ export function EditorToolbar({
   setTool,
   canAddAnimationFrame,
   addAnimationFrame,
+  canRotateSelection,
+  openSelectionRotateModal,
   zoom,
   zoomIn,
   zoomOut,
@@ -93,6 +97,18 @@ export function EditorToolbar({
         <span className="editor-btn-inner">
           <i className="fa-solid fa-film" aria-hidden="true" />
           <span className="editor-shortcut">T</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        className="btn btn-sm editor-tool-btn"
+        onClick={openSelectionRotateModal}
+        disabled={!canRotateSelection}
+        title="選択範囲をローテーション (Y)"
+      >
+        <span className="editor-btn-inner">
+          <i className="fa-solid fa-arrows-rotate" aria-hidden="true" />
+          <span className="editor-shortcut">Y</span>
         </span>
       </button>
 

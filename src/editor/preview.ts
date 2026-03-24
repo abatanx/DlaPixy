@@ -17,6 +17,11 @@ export function createImagePreviewDataUrl(
     return '';
   }
 
+  const requiredLength = width * height * 4;
+  if (pixels.length < requiredLength) {
+    return '';
+  }
+
   const sourceCanvas = document.createElement('canvas');
   sourceCanvas.width = width;
   sourceCanvas.height = height;
