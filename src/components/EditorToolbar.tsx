@@ -37,11 +37,11 @@ export function EditorToolbar({
         type="button"
         className={`btn btn-sm editor-tool-btn ${tool === 'select' ? 'active' : ''}`}
         onClick={() => setTool('select')}
-        title="矩形選択"
+        title="矩形選択 (Q)"
       >
         <span className="editor-btn-inner">
           <i className="fa-regular fa-square" aria-hidden="true" />
-          <span className="editor-shortcut">V</span>
+          <span className="editor-shortcut">Q</span>
         </span>
       </button>
 
@@ -51,18 +51,18 @@ export function EditorToolbar({
         type="button"
         className={`btn btn-sm editor-tool-btn ${tool === 'pencil' ? 'active' : ''}`}
         onClick={() => setTool('pencil')}
-        title="描画ツール"
+        title="描画ツール (W)"
       >
         <span className="editor-btn-inner">
           <i className="fa-solid fa-pencil" aria-hidden="true" />
-          <span className="editor-shortcut">B</span>
+          <span className="editor-shortcut">W</span>
         </span>
       </button>
       <button
         type="button"
         className={`btn btn-sm editor-tool-btn ${tool === 'eraser' ? 'active' : ''}`}
         onClick={() => setTool('eraser')}
-        title="消しゴム"
+        title="消しゴム (E)"
       >
         <span className="editor-btn-inner">
           <i className="fa-solid fa-eraser" aria-hidden="true" />
@@ -73,11 +73,11 @@ export function EditorToolbar({
         type="button"
         className={`btn btn-sm editor-tool-btn ${tool === 'fill' ? 'active' : ''}`}
         onClick={() => setTool('fill')}
-        title="塗りつぶし"
+        title="塗りつぶし (P)"
       >
         <span className="editor-btn-inner">
           <i className="fa-solid fa-fill-drip" aria-hidden="true" />
-          <span className="editor-shortcut">G</span>
+          <span className="editor-shortcut">P</span>
         </span>
       </button>
 
@@ -88,27 +88,38 @@ export function EditorToolbar({
         className="btn btn-sm editor-tool-btn"
         onClick={addAnimationFrame}
         disabled={!canAddAnimationFrame}
-        title="選択範囲をアニメーションフレームに追加 (A)"
+        title="選択範囲をアニメーションフレームに追加 (T)"
       >
         <span className="editor-btn-inner">
           <i className="fa-solid fa-film" aria-hidden="true" />
-          <span className="editor-shortcut">A</span>
+          <span className="editor-shortcut">T</span>
         </span>
       </button>
 
       <div className="editor-toolbar-separator" />
 
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={doUndo} title="Undo (Cmd/Ctrl+Z)">
+      <button type="button" className="btn btn-sm editor-tool-btn" onClick={doUndo} title="Undo (⌘Z)">
         <span className="editor-btn-inner">
           <i className="fa-solid fa-rotate-left" aria-hidden="true" />
-          <span className="editor-shortcut">Z</span>
+          <span className="editor-shortcut">⌘Z</span>
         </span>
       </button>
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={() => void copySelection()} title="選択範囲をコピー">
-        <i className="fa-regular fa-copy" aria-hidden="true" />
+      <button
+        type="button"
+        className="btn btn-sm editor-tool-btn"
+        onClick={() => void copySelection()}
+        title="選択範囲をコピー (⌘C)"
+      >
+        <span className="editor-btn-inner">
+          <i className="fa-regular fa-copy" aria-hidden="true" />
+          <span className="editor-shortcut">⌘C</span>
+        </span>
       </button>
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={pasteSelection} title="貼り付け (Cmd/Ctrl+V)">
-        <i className="fa-regular fa-paste" aria-hidden="true" />
+      <button type="button" className="btn btn-sm editor-tool-btn" onClick={pasteSelection} title="貼り付け (⌘V)">
+        <span className="editor-btn-inner">
+          <i className="fa-regular fa-paste" aria-hidden="true" />
+          <span className="editor-shortcut">⌘V</span>
+        </span>
       </button>
       <button type="button" className="btn btn-sm editor-tool-btn" onClick={deleteSelection} title="選択範囲を削除">
         <i className="fa-regular fa-trash-can" aria-hidden="true" />
@@ -124,11 +135,11 @@ export function EditorToolbar({
         className="btn btn-sm editor-tool-btn"
         onClick={zoomIn}
         disabled={zoom >= MAX_ZOOM}
-        title="拡大 (+)"
+        title="拡大 (+D)"
       >
         <span className="editor-btn-inner">
           <i className="fa-solid fa-magnifying-glass-plus" aria-hidden="true" />
-          <span className="editor-shortcut">+</span>
+          <span className="editor-shortcut">+D</span>
         </span>
       </button>
       <button
@@ -136,11 +147,11 @@ export function EditorToolbar({
         className="btn btn-sm editor-tool-btn"
         onClick={zoomOut}
         disabled={zoom <= MIN_ZOOM}
-        title="縮小 (-)"
+        title="縮小 (-A)"
       >
         <span className="editor-btn-inner">
           <i className="fa-solid fa-magnifying-glass-minus" aria-hidden="true" />
-          <span className="editor-shortcut">-</span>
+          <span className="editor-shortcut">-A</span>
         </span>
       </button>
       <div className="editor-zoom-label">{zoom}x</div>

@@ -129,7 +129,7 @@ npm run dist
   - Auto-fit to parent width (responsive scale)
   - Preview area is displayed in a square (`1:1`) viewport
 - Animation preview panel (under Tiling)
-  - `A` or the right toolbar button adds the current selection as an animation frame
+  - `T` or the right toolbar button adds the current selection as an animation frame
   - When a frame is added, the sidebar automatically switches to the `Animation Preview` tab
   - Sidebar preview supports play/stop, FPS, loop toggle, clear all, delete, and up/down reorder
   - Animation controls are compact, icon-first Bootstrap buttons
@@ -147,13 +147,13 @@ npm run dist
 
 ## 5. Shortcuts (Current)
 - Tool switch:
-  - `B`: Pencil
+  - `Q`: Select
+  - `W`: Pencil
   - `E`: Eraser
-  - `G`: Fill
-  - `V`: Select
+  - `P`: Fill
 - Zoom:
-  - `+` (`Equal`, `NumpadAdd`): Zoom in
-  - `-` (`Minus`, `NumpadSubtract`): Zoom out
+  - `+D` (`Equal`, `NumpadAdd`, `KeyD`, `BracketRight`, `Period`): Zoom in
+  - `-A` (`Minus`, `NumpadSubtract`, `KeyA`, `BracketLeft`, `Comma`): Zoom out
 - Edit:
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + A`: Select entire canvas
@@ -162,8 +162,9 @@ npm run dist
   - `Cmd/Ctrl + I`: Open canvas size modal
   - `Cmd/Ctrl + G`: Open grid spacing modal
   - `Cmd/Ctrl + R`: Open zoom modal
-  - `A`: Add current selection to animation preview frames
+  - `T`: Add current selection to animation preview frames
   - `F`: Add/update hovered pixel in reference line, and select matching palette color if present
+  - `S`: Center the hovered pixel in the canvas viewport
   - `1..9`: Select color from numbered reference line
   - `Enter`: Finalize floating paste/move
   - `Esc`: Cancel floating paste/move (if active), otherwise clear current selection

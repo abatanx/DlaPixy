@@ -294,8 +294,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
+  border: 1px solid transparent;
+  background: transparent;
   color: #334155;
 }
 
@@ -318,7 +318,7 @@ body {
 }
 
 .editor-tool-btn:hover {
-  background: #f8fafc;
+  background: rgba(15, 23, 42, 0.08);
   color: #0f172a;
 }
 
@@ -329,7 +329,9 @@ body {
 }
 
 .editor-tool-btn:disabled {
-  opacity: 0.45;
+  border-color: transparent;
+  background: transparent;
+  opacity: 0.18;
 }
 
 .editor-toolbar-separator {
