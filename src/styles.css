@@ -70,10 +70,11 @@ body {
   min-height: 0;
   max-height: none;
   align-items: flex-start;
+  padding: 0.5rem;
 }
 
 .canvas-stage-with-toolbar {
-  padding-right: 4.25rem;
+  padding-right: 4.75rem;
 }
 
 .canvas-stage.is-panning {
