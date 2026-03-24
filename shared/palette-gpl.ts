@@ -75,7 +75,8 @@ function parseRgbLine(line: string, lineNo: number, hasAlpha: boolean): PaletteE
 
   return {
     color: toHex8(r, g, b, a),
-    caption: normalizeImportedCaption(rawName)
+    caption: normalizeImportedCaption(rawName),
+    locked: false
   };
 }
 

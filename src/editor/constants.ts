@@ -26,7 +26,8 @@ export const DEFAULT_PALETTE = WEB_SAFE_CHANNELS.flatMap((r) =>
     WEB_SAFE_CHANNELS.map(
       (b): PaletteEntry => ({
         color: `#${r}${g}${b}`.toLowerCase(),
-        caption: ''
+        caption: '',
+        locked: false
       })
     )
   )

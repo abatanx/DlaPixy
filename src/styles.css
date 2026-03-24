@@ -70,10 +70,11 @@ body {
   min-height: 0;
   max-height: none;
   align-items: flex-start;
+  padding: 0.5rem;
 }
 
 .canvas-stage-with-toolbar {
-  padding-right: 4.25rem;
+  padding-right: 4.75rem;
 }
 
 .canvas-stage.is-panning {
@@ -662,6 +663,8 @@ body {
 }
 
 .palette-item-swatch {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -671,6 +674,51 @@ body {
   border: 1px solid rgba(148, 163, 184, 0.75);
   border-radius: 3px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.palette-item-swatch-fill {
+  position: absolute;
+  inset: 0;
+}
+
+.palette-item-lock,
+.palette-item-usage {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.palette-item-lock {
+  top: 0.12rem;
+  right: 0.12rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.78rem;
+  height: 0.78rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  font-size: 0.42rem;
+  line-height: 1;
+}
+
+.palette-item-usage {
+  left: 50%;
+  bottom: 0.12rem;
+  transform: translateX(-50%);
+  max-width: calc(100% - 0.2rem);
+  padding: 0.05rem 0.18rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.8);
+  color: #f8fafc;
+  font-size: 0.47rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .palette-item-caption {
@@ -693,6 +741,10 @@ body {
     0 0 0 3px rgba(29, 78, 216, 0.18);
 }
 
+.palette-item.active .palette-item-usage {
+  background: rgba(29, 78, 216, 0.88);
+}
+
 .palette-item-add .palette-item-swatch {
   color: #64748b;
   background: rgba(241, 245, 249, 0.96);
@@ -710,6 +762,14 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
+}
+
+.palette-color-modal-lock-switch .form-check-input {
+  cursor: pointer;
+}
+
+.palette-color-modal-lock-switch .form-check-label {
+  cursor: pointer;
 }
 
 .palette-color-modal-preview-item {

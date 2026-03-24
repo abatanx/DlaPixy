@@ -10,6 +10,7 @@ import {
 import { EditorSidebar } from './components/EditorSidebar';
 import { EditorToolbar } from './components/EditorToolbar';
 import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
+import { ConfirmModal } from './components/modals/ConfirmModal';
 import { GridSpacingModal } from './components/modals/GridSpacingModal';
 import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
 import { ZoomModal } from './components/modals/ZoomModal';
@@ -35,6 +36,12 @@ import {
   type QuantizeSelectionResult,
   type QuantizeSelectionSource
 } from './editor/kmeans-quantize';
+import {
+  collectPaletteUsageFromPixels,
+  syncPaletteEntriesFromPixels,
+  syncPaletteEntriesWithUsage,
+  type PaletteUsageAnalysis
+} from './editor/palette-sync';
 import { createRegionPreviewDataUrl } from './editor/preview';
 import {
   blitBlockOnCanvas,
@@ -43,7 +50,6 @@ import {
   clonePaletteEntries,
   clonePixels,
   cloneSelection,
-  createPaletteEntries,
   createEmptyPixels,
   hexToRgba,
   normalizePaletteEntries,
@@ -72,6 +78,11 @@ type KMeansQuantizeRequest = {
   initialColorCount: number;
 };
 
+type PaletteRemovalRequest = {
+  color: string;
+  usedPixelCount: number;
+};
+
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 const DEFAULT_ANIMATION_PREVIEW_FPS = 6;
@@ -84,8 +95,17 @@ function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boo
   }
 
   return left.every(
-    (entry, index) => entry.color === right[index]?.color && entry.caption === right[index]?.caption
+    (entry, index) =>
+      entry.color === right[index]?.color &&
+      entry.caption === right[index]?.caption &&
+      entry.locked === right[index]?.locked
   );
+}
+
+function resolveNextSelectedColor(nextPalette: PaletteEntry[], currentSelectedColor: string): string {
+  return nextPalette.some((entry) => entry.color === currentSelectedColor)
+    ? currentSelectedColor
+    : nextPalette[0]?.color ?? currentSelectedColor;
 }
 
 function getFileNameFromPath(filePath?: string): string | null {
@@ -121,47 +141,6 @@ function hasHoveredPixelInfoSameContent(
   );
 }
 
-function collectUsedColorsFromPixels(pixels: Uint8ClampedArray): string[] {
-  const usedColors: string[] = [];
-  const seen = new Set<string>();
-
-  for (let index = 0; index < pixels.length; index += 4) {
-    const alpha = pixels[index + 3];
-    if (alpha === 0) {
-      continue;
-    }
-
-    const color = rgbaToHex8(pixels[index], pixels[index + 1], pixels[index + 2], alpha);
-    if (seen.has(color)) {
-      continue;
-    }
-    seen.add(color);
-    usedColors.push(color);
-  }
-
-  return usedColors;
-}
-
-function buildPaletteFromCanvasPixels(
-  pixels: Uint8ClampedArray,
-  currentPalette: PaletteEntry[]
-): PaletteEntry[] {
-  const usedColors = collectUsedColorsFromPixels(pixels);
-  const usedSet = new Set(usedColors);
-  const nextPalette = currentPalette.filter((entry) => usedSet.has(entry.color));
-  const seenColors = new Set(nextPalette.map((entry) => entry.color));
-
-  for (const color of usedColors) {
-    if (seenColors.has(color)) {
-      continue;
-    }
-    seenColors.add(color);
-    nextPalette.push({ color, caption: '' });
-  }
-
-  return normalizePaletteEntries(nextPalette);
-}
-
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
   // ---- UI / editor state ----
@@ -188,6 +167,7 @@ export function App() {
   const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
   const [draggingReferenceKey, setDraggingReferenceKey] = useState<string | null>(null);
   const [paletteColorModalRequest, setPaletteColorModalRequest] = useState<PaletteColorModalRequest>(null);
+  const [paletteRemovalRequest, setPaletteRemovalRequest] = useState<PaletteRemovalRequest | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
@@ -266,6 +246,10 @@ export function App() {
   const undoStackRef = useRef<UndoSnapshot[]>([]);
 
   const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
+  const paletteUsage = useMemo<PaletteUsageAnalysis>(
+    () => collectPaletteUsageFromPixels(pixels, canvasSize),
+    [canvasSize, pixels]
+  );
   const previewDataUrl = useMemo(() => {
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = canvasSize;
@@ -713,6 +697,30 @@ export function App() {
     drawStateRef.current.moveStartOrigin = null;
   }, []);
 
+  const scrollCanvasStageToCell = useCallback(
+    (cell: { x: number; y: number }) => {
+      const stage = canvasStageRef.current;
+      const canvas = canvasRef.current;
+      if (!stage || !canvas) {
+        return;
+      }
+
+      const targetCenterX = canvas.offsetLeft + (cell.x + 0.5) * zoom;
+      const targetCenterY = canvas.offsetTop + (cell.y + 0.5) * zoom;
+      const maxScrollLeft = Math.max(0, stage.scrollWidth - stage.clientWidth);
+      const maxScrollTop = Math.max(0, stage.scrollHeight - stage.clientHeight);
+      const nextScrollLeft = Math.max(0, Math.min(targetCenterX - stage.clientWidth / 2, maxScrollLeft));
+      const nextScrollTop = Math.max(0, Math.min(targetCenterY - stage.clientHeight / 2, maxScrollTop));
+
+      stage.scrollTo({
+        left: nextScrollLeft,
+        top: nextScrollTop,
+        behavior: 'smooth'
+      });
+    },
+    [zoom]
+  );
+
   const resolvePaletteMatch = useCallback(
     (hex8: string): { paletteIndex: number | null; paletteCaption: string | null } => {
       const paletteIndex = palette.findIndex((entry) => entry.color === hex8.toLowerCase());
@@ -832,6 +840,36 @@ export function App() {
       });
     },
     [canvasSize, pixels, resolvePaletteMatch]
+  );
+
+  const jumpToPaletteUsage = useCallback(
+    (color: string): boolean => {
+      if (floatingPasteRef.current) {
+        setStatusText('貼り付け移動を確定またはキャンセルしてから使用位置へ移動してください', 'warning');
+        return false;
+      }
+
+      const usageEntry = paletteUsage.byColor[color.toLowerCase()];
+      if (!usageEntry) {
+        setStatusText(`使用位置がありません: ${color.toUpperCase()}`, 'warning');
+        return false;
+      }
+
+      const nextSelection = {
+        x: usageEntry.firstX,
+        y: usageEntry.firstY,
+        w: 1,
+        h: 1
+      } satisfies SelectionRect;
+
+      setSelection(nextSelection);
+      setLastTilePreviewSelection(nextSelection);
+      updateHoveredPixelInfo({ x: usageEntry.firstX, y: usageEntry.firstY });
+      scrollCanvasStageToCell({ x: usageEntry.firstX, y: usageEntry.firstY });
+      setStatusText(`使用位置へ移動しました: (${usageEntry.firstX}, ${usageEntry.firstY})`, 'success');
+      return true;
+    },
+    [paletteUsage.byColor, scrollCanvasStageToCell, setStatusText, updateHoveredPixelInfo]
   );
 
   const getPixelInfoFields = useCallback((info: NonNullable<HoveredPixelInfo>) => {
@@ -998,7 +1036,8 @@ export function App() {
         syncedInfo.paletteIndex !== null ? palette[syncedInfo.paletteIndex] ?? null : null;
       const modalEntry: PaletteEntry = matchedEntry ?? {
         color: syncedInfo.hex8.toLowerCase(),
-        caption: syncedInfo.paletteCaption ?? ''
+        caption: syncedInfo.paletteCaption ?? '',
+        locked: false
       };
 
       setSelectedColor(modalEntry.color);
@@ -1448,7 +1487,10 @@ export function App() {
         }
       }
 
-      const nextPalette = buildPaletteFromCanvasPixels(nextPixels, palette);
+      const { palette: nextPalette } = syncPaletteEntriesFromPixels(palette, nextPixels, canvasSize, {
+        removeUnusedColors: true,
+        addUsedColors: true
+      });
       if (changedPixelCount === 0 && hasSamePaletteEntries(palette, nextPalette)) {
         setStatusText('減色結果は現在の内容と同じです', 'warning');
         return;
@@ -1458,9 +1500,7 @@ export function App() {
       const nextPaletteColors = new Set(nextPalette.map((entry) => entry.color));
       const removedColorCount = palette.filter((entry) => !nextPaletteColors.has(entry.color)).length;
       const addedColorCount = nextPalette.filter((entry) => !previousPaletteColors.has(entry.color)).length;
-      const nextSelectedColor = nextPalette.some((entry) => entry.color === selectedColor)
-        ? selectedColor
-        : nextPalette[0]?.color ?? selectedColor;
+      const nextSelectedColor = resolveNextSelectedColor(nextPalette, selectedColor);
 
       pushUndo();
       setPixels(nextPixels);
@@ -1979,7 +2019,7 @@ export function App() {
   ]);
 
   const addPaletteColor = useCallback(
-    ({ color: nextColor, caption: nextCaption }: PaletteEntry) => {
+    ({ color: nextColor, caption: nextCaption, locked: nextLocked }: PaletteEntry) => {
       if (palette.some((entry) => entry.color === nextColor)) {
         setStatusText('同じ色はすでにパレットにあります', 'warning');
         return;
@@ -1987,11 +2027,67 @@ export function App() {
 
       pushUndo();
       setSelectedColor(nextColor);
-      setPalette((prev) => [...prev, { color: nextColor, caption: nextCaption }]);
+      setPalette((prev) => [...prev, { color: nextColor, caption: nextCaption, locked: nextLocked }]);
       setHasUnsavedChanges(true);
       setStatusText(`パレットに追加しました: ${nextColor.toUpperCase()}`, 'success');
     },
     [palette, pushUndo, setStatusText]
+  );
+
+  const removePaletteColor = useCallback(
+    (colorToRemove: string, clearUsedPixels: boolean) => {
+      const selectedPaletteIndex = palette.findIndex((entry) => entry.color === colorToRemove);
+      if (selectedPaletteIndex < 0) {
+        setPaletteRemovalRequest(null);
+        setStatusText('削除対象の色はパレットにありません', 'warning');
+        return;
+      }
+
+      const nextPalette = palette.filter((_entry, index) => index !== selectedPaletteIndex);
+      const nextSelectedColor = resolveNextSelectedColor(nextPalette, selectedColor);
+      let nextPixels = pixels;
+      let clearedPixelCount = 0;
+
+      if (clearUsedPixels) {
+        const targetColor = hexToRgba(colorToRemove);
+        const clearedPixels = clonePixels(pixels);
+
+        for (let index = 0; index < clearedPixels.length; index += 4) {
+          if (
+            clearedPixels[index] !== targetColor.r ||
+            clearedPixels[index + 1] !== targetColor.g ||
+            clearedPixels[index + 2] !== targetColor.b ||
+            clearedPixels[index + 3] !== targetColor.a
+          ) {
+            continue;
+          }
+
+          clearedPixels[index] = 0;
+          clearedPixels[index + 1] = 0;
+          clearedPixels[index + 2] = 0;
+          clearedPixels[index + 3] = 0;
+          clearedPixelCount += 1;
+        }
+
+        nextPixels = clearedPixels;
+      }
+
+      pushUndo();
+      setPalette(nextPalette);
+      setSelectedColor(nextSelectedColor);
+      if (clearUsedPixels) {
+        setPixels(nextPixels);
+      }
+      setPaletteRemovalRequest(null);
+      setHasUnsavedChanges(true);
+      setStatusText(
+        clearUsedPixels && clearedPixelCount > 0
+          ? `使用中の色をクリアして削除しました: ${colorToRemove.toUpperCase()} / ${clearedPixelCount.toLocaleString()}px`
+          : `パレットから削除しました: ${colorToRemove.toUpperCase()}`,
+        'success'
+      );
+    },
+    [palette, pixels, pushUndo, selectedColor, setStatusText]
   );
 
   const removeSelectedColorFromPalette = useCallback(() => {
@@ -2001,17 +2097,25 @@ export function App() {
       return;
     }
 
-    pushUndo();
-    setPalette((prev) => prev.filter((_entry, index) => index !== selectedPaletteIndex));
-    setHasUnsavedChanges(true);
-    setStatusText(`パレットから削除しました: ${selectedColor.toUpperCase()}`, 'success');
-  }, [palette, pushUndo, selectedColor, setStatusText]);
+    const usedPixelCount = paletteUsage.byColor[selectedColor]?.count ?? 0;
+    if (usedPixelCount > 0) {
+      setPaletteRemovalRequest({
+        color: selectedColor,
+        usedPixelCount
+      });
+      return;
+    }
+
+    removePaletteColor(selectedColor, false);
+  }, [palette, paletteUsage.byColor, removePaletteColor, selectedColor, setStatusText]);
 
   const applySelectedColorChange = useCallback(
-    ({ color: nextColor, caption: nextCaption }: PaletteEntry) => {
+    ({ color: nextColor, caption: nextCaption, locked: nextLocked }: PaletteEntry) => {
       const selectedPaletteIndex = palette.findIndex((entry) => entry.color === selectedColor);
-      const currentCaption = selectedPaletteIndex >= 0 ? palette[selectedPaletteIndex]?.caption ?? '' : '';
-      if (nextColor === selectedColor && nextCaption === currentCaption) {
+      const currentEntry = selectedPaletteIndex >= 0 ? palette[selectedPaletteIndex] ?? null : null;
+      const currentCaption = currentEntry?.caption ?? '';
+      const currentLocked = currentEntry?.locked ?? false;
+      if (nextColor === selectedColor && nextCaption === currentCaption && nextLocked === currentLocked) {
         return;
       }
 
@@ -2043,7 +2147,7 @@ export function App() {
       }
 
       const nextPalette = palette.map((entry, index) =>
-        index === selectedPaletteIndex ? { color: nextColor, caption: nextCaption } : entry
+        index === selectedPaletteIndex ? { color: nextColor, caption: nextCaption, locked: nextLocked } : entry
       );
 
       pushUndo();
@@ -2057,7 +2161,7 @@ export function App() {
           'success'
         );
       } else {
-        setStatusText(`パレットキャプションを更新しました: ${nextCaption || '(空)'}`, 'success');
+        setStatusText('パレット設定を更新しました', 'success');
       }
     },
     [palette, pixels, pushUndo, selectedColor, setStatusText]
@@ -2086,9 +2190,7 @@ export function App() {
         return;
       }
 
-      const nextSelectedColor = nextPalette.some((entry) => entry.color === selectedColor)
-        ? selectedColor
-        : nextPalette[0]?.color ?? selectedColor;
+      const nextSelectedColor = resolveNextSelectedColor(nextPalette, selectedColor);
       const importedCount =
         mode === 'append' ? Math.max(0, nextPalette.length - palette.length) : nextPalette.length;
       const sourceLabel = getFileNameFromPath(filePath) ?? 'palette.gpl';
@@ -2319,20 +2421,11 @@ export function App() {
 
       const imageData = ctx.getImageData(0, 0, targetCanvasSize, targetCanvasSize);
 
-      const detected = new Set<string>();
-      for (let i = 0; i < imageData.data.length; i += 4) {
-        const a = imageData.data[i + 3];
-        if (a === 0) {
-          continue;
-        }
-        detected.add(rgbaToHex8(imageData.data[i], imageData.data[i + 1], imageData.data[i + 2], a));
-        if (detected.size > 128) {
-          break;
-        }
-      }
+      const loadedPixels = new Uint8ClampedArray(imageData.data);
+      const usageFromLoadedPixels = collectPaletteUsageFromPixels(loadedPixels, targetCanvasSize);
 
       setCanvasSize(targetCanvasSize);
-      setPixels(new Uint8ClampedArray(imageData.data));
+      setPixels(loadedPixels);
       setSelection(null);
       setLastTilePreviewSelection(null);
       resetAnimationFrames();
@@ -2340,14 +2433,15 @@ export function App() {
       undoStackRef.current = [];
       setCurrentFilePath(result.filePath);
 
-      const normalizedPalette = result.metadata?.palette?.length
+      const metadataPalette = result.metadata?.palette?.length
         ? normalizePaletteEntries(result.metadata.palette)
         : [];
-      if (normalizedPalette.length > 0) {
-        setPalette(normalizedPalette);
-      } else if (detected.size > 0) {
-        setPalette(createPaletteEntries(Array.from(detected).slice(0, 64)));
-      }
+      const nextPalette = syncPaletteEntriesWithUsage(metadataPalette, usageFromLoadedPixels, {
+        removeUnusedColors: false,
+        addUsedColors: true
+      });
+      setPalette(nextPalette);
+      setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
 
       if (result.metadata?.lastTool) {
         setTool(result.metadata.lastTool);
@@ -2372,7 +2466,7 @@ export function App() {
       const message = error instanceof Error ? error.message : '不明なエラー';
       setStatusText(`読み込みに失敗しました: ${message}`, 'error');
     }
-  }, [clearFloatingPaste, confirmBeforeOpen, resetAnimationFrames]);
+  }, [clearFloatingPaste, confirmBeforeOpen, resetAnimationFrames, selectedColor]);
 
   useEffect(() => {
     const isEditableElement = (target: EventTarget | null): boolean => {
@@ -2508,9 +2602,11 @@ export function App() {
             setSelectedColor={setSelectedColor}
             applySelectedColorChange={applySelectedColorChange}
             palette={palette}
+            paletteUsageByColor={paletteUsage.byColor}
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
+            jumpToPaletteUsage={jumpToPaletteUsage}
             paletteColorModalRequest={paletteColorModalRequest}
           />
 
@@ -2750,6 +2846,28 @@ export function App() {
           onClose={closeKMeansQuantizeModal}
           onValidationError={(message) => setStatusText(message, 'warning')}
         />
+        <ConfirmModal
+          isOpen={paletteRemovalRequest !== null}
+          title="使用中の色を削除しますか？"
+          confirmLabel="クリアして削除"
+          onConfirm={() => {
+            if (!paletteRemovalRequest) {
+              return;
+            }
+            removePaletteColor(paletteRemovalRequest.color, true);
+          }}
+          onClose={() => setPaletteRemovalRequest(null)}
+        >
+          <p className="mb-2">
+            <span className="font-monospace">{paletteRemovalRequest?.color.toUpperCase() ?? '-'}</span>
+            {' '}はキャンバス上で{' '}
+            <strong>{paletteRemovalRequest?.usedPixelCount.toLocaleString() ?? '0'} px</strong>
+            {' '}使用されています。
+          </p>
+          <p className="mb-0 text-body-secondary">
+            この色を削除すると、該当するピクセルはすべて透明になります。続けてよければ削除してください。
+          </p>
+        </ConfirmModal>
       </div>
       <footer className="container-fluid app-footer font-monospace small border-top">
         <div className="app-footer-status">
