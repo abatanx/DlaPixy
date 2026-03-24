@@ -121,6 +121,12 @@ npm run dist
 - Zoom modal
   - `Cmd/Ctrl + R` opens a renderer modal for explicit zoom input
   - Modal range is `1..12`, with `Enter` to apply and `Esc` to cancel
+- Zoom behavior
+  - Zoom-in / zoom-out keeps the pixel under the current canvas cursor fixed whenever the pointer is on the canvas
+  - If the cursor is outside the canvas, zoom falls back to keeping the current viewport center fixed
+  - `Space + wheel` zooms in/out without disabling the existing `Space + drag` pan behavior
+  - `Space + wheel` uses accumulated wheel delta with a threshold so high-resolution inputs (Magic Mouse / trackpad) do not jump too many zoom steps
+  - While `Space` is held, native stage scrolling is suppressed so Magic Mouse wheel input does not scroll and zoom at the same time
 - 1x PNG preview panel
   - Large previews stay scrollable instead of shrinking to fit
 - Selection 3x3 tile preview panel (under 1x preview)
@@ -154,6 +160,7 @@ npm run dist
 - Zoom:
   - `+D` (`Equal`, `NumpadAdd`, `KeyD`, `BracketRight`, `Period`): Zoom in
   - `-A` (`Minus`, `NumpadSubtract`, `KeyA`, `BracketLeft`, `Comma`): Zoom out
+  - `Space + wheel up/down`: Zoom in/out around the current cursor position on canvas
 - Edit:
   - `Cmd/Ctrl + Z`: Undo
   - `Cmd/Ctrl + A`: Select entire canvas

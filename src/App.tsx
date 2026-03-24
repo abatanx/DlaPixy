@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -83,11 +84,20 @@ type PaletteRemovalRequest = {
   usedPixelCount: number;
 };
 
+type ZoomAnchor = {
+  canvasX: number;
+  canvasY: number;
+  viewportX: number;
+  viewportY: number;
+};
+
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 const DEFAULT_ANIMATION_PREVIEW_FPS = 6;
 const MIN_ANIMATION_PREVIEW_FPS = 1;
 const MAX_ANIMATION_PREVIEW_FPS = 24;
+const SPACE_WHEEL_ZOOM_THRESHOLD = 120;
+const SPACE_WHEEL_ZOOM_RESET_MS = 160;
 
 function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boolean {
   if (left.length !== right.length) {
@@ -186,6 +196,10 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
+  const canvasPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const pendingZoomAnchorRef = useRef<ZoomAnchor | null>(null);
+  const spaceWheelZoomAccumRef = useRef<number>(0);
+  const spaceWheelZoomResetTimerRef = useRef<number | null>(null);
   const animationFrameIdRef = useRef<number>(1);
 
   useEffect(() => {
@@ -453,6 +467,14 @@ export function App() {
     stage.scrollTop = panStateRef.current.startScrollTop - dy;
   }, []);
 
+  const resetSpaceWheelZoomAccumulation = useCallback(() => {
+    spaceWheelZoomAccumRef.current = 0;
+    if (spaceWheelZoomResetTimerRef.current !== null) {
+      window.clearTimeout(spaceWheelZoomResetTimerRef.current);
+      spaceWheelZoomResetTimerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     const isEditableElement = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) {
@@ -479,11 +501,13 @@ export function App() {
       }
       setIsSpacePressed(false);
       endPan();
+      resetSpaceWheelZoomAccumulation();
     };
 
     const onBlur = () => {
       setIsSpacePressed(false);
       endPan();
+      resetSpaceWheelZoomAccumulation();
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -495,7 +519,13 @@ export function App() {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [endPan]);
+  }, [endPan, resetSpaceWheelZoomAccumulation]);
+
+  useEffect(() => {
+    return () => {
+      resetSpaceWheelZoomAccumulation();
+    };
+  }, [resetSpaceWheelZoomAccumulation]);
 
   useEffect(() => {
     if (!isPanning) {
@@ -719,6 +749,135 @@ export function App() {
       });
     },
     [zoom]
+  );
+
+  const clampCanvasCoordinate = useCallback((value: number) => {
+    return Math.max(0, Math.min(value, canvasSize));
+  }, [canvasSize]);
+
+  const resolveZoomAnchorFromClientPoint = useCallback(
+    (clientX: number, clientY: number): ZoomAnchor | null => {
+      const stage = canvasStageRef.current;
+      const canvas = canvasRef.current;
+      if (!stage || !canvas) {
+        return null;
+      }
+
+      const canvasRect = canvas.getBoundingClientRect();
+      if (
+        clientX < canvasRect.left ||
+        clientX > canvasRect.right ||
+        clientY < canvasRect.top ||
+        clientY > canvasRect.bottom
+      ) {
+        return null;
+      }
+
+      const stageRect = stage.getBoundingClientRect();
+      return {
+        canvasX: clampCanvasCoordinate((clientX - canvasRect.left) / zoom),
+        canvasY: clampCanvasCoordinate((clientY - canvasRect.top) / zoom),
+        viewportX: clientX - stageRect.left,
+        viewportY: clientY - stageRect.top
+      };
+    },
+    [clampCanvasCoordinate, zoom]
+  );
+
+  const resolveViewportCenterZoomAnchor = useCallback((): ZoomAnchor | null => {
+    const stage = canvasStageRef.current;
+    const canvas = canvasRef.current;
+    if (!stage || !canvas) {
+      return null;
+    }
+
+    const viewportX = stage.clientWidth / 2;
+    const viewportY = stage.clientHeight / 2;
+    return {
+      canvasX: clampCanvasCoordinate((stage.scrollLeft + viewportX - canvas.offsetLeft) / zoom),
+      canvasY: clampCanvasCoordinate((stage.scrollTop + viewportY - canvas.offsetTop) / zoom),
+      viewportX,
+      viewportY
+    };
+  }, [clampCanvasCoordinate, zoom]);
+
+  const resolveZoomAnchor = useCallback(
+    (clientPoint?: { clientX: number; clientY: number } | null): ZoomAnchor | null => {
+      if (clientPoint) {
+        const hoveredAnchor = resolveZoomAnchorFromClientPoint(clientPoint.clientX, clientPoint.clientY);
+        if (hoveredAnchor) {
+          return hoveredAnchor;
+        }
+      }
+
+      if (canvasPointerRef.current) {
+        const pointerAnchor = resolveZoomAnchorFromClientPoint(
+          canvasPointerRef.current.clientX,
+          canvasPointerRef.current.clientY
+        );
+        if (pointerAnchor) {
+          return pointerAnchor;
+        }
+      }
+
+      return resolveViewportCenterZoomAnchor();
+    },
+    [resolveViewportCenterZoomAnchor, resolveZoomAnchorFromClientPoint]
+  );
+
+  const restoreZoomAnchor = useCallback(
+    (anchor: ZoomAnchor) => {
+      const stage = canvasStageRef.current;
+      const canvas = canvasRef.current;
+      if (!stage || !canvas) {
+        return;
+      }
+
+      const maxScrollLeft = Math.max(0, stage.scrollWidth - stage.clientWidth);
+      const maxScrollTop = Math.max(0, stage.scrollHeight - stage.clientHeight);
+      const nextScrollLeft = Math.max(
+        0,
+        Math.min(canvas.offsetLeft + anchor.canvasX * zoom - anchor.viewportX, maxScrollLeft)
+      );
+      const nextScrollTop = Math.max(
+        0,
+        Math.min(canvas.offsetTop + anchor.canvasY * zoom - anchor.viewportY, maxScrollTop)
+      );
+
+      stage.scrollLeft = nextScrollLeft;
+      stage.scrollTop = nextScrollTop;
+    },
+    [zoom]
+  );
+
+  useLayoutEffect(() => {
+    if (!pendingZoomAnchorRef.current) {
+      return;
+    }
+
+    restoreZoomAnchor(pendingZoomAnchorRef.current);
+    pendingZoomAnchorRef.current = null;
+  }, [restoreZoomAnchor, zoom]);
+
+  const setZoomWithAnchor = useCallback(
+    (nextZoom: number, clientPoint?: { clientX: number; clientY: number } | null) => {
+      const normalizedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.trunc(nextZoom)));
+      if (normalizedZoom !== zoom) {
+        pendingZoomAnchorRef.current = resolveZoomAnchor(clientPoint);
+      } else {
+        pendingZoomAnchorRef.current = null;
+      }
+      setZoom(normalizedZoom);
+      setStatusText(`表示倍率: ${normalizedZoom}x`, 'success');
+    },
+    [resolveZoomAnchor, setStatusText, zoom]
+  );
+
+  const stepZoom = useCallback(
+    (delta: number, clientPoint?: { clientX: number; clientY: number } | null) => {
+      setZoomWithAnchor(zoom + delta, clientPoint);
+    },
+    [setZoomWithAnchor, zoom]
   );
 
   const resolvePaletteMatch = useCallback(
@@ -1254,6 +1413,7 @@ export function App() {
 
   const onMouseMove = useCallback(
     (event: ReactMouseEvent<HTMLCanvasElement>) => {
+      canvasPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
       const hoveredCell = getCellFromEvent(event);
       updateHoveredPixelInfo(hoveredCell);
 
@@ -1357,9 +1517,74 @@ export function App() {
   }, [endPan, gridSpacing, resetDrawState, resolveSingleTileSelection, tool]);
 
   const onMouseLeaveCanvas = useCallback(() => {
+    canvasPointerRef.current = null;
     onMouseUp();
     setHoveredPixelInfo(null);
   }, [onMouseUp]);
+
+  useEffect(() => {
+    const stage = canvasStageRef.current;
+    if (!stage) {
+      return;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!isSpacePressed) {
+        return;
+      }
+
+      // Space + wheel is reserved for zoom, so suppress native stage scrolling.
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (isPanning) {
+        return;
+      }
+
+      if (event.deltaY === 0) {
+        return;
+      }
+
+      const normalizedDelta =
+        event.deltaMode === 1
+          ? event.deltaY * 40
+          : event.deltaMode === 2
+            ? event.deltaY * stage.clientHeight
+            : event.deltaY;
+
+      if (Math.abs(normalizedDelta) < 1) {
+        return;
+      }
+
+      spaceWheelZoomAccumRef.current += normalizedDelta;
+      if (spaceWheelZoomResetTimerRef.current !== null) {
+        window.clearTimeout(spaceWheelZoomResetTimerRef.current);
+      }
+      spaceWheelZoomResetTimerRef.current = window.setTimeout(() => {
+        resetSpaceWheelZoomAccumulation();
+      }, SPACE_WHEEL_ZOOM_RESET_MS);
+
+      const anchorPoint = {
+        clientX: event.clientX,
+        clientY: event.clientY
+      };
+
+      while (spaceWheelZoomAccumRef.current <= -SPACE_WHEEL_ZOOM_THRESHOLD) {
+        stepZoom(1, anchorPoint);
+        spaceWheelZoomAccumRef.current += SPACE_WHEEL_ZOOM_THRESHOLD;
+      }
+
+      while (spaceWheelZoomAccumRef.current >= SPACE_WHEEL_ZOOM_THRESHOLD) {
+        stepZoom(-1, anchorPoint);
+        spaceWheelZoomAccumRef.current -= SPACE_WHEEL_ZOOM_THRESHOLD;
+      }
+    };
+
+    stage.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      stage.removeEventListener('wheel', handleWheel);
+    };
+  }, [isPanning, isSpacePressed, resetSpaceWheelZoomAccumulation, stepZoom]);
 
   const onCanvasStageMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -1422,9 +1647,8 @@ export function App() {
   }, []);
 
   const applyZoom = useCallback((value: number) => {
-    setZoom(value);
-    setStatusText(`表示倍率: ${value}x`, 'success');
-  }, []);
+    setZoomWithAnchor(value);
+  }, [setZoomWithAnchor]);
 
   const openZoomModal = useCallback(() => {
     setIsZoomModalOpen(true);
@@ -1527,20 +1751,12 @@ export function App() {
   );
 
   const zoomIn = useCallback(() => {
-    setZoom((prev) => {
-      const next = Math.min(MAX_ZOOM, prev + 1);
-      setStatusText(`表示倍率: ${next}x`, 'success');
-      return next;
-    });
-  }, []);
+    stepZoom(1);
+  }, [stepZoom]);
 
   const zoomOut = useCallback(() => {
-    setZoom((prev) => {
-      const next = Math.max(MIN_ZOOM, prev - 1);
-      setStatusText(`表示倍率: ${next}x`, 'success');
-      return next;
-    });
-  }, []);
+    stepZoom(-1);
+  }, [stepZoom]);
 
   const clearCanvas = useCallback(() => {
     pushUndo();
