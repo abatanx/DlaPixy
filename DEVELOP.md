@@ -54,6 +54,15 @@ npm run dist
 - Initial palette uses the 216 Web Safe Colors
 - Palette entries can store a short caption (up to 4 characters), shown under each swatch
   - Double-clicking an existing palette swatch selects it and opens the color edit modal
+- Palette entries now also carry a `locked` flag
+  - Lock / unlock is controlled from the palette color modal
+  - GPL import defaults imported entries to unlocked
+- Swatch panel usage overlay
+  - While `Ctrl/Cmd` is held, each swatch shows current canvas usage count as an overlaid summarized label
+  - Clicking a swatch during that overlay mode scrolls the canvas to the first matching pixel (`for y` then `for x`) and sets a `1x1` selection there
+- Palette sync behavior is now driven by shared helper logic
+  - K-Means sync uses reusable `removeUnusedColors` / `addUsedColors` options
+  - PNG load merges metadata palette entries with actually used canvas colors
 - GPL palette import/export
   - Native `Palette` menu includes `Import (GPL / Replace All)`, `Import (GPL / Append)`, `Export (Standard GPL)`, and `Export (Aseprite RGBA GPL)`
   - Imports `.gpl` via Electron native dialog and applies palette as replace/append
@@ -167,7 +176,7 @@ Current metadata shape:
   version: number,
   canvasSize?: number,
   gridSpacing?: number,
-  palette: Array<{ color: string, caption: string }>,
+  palette: Array<{ color: string, caption: string, locked: boolean }>,
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
 }
 ```
@@ -205,6 +214,9 @@ Current metadata shape:
   - Editor constants (grid/canvas/zoom limits, default palette)
 - `src/editor/kmeans-quantize.ts`
   - Selection extraction + Lab-distance K-Means quantization helpers
+- `src/editor/palette-sync.ts`
+  - Shared palette usage analysis + swatch synchronization helpers
+  - Owns summarized usage labels and first-match jump target selection data
 - `src/editor/preview.ts`
   - Renderer preview helpers for region/block PNG Data URLs
 - `src/editor/types.ts`
@@ -250,9 +262,15 @@ Current metadata shape:
 - Palette color selection is edited in a renderer modal instead of the native browser color picker.
 - The palette color modal preview shows both the original color and the current editing color side by side, with a nearby `Delta HSV` diff.
 - Palette entries are stored as `{ color, caption }[]`.
+- Palette entries are now stored as `{ color, caption, locked }[]`.
 - Palette caption max length is managed by `PALETTE_CAPTION_MAX_LENGTH` in `src/editor/constants.ts`.
+- `src/editor/palette-sync.ts` is the canonical home for:
+  - per-color pixel usage scanning
+  - swatch sync options (`removeUnusedColors`, `addUsedColors`)
+  - summarized usage labels for the palette overlay
 - Selected drawing color and palette entries can carry alpha (`#RRGGBBAA`), while legacy `#RRGGBB` values are normalized on load.
 - K-Means quantization currently uses RGB->Lab distance for clustering and keeps each pixel's original alpha unchanged.
+- PNG load now merges metadata palette entries with used colors detected from the loaded canvas pixels.
 - GPL import accepts standard RGB lines and Aseprite-style `Channels: RGBA` lines.
 - GPL export is split into explicit menu actions:
   - `Export (Standard GPL)`: 3-channel GPL only; rejects palettes that contain alpha
@@ -297,3 +315,45 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/3
 - #33 `fix: Edited image disappears when changing canvas size`
   - https://github.com/abatanx/DlaPixy/issues/33
+- #42 `refactor: スウォッチ整理処理を共通化する`
+  - https://github.com/abatanx/DlaPixy/issues/42
+
+## 13. Issue #42 Draft Notes (2026-03-24)
+- Goal:
+  - Extract palette/swatch sync logic from `src/App.tsx` so it can be reused after K-Means, PNG load, and future image transforms.
+- Current implementation anchors:
+  - `collectUsedColorsFromPixels(pixels)` in `src/App.tsx` collects unique non-transparent `#RRGGBBAA` colors in first-seen order.
+  - `buildPaletteFromCanvasPixels(pixels, currentPalette)` in `src/App.tsx` keeps used existing colors, appends newly used colors, preserves captions for surviving entries, and gives new entries empty captions.
+  - K-Means apply flow already uses `buildPaletteFromCanvasPixels(...)`.
+  - PNG load currently does **not** use the same sync path:
+    - if metadata palette exists, it is loaded as-is
+    - otherwise detected colors (up to 64) are converted with `createPaletteEntries(...)`
+- Drafted behavior to preserve during refactor:
+  - Transparent pixels are ignored when building/syncing palette entries.
+  - On PNG load, if metadata palette exists, merge the metadata palette with the actual palette derived from canvas pixels.
+  - Palette swatches should gain a lock flag.
+  - Lock / unlock is controlled from the palette color modal.
+  - Each swatch should also expose how many canvas pixels currently use that color.
+  - The swatch panel should show that usage count only while `Ctrl/Cmd` is held, as a text overlay on the swatch.
+  - Clicking a swatch while the usage-count overlay is visible should auto-move the canvas viewport to the center of a pixel using that swatch color and set a `1x1` rectangular selection there.
+  - If multiple pixels use the same swatch color, the jump target should be the first pixel found by scanning in `for y in 0..` then `for x in 0..` order.
+  - The usage count display should be summarized as:
+    - `0..999`: show the exact number as-is
+    - `1000+`: show an approximate integer value prefixed with `~` and suffixed with `K` / `M` / `G` / `T`
+    - Do not use decimal points in summarized labels
+    - Examples: `0`, `42`, `999`, `~1K`, `~12K`, `~3M`
+  - Surviving existing colors keep their captions and lock state.
+  - Newly added colors start with empty caption `''` and unlocked state.
+  - Palette order follows current behavior:
+    - keep surviving existing entries in their current order
+    - append newly detected used colors in canvas first-seen order
+  - Whether unused colors are removed and whether newly used colors are added should both follow caller options.
+  - Whether unused colors are removed should be configurable by the caller (`remove` / `keep`).
+  - When the caller chooses to remove unused colors, a swatch is removed only when both conditions are met:
+    - the swatch is not locked
+    - the swatch has no caption
+  - When the caller chooses not to remove unused colors, unused swatches remain regardless of lock/caption state.
+  - Backward compatibility for metadata is not required at this time.
+  - Selected color fallback should stay consistent with current K-Means path:
+    - keep current selection if still present
+    - otherwise fall back to first palette color when available

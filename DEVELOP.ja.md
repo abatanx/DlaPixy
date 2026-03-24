@@ -54,6 +54,15 @@ npm run dist
 - 初期パレットは Web Safe Color 216 色を使う
 - パレット項目は短いキャプション（最大4文字）を持てて、各スウォッチの下に小さく表示する
   - 既存スウォッチをダブルクリックすると、その色を選択しつつ色編集モーダルを開く
+- パレット項目は `locked` 状態も持てる
+  - ロック / ロック解除はパレット色モーダルから切り替える
+  - GPL import で入る色は未ロックで扱う
+- スウォッチパネルの使用数オーバーレイ
+  - `Ctrl/Cmd` 押下中だけ、各スウォッチ上に現在の使用ピクセル数を要約ラベルで重ねて表示する
+  - オーバーレイ表示中のスウォッチクリックで、最初に見つかった同色ピクセル（`for y` → `for x` 順）へスクロールし、`1x1` 選択にする
+- パレット同期は共通 helper ベースに整理した
+  - K-Means 後は `removeUnusedColors` / `addUsedColors` オプション付き helper を使う
+  - PNG 読込時は metadata の palette と実使用色を結合する
 - GPL パレットのインポート / エクスポート
   - ネイティブ `Palette` メニューに `インポート（GPL/すべて置換）` / `インポート（GPL/追加）` / `エクスポート（標準 GPL）` / `エクスポート（Aseprite向け RGBA GPL）` を追加
   - `.gpl` を Electron の native dialog 経由で読み込み、置換または追加で適用できる
@@ -167,7 +176,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   version: number,
   canvasSize?: number,
   gridSpacing?: number,
-  palette: Array<{ color: string, caption: string }>,
+  palette: Array<{ color: string, caption: string, locked: boolean }>,
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
 }
 ```
@@ -205,6 +214,9 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - グリッド/キャンバス/ズーム制約、デフォルトパレットなど定数
 - `src/editor/kmeans-quantize.ts`
   - 選択範囲抽出と Lab 距離ベース K-Means 減色 helper
+- `src/editor/palette-sync.ts`
+  - パレット使用数解析とスウォッチ同期の共通 helper
+  - 使用数ラベル生成と、同色ピクセルへのジャンプ先情報を持つ
 - `src/editor/preview.ts`
   - 領域/ブロックの PNG Data URL プレビュー helper
 - `src/editor/types.ts`
@@ -250,9 +262,15 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。
 - パレット色モーダルのプレビューは、変更前の色と現在編集中の色を横並びで表示し、近くに `Delta HSV` 差分を出す。
 - パレット項目は `{ color, caption }[]` で保持する。
+- パレット項目は `{ color, caption, locked }[]` で保持する。
 - パレットキャプションの最大文字数は `src/editor/constants.ts` の `PALETTE_CAPTION_MAX_LENGTH` で管理する。
+- `src/editor/palette-sync.ts` を、以下の共通責務の置き場にした。
+  - 色ごとの使用ピクセル数集計
+  - スウォッチ同期オプション（`removeUnusedColors`, `addUsedColors`）
+  - 使用数ラベルの要約表示
 - 描画色とパレット色は alpha 付き `#RRGGBBAA` も扱え、従来の `#RRGGBB` は読込時に正規化する。
 - K-Means 減色は現状 RGB->Lab 距離でクラスタリングし、各ピクセルの alpha は変更しない。
+- PNG読込時は metadata の palette と、キャンバス使用色から得たパレットを結合する。
 - GPL import は標準 RGB 行と Aseprite 互換の `Channels: RGBA` を受け付ける。
 - GPL export はメニューで形式を明示選択する。
   - `エクスポート（標準 GPL）`: 3ch GPL のみ。alpha を含むパレットは拒否する
@@ -301,3 +319,46 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - https://github.com/abatanx/DlaPixy/issues/3
 - #33 `fix: キャンバスサイズ変更で編集中の画像が消える`
   - https://github.com/abatanx/DlaPixy/issues/33
+- #42 `refactor: スウォッチ整理処理を共通化する`
+  - https://github.com/abatanx/DlaPixy/issues/42
+
+## 13. Issue #42 仕様メモ（2026-03-24）
+- 目的:
+  - `src/App.tsx` にあるパレット/スウォッチ同期処理を切り出して、K-Means後・PNG読込後・今後の画像変換処理から再利用できる形にする。
+- 現状の実装起点:
+  - `src/App.tsx` の `collectUsedColorsFromPixels(pixels)` は、非透明ピクセルだけを対象に、出現順のユニークな `#RRGGBBAA` 色一覧を集めている。
+  - `src/App.tsx` の `buildPaletteFromCanvasPixels(pixels, currentPalette)` は、使用中の既存色を残し、新しく使われた色を末尾追加し、残存色の caption を維持し、新規色の caption は空文字で作る。
+  - K-Means 適用後はすでに `buildPaletteFromCanvasPixels(...)` を使っている。
+  - PNG読込後はまだ同じ同期経路を使っていない。
+    - メタ情報の palette があればそのまま採用
+    - なければ検出色（最大64色）を `createPaletteEntries(...)` で初期化
+- リファクタ時に維持したい挙動案:
+  - 透明ピクセルはパレット同期の対象外にする。
+  - PNG読込時に metadata の palette があれば、実際のキャンバス使用色から得たパレットと結合する。
+  - スウォッチにロック状態を持てるようにする。
+  - ロック / ロック解除はパレット色モーダルから行えるようにする。
+  - 各スウォッチ色について、現在キャンバス上で何ピクセル使われているかを扱えるようにする。
+  - スウォッチパネルでは `Ctrl/Cmd` 押下中だけ、その使用ピクセル数をスウォッチ上へ文字オーバーレイ表示できるようにする。
+  - 使用ピクセル数オーバーレイが表示されている状態でスウォッチをクリックしたときは、その色を使っているピクセル位置の中心へキャンバス表示を自動移動し、`1x1` の矩形選択状態にする。
+  - 同じ色のピクセルが複数ある場合、ジャンプ先は `for y in 0..` の外側ループ、`for x in 0..` の内側ループで最初に見つかったピクセルとする。
+  - 使用数ラベルの表示は次の形式にする。
+    - `0..999`: 実数値をそのまま表示
+    - `1000` 以上: `~` を付けた整数の概数 + `K / M / G / T`
+    - 小数点は使わない
+    - 例: `0`, `42`, `999`, `~1K`, `~12K`, `~3M`
+  - 残る既存色は caption とロック状態を維持する。
+  - 新規追加色の caption 初期値は `''`、ロック初期値は `false` にする。
+  - パレット順序は現状挙動を維持する。
+    - 残る既存色は現在順を維持
+    - 新規使用色はキャンバス上の初出順で末尾追加
+  - 未使用色を外すかどうかと、新規使用色を追加するかどうかは、どちらも呼び出し側オプションに従う。
+  - 未使用色を外すかどうかは、呼び出し側が `外す / 外さない` を選べるようにする。
+  - 呼び出し側が「外す」を選んだ場合だけ、未使用色を外す判定を行う。
+    - その場合、未使用色を外す条件は次の両方を満たす場合だけにする。
+      - ロックされていない
+      - caption が付いていない
+  - 呼び出し側が「外さない」を選んだ場合は、未使用色はロック状態や caption に関係なく残す。
+  - メタ情報の後方互換性は、現時点では不要とする。
+  - `selectedColor` のフォールバックは現状の K-Means 後挙動に合わせる。
+    - まだ存在するなら現在色を維持
+    - なくなったら先頭パレット色へフォールバック

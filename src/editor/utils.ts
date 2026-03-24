@@ -22,7 +22,7 @@ export function rgbaToHex8(r: number, g: number, b: number, a: number): string {
 
 // 色配列から空キャプション付きのパレット配列を作る。
 export function createPaletteEntries(colors: string[]): PaletteEntry[] {
-  return normalizePaletteEntries(colors.map((color) => ({ color, caption: '' })));
+  return normalizePaletteEntries(colors.map((color) => ({ color, caption: '', locked: false })));
 }
 
 // パレット配列をディープコピーしてイミュータブル更新に使う。

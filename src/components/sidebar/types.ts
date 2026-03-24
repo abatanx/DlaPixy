@@ -1,4 +1,5 @@
 import type { AnimationFrame, PaletteEntry, Selection } from '../../editor/types';
+import type { PaletteUsageEntry } from '../../editor/palette-sync';
 
 export type PaletteColorModalRequest = {
   mode: 'edit' | 'create';
@@ -29,9 +30,11 @@ export type EditorSidebarProps = {
   setSelectedColor: (value: string) => void;
   applySelectedColorChange: (value: PaletteEntry) => void;
   palette: PaletteEntry[];
+  paletteUsageByColor: Record<string, PaletteUsageEntry>;
   setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
   addPaletteColor: (value: PaletteEntry) => void;
   removeSelectedColorFromPalette: () => void;
+  jumpToPaletteUsage: (color: string) => boolean;
   paletteColorModalRequest: PaletteColorModalRequest;
 };
 
@@ -64,8 +67,10 @@ export type SidebarPaletteSectionProps = Pick<
   | 'setSelectedColor'
   | 'applySelectedColorChange'
   | 'palette'
+  | 'paletteUsageByColor'
   | 'setHoveredPaletteColor'
   | 'addPaletteColor'
   | 'removeSelectedColorFromPalette'
+  | 'jumpToPaletteUsage'
   | 'paletteColorModalRequest'
 >;

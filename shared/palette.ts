@@ -1,6 +1,7 @@
 export type PaletteEntry = {
   color: string;
   caption: string;
+  locked: boolean;
 };
 
 export const PALETTE_CAPTION_MAX_LENGTH = 4;
@@ -36,7 +37,8 @@ export function normalizePaletteEntries(entries: PaletteEntry[]): PaletteEntry[]
     seenColors.add(color);
     normalizedEntries.push({
       color,
-      caption: typeof entry.caption === 'string' ? normalizePaletteCaption(entry.caption) : ''
+      caption: typeof entry.caption === 'string' ? normalizePaletteCaption(entry.caption) : '',
+      locked: entry?.locked === true
     });
   }
 

@@ -123,6 +123,7 @@ export function PaletteColorModal({
   const [pendingHexRgbInput, setPendingHexRgbInput] = useState<string>(initialHexParts.rgb);
   const [pendingAlphaHexInput, setPendingAlphaHexInput] = useState<string>(initialHexParts.alpha);
   const [pendingCaptionInput, setPendingCaptionInput] = useState<string>(normalizePaletteCaption(selectedPalette.caption));
+  const [pendingLocked, setPendingLocked] = useState<boolean>(selectedPalette.locked);
   const [pendingRgba, setPendingRgba] = useState<RgbaChannels>(() => hexToRgba(selectedPalette.color));
   const [pendingHsva, setPendingHsva] = useState<HsvaChannels>(() => {
     const rgba = hexToRgba(selectedPalette.color);
@@ -167,7 +168,8 @@ export function PaletteColorModal({
   const syncPendingState = useCallback(() => {
     syncFromRgba(hexToRgba(selectedPalette.color));
     setPendingCaptionInput(normalizePaletteCaption(selectedPalette.caption));
-  }, [selectedPalette.caption, selectedPalette.color, syncFromRgba]);
+    setPendingLocked(selectedPalette.locked);
+  }, [selectedPalette.caption, selectedPalette.color, selectedPalette.locked, syncFromRgba]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -188,6 +190,7 @@ export function PaletteColorModal({
 
   const modalRef = useBootstrapModal({
     isOpen,
+    keyboard: true,
     onShown: handleShown,
     onHidden: handleHidden
   });
@@ -317,11 +320,12 @@ export function PaletteColorModal({
       }
       onApply({
         color: nextColor,
-        caption: normalizePaletteCaption(pendingCaptionInput)
+        caption: normalizePaletteCaption(pendingCaptionInput),
+        locked: pendingLocked
       });
       onClose();
     },
-    [hasDuplicatePaletteColor, normalizedPendingAlpha, normalizedPendingColor, normalizedPendingRgb, onApply, onClose, pendingCaptionInput]
+    [hasDuplicatePaletteColor, normalizedPendingAlpha, normalizedPendingColor, normalizedPendingRgb, onApply, onClose, pendingCaptionInput, pendingLocked]
   );
 
   return (
@@ -361,6 +365,21 @@ export function PaletteColorModal({
                     placeholder={`${PALETTE_CAPTION_MAX_LENGTH}文字まで`}
                     maxLength={PALETTE_CAPTION_MAX_LENGTH}
                   />
+                </div>
+                <div className="col-12">
+                  <div className="form-check form-switch palette-color-modal-lock-switch">
+                    <input
+                      id="palette-color-lock-input"
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={pendingLocked}
+                      onChange={(event) => setPendingLocked(event.target.checked)}
+                    />
+                    <label htmlFor="palette-color-lock-input" className="form-check-label d-inline-flex align-items-center gap-2">
+                      <i className={`fa-solid ${pendingLocked ? 'fa-lock' : 'fa-lock-open'}`} aria-hidden="true" />
+                      <span>{pendingLocked ? 'ロック中' : 'ロック解除中'}</span>
+                    </label>
+                  </div>
                 </div>
               </div>
               <div className="palette-color-modal-preview mb-4">
