@@ -116,6 +116,9 @@ npm run dist
   - The canvas size modal supports `Esc` to cancel
   - `Canvas -> Change Grid Spacing...` opens modal dialog in renderer
   - `Cmd/Ctrl + G` also opens the grid spacing modal
+  - `Canvas -> 透過バックグラウンド` switches the transparent preview background mode
+  - Modes: `White Check`, `Black Check`, `White`, `Black`, `Magenta`
+  - The chosen mode is saved as an app-wide preference and shared by the editor canvas, left sidebar previews, and renderer modal previews
   - Sidebar no longer shows persistent canvas size / grid spacing inputs
 - Footer status row
   - `Canvas`, `Grid`, `Zoom`, and `Current File` status are shown in the bottom footer instead of the sidebar
@@ -218,6 +221,8 @@ Current metadata shape:
 - `src/editor/preview.ts`
   - Generates the 1x / tile preview images
   - Normalizes Tile Preview layers to the first registered size, composites them, then repeats the result in `3x3`
+- `src/editor/transparent-background.ts`
+  - Maps transparent background mode to reusable renderer surface classes
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - Palette section for color selector trigger and palette grid; memoized to reduce rerenders during canvas edits
   - Palette grid is compact + independently scrollable so large palettes (hundreds of colors) stay usable
@@ -258,6 +263,8 @@ Current metadata shape:
   - Cross-runtime palette type + normalization helpers
 - `shared/palette-gpl.ts`
   - GPL parser/serializer shared by Electron main process and renderer expectations
+- `shared/transparent-background.ts`
+  - Shared transparent background mode/label definitions for Electron menu + renderer
 - `src/styles.css`
   - Layout, non-page-scroll, canvas stage, toolbar styling
 - `src/main.tsx`
@@ -288,6 +295,9 @@ Current metadata shape:
   - shrink: crop pixels outside the new bounds
   - selection / floating paste are cleared on resize
 - Grid spacing change is also opened from native `Canvas` menu; values are allowed in range `0..canvasSize` (`0` = none).
+- Transparent background mode is also selected from native `Canvas` menu, persisted in app preferences, and mirrored into renderer state through IPC.
+- Transparent background mode applies to the main editor canvas, sidebar `Preview / Tile / Animation Preview`, and renderer modal previews.
+- Transparent background mode is not stored in PNG metadata.
 - Palette import/export is opened from native `Palette` menu and uses Electron main-process dialogs.
 - Selection quantization is triggered from native `Palette -> K-Meansで減色する...`, but the input UI lives in a renderer modal.
 - Palette color selection is edited in a renderer modal instead of the native browser color picker.

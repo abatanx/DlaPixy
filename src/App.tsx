@@ -20,6 +20,11 @@ import type { PaletteColorModalRequest } from './components/sidebar/types';
 import type { MenuAction as FileMenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import {
+  DEFAULT_TRANSPARENT_BACKGROUND_MODE,
+  isTransparentBackgroundMode,
+  type TransparentBackgroundMode
+} from '../shared/transparent-background';
+import {
   DEFAULT_CANVAS_SIZE,
   DEFAULT_GRID_SPACING,
   DEFAULT_PALETTE,
@@ -57,6 +62,7 @@ import {
   createTilePreviewLayerDataUrl,
   createTilePreviewLayerThumbnailDataUrl
 } from './editor/preview';
+import { getTransparentBackgroundSurfaceClassName } from './editor/transparent-background';
 import {
   applySelectionPixelBlock,
   extractSelectionPixelBlock,
@@ -181,6 +187,9 @@ export function App() {
   const [canvasSize, setCanvasSize] = useState<number>(DEFAULT_CANVAS_SIZE);
   const [gridSpacing, setGridSpacing] = useState<number>(DEFAULT_GRID_SPACING);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
+  const [transparentBackgroundMode, setTransparentBackgroundMode] = useState<TransparentBackgroundMode>(
+    DEFAULT_TRANSPARENT_BACKGROUND_MODE
+  );
   const [pixels, setPixels] = useState<Uint8ClampedArray>(() => createEmptyPixels(DEFAULT_CANVAS_SIZE));
   const [palette, setPalette] = useState<PaletteEntry[]>(INITIAL_PALETTE);
   const [selectedColor, setSelectedColor] = useState<string>(INITIAL_SELECTED_COLOR);
@@ -231,10 +240,26 @@ export function App() {
   const spaceWheelZoomResetTimerRef = useRef<number | null>(null);
   const tilePreviewLayerIdRef = useRef<number>(1);
   const animationFrameIdRef = useRef<number>(1);
+  const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
 
   useEffect(() => {
     document.title = `DlaPixy${hasUnsavedChanges ? ' *' : ''}`;
   }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void window.pixelApi.getPreferences().then((nextPreferences) => {
+      if (cancelled || !isTransparentBackgroundMode(nextPreferences.transparentBackgroundMode)) {
+        return;
+      }
+      setTransparentBackgroundMode(nextPreferences.transparentBackgroundMode);
+    }).catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setSelectionChangeSequence((prev) => prev + 1);
@@ -3031,6 +3056,9 @@ export function App() {
         case 'grid-spacing':
           openGridSpacingModal();
           break;
+        case 'transparent-background':
+          setTransparentBackgroundMode(action.mode);
+          break;
         case 'palette-kmeans-quantize':
           openKMeansQuantizeModal();
           break;
@@ -3067,6 +3095,7 @@ export function App() {
         <div className="row g-3 app-main-row">
           <EditorSidebar
             canvasSize={canvasSize}
+            transparentBackgroundMode={transparentBackgroundMode}
             previewDataUrl={previewDataUrl}
             tilePreviewDataUrl={tilePreviewDataUrl}
             tilePreviewSelection={tilePreviewSelection}
@@ -3116,7 +3145,7 @@ export function App() {
                   ref={canvasRef}
                   width={displaySize}
                   height={displaySize}
-                  className={`pixel-canvas ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
+                  className={`pixel-canvas ${transparentBackgroundClassName} ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
                   onMouseDown={onMouseDown}
                   onMouseMove={onMouseMove}
                   onMouseUp={onMouseUp}
@@ -3336,6 +3365,7 @@ export function App() {
         />
         <KMeansQuantizeModal
           isOpen={kMeansQuantizeRequest !== null}
+          transparentBackgroundMode={transparentBackgroundMode}
           selection={kMeansQuantizeRequest?.selection ?? null}
           source={kMeansQuantizeRequest?.source ?? null}
           initialColorCount={kMeansQuantizeRequest?.initialColorCount ?? 1}
@@ -3345,6 +3375,7 @@ export function App() {
         />
         <SelectionRotateModal
           isOpen={selectionRotateRequest !== null}
+          transparentBackgroundMode={transparentBackgroundMode}
           selection={selectionRotateRequest?.selection ?? null}
           source={selectionRotateRequest?.source ?? null}
           onApply={applySelectionRotate}

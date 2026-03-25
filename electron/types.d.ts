@@ -1,6 +1,7 @@
 import type { MenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
+import type { TransparentBackgroundMode } from '../shared/transparent-background';
 export {};
 
 declare global {
@@ -49,6 +50,9 @@ declare global {
         filePath?: string;
         error?: 'serialize-failed' | 'write-failed';
         message?: string;
+      }>;
+      getPreferences: () => Promise<{
+        transparentBackgroundMode: TransparentBackgroundMode;
       }>;
       copyImageDataUrl: (dataUrl: string) => Promise<{ ok: boolean }>;
       confirmOpenWithUnsaved: () => Promise<{ action: 'save-open' | 'discard-open' | 'cancel' }>;

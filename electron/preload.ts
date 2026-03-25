@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { MenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
+import type { TransparentBackgroundMode } from '../shared/transparent-background';
 
 type EditorMeta = {
   version: number;
@@ -24,6 +25,7 @@ contextBridge.exposeInMainWorld('pixelApi', {
     paletteName?: string;
   }) =>
     ipcRenderer.invoke('palette:export-gpl', args),
+  getPreferences: () => ipcRenderer.invoke('preferences:get') as Promise<{ transparentBackgroundMode: TransparentBackgroundMode }>,
   copyImageDataUrl: (dataUrl: string) => ipcRenderer.invoke('clipboard:writeImageDataUrl', dataUrl),
   confirmOpenWithUnsaved: () => ipcRenderer.invoke('dialog:confirmOpenWithUnsaved'),
   onMenuAction: (handler: (action: MenuAction) => void) => {

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createImagePreviewDataUrl } from '../../editor/preview';
+import { getTransparentBackgroundSurfaceClassName } from '../../editor/transparent-background';
 import {
   quantizeSelectionWithKMeans,
   type QuantizeSelectionResult,
   type QuantizeSelectionSource
 } from '../../editor/kmeans-quantize';
 import { useBootstrapModal } from './useBootstrapModal';
+import type { TransparentBackgroundMode } from '../../../shared/transparent-background';
 
 const MIN_PREVIEW_ZOOM = 1;
 const MAX_PREVIEW_ZOOM = 48;
@@ -24,6 +26,7 @@ function clampPreviewZoom(value: number): number {
 
 type KMeansQuantizeModalProps = {
   isOpen: boolean;
+  transparentBackgroundMode: TransparentBackgroundMode;
   selection: { x: number; y: number; w: number; h: number } | null;
   source: QuantizeSelectionSource | null;
   initialColorCount: number;
@@ -34,6 +37,7 @@ type KMeansQuantizeModalProps = {
 
 export function KMeansQuantizeModal({
   isOpen,
+  transparentBackgroundMode,
   selection,
   source,
   initialColorCount,
@@ -103,6 +107,7 @@ export function KMeansQuantizeModal({
 
   const zoomedWidth = source ? source.width * previewZoom : 0;
   const zoomedHeight = source ? source.height * previewZoom : 0;
+  const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
 
   const getScrollRatio = useCallback((element: HTMLDivElement | null) => {
     if (!element) {
@@ -289,7 +294,7 @@ export function KMeansQuantizeModal({
                       <h3 className="fs-6 mb-2">元画像</h3>
                       <div
                         ref={sourceSurfaceRef}
-                        className="kmeans-quantize-preview-surface"
+                        className={`kmeans-quantize-preview-surface ${transparentBackgroundClassName}`}
                         onScroll={() => syncPreviewScroll('source')}
                       >
                         {sourcePreviewDataUrl ? (
@@ -309,7 +314,7 @@ export function KMeansQuantizeModal({
                       <h3 className="fs-6 mb-2">減色後</h3>
                       <div
                         ref={resultSurfaceRef}
-                        className="kmeans-quantize-preview-surface"
+                        className={`kmeans-quantize-preview-surface ${transparentBackgroundClassName}`}
                         onScroll={() => syncPreviewScroll('result')}
                       >
                         {resultPreviewDataUrl ? (

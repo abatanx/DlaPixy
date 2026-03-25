@@ -1,5 +1,6 @@
 import type { AnimationFrame, PaletteEntry, Selection, TilePreviewLayer } from '../../editor/types';
 import type { PaletteUsageEntry } from '../../editor/palette-sync';
+import type { TransparentBackgroundMode } from '../../../shared/transparent-background';
 
 export type PaletteColorModalRequest = {
   mode: 'edit' | 'create';
@@ -12,6 +13,7 @@ export type TilePreviewLayerSummary = Pick<TilePreviewLayer, 'id' | 'width' | 'h
 
 export type EditorSidebarProps = {
   canvasSize: number;
+  transparentBackgroundMode: TransparentBackgroundMode;
   previewDataUrl: string;
   tilePreviewDataUrl: string;
   tilePreviewSelection: Selection;
@@ -53,6 +55,7 @@ export type EditorSidebarProps = {
 export type SidebarPreviewSectionProps = Pick<
   EditorSidebarProps,
   | 'canvasSize'
+  | 'transparentBackgroundMode'
   | 'previewDataUrl'
   | 'tilePreviewDataUrl'
   | 'tilePreviewSelection'
@@ -83,6 +86,7 @@ export type SidebarPreviewSectionProps = Pick<
 
 export type SidebarPaletteSectionProps = Pick<
   EditorSidebarProps,
+  | 'transparentBackgroundMode'
   | 'selectedColor'
   | 'setSelectedColor'
   | 'applySelectedColorChange'

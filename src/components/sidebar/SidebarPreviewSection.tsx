@@ -1,8 +1,10 @@
 import { memo, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
+import { getTransparentBackgroundSurfaceClassName } from '../../editor/transparent-background';
 import type { SidebarPreviewSectionProps } from './types';
 
 export const SidebarPreviewSection = memo(function SidebarPreviewSection({
   canvasSize,
+  transparentBackgroundMode,
   previewDataUrl,
   tilePreviewDataUrl,
   tilePreviewSelection,
@@ -35,6 +37,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
   const previousFrameCountRef = useRef<number>(animationFrames.length);
   const previousTilePreviewFocusSequenceRef = useRef<number>(tilePreviewFocusSequence);
   const displayedTilePreviewLayers = [...tilePreviewLayers].reverse();
+  const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
   const canPlayAnimation = animationFrames.length >= 2;
   const canAddAnimationFrame = selection !== null;
   const canClearTilePreviewLayers = tilePreviewLayerCount > 0;
@@ -145,7 +148,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
           className={`tab-pane fade ${activeTab === 'preview' ? 'show active' : ''}`}
           role="tabpanel"
         >
-          <div className="preview-wrap preview-scroll-wrap">
+          <div className={`preview-wrap preview-scroll-wrap ${transparentBackgroundClassName}`}>
             {previewDataUrl ? (
               <div className="preview-scroll-content">
                 <img
@@ -164,7 +167,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
           className={`tab-pane fade ${activeTab === 'tiling' ? 'show active' : ''}`}
           role="tabpanel"
         >
-          <div className="preview-wrap tile-preview-wrap">
+          <div className={`preview-wrap tile-preview-wrap ${transparentBackgroundClassName}`}>
             {tilePreviewDataUrl ? (
               <img
                 src={tilePreviewDataUrl}
@@ -226,7 +229,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
                     onDrop={(event) => onTilePreviewLayerDrop(event, layer.id)}
                   >
                     <div className="tile-preview-layer-main">
-                      <span className="tile-preview-layer-thumb" aria-hidden="true">
+                      <span className={`tile-preview-layer-thumb ${transparentBackgroundClassName}`} aria-hidden="true">
                         <img src={layer.previewDataUrl} alt="" />
                       </span>
                       <span className="tile-preview-layer-number">{actualIndex + 1}</span>
@@ -257,7 +260,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
           className={`tab-pane fade ${activeTab === 'animation' ? 'show active' : ''}`}
           role="tabpanel"
         >
-          <div className="preview-wrap animation-preview-wrap">
+          <div className={`preview-wrap animation-preview-wrap ${transparentBackgroundClassName}`}>
             {animationPreviewDataUrl ? (
               <img
                 src={animationPreviewDataUrl}

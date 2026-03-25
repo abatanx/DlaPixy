@@ -2,16 +2,23 @@ import { Menu } from 'electron';
 import type { MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import type { MenuAction } from '../shared/ipc';
+import {
+  TRANSPARENT_BACKGROUND_LABELS,
+  TRANSPARENT_BACKGROUND_MODES,
+  type TransparentBackgroundMode
+} from '../shared/transparent-background';
 
 export type AppPreferences = {
   recentFiles: string[];
   lastDirectory: string | null;
+  transparentBackgroundMode: TransparentBackgroundMode;
 };
 
 type BuildApplicationMenuArgs = {
   preferences: AppPreferences;
   createWindow: () => void;
   sendMenuAction: (action: MenuAction) => void;
+  setTransparentBackgroundMode: (mode: TransparentBackgroundMode) => void;
 };
 
 function buildFileMenuTemplate({
@@ -65,7 +72,11 @@ function buildFileMenuTemplate({
   };
 }
 
-function buildCanvasMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): MenuItemConstructorOptions {
+function buildCanvasMenuTemplate({
+  preferences,
+  sendMenuAction,
+  setTransparentBackgroundMode
+}: BuildApplicationMenuArgs): MenuItemConstructorOptions {
   return {
     label: 'Canvas',
     submenu: [
@@ -76,6 +87,16 @@ function buildCanvasMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): 
       {
         label: 'グリッド線間隔変更...',
         click: () => sendMenuAction({ type: 'grid-spacing' })
+      },
+      { type: 'separator' },
+      {
+        label: '透過バックグラウンド',
+        submenu: TRANSPARENT_BACKGROUND_MODES.map((mode) => ({
+          label: TRANSPARENT_BACKGROUND_LABELS[mode],
+          type: 'radio',
+          checked: preferences.transparentBackgroundMode === mode,
+          click: () => setTransparentBackgroundMode(mode)
+        }))
       }
     ]
   };

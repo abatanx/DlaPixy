@@ -5,6 +5,7 @@ import { PaletteColorModal } from '../modals/PaletteColorModal';
 import type { SidebarPaletteSectionProps } from './types';
 
 export const SidebarPaletteSection = memo(function SidebarPaletteSection({
+  transparentBackgroundMode,
   selectedColor,
   setSelectedColor,
   applySelectedColorChange,
@@ -231,6 +232,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
       </div>
       <PaletteColorModal
         isOpen={isPaletteColorModalOpen}
+        transparentBackgroundMode={transparentBackgroundMode}
         selectedPalette={paletteColorModalInitial}
         palette={palette}
         paletteEditTarget={paletteColorModalMode === 'edit' ? paletteColorModalInitial.color : null}

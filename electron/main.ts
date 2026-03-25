@@ -10,6 +10,11 @@ import * as pngText from 'png-chunk-text';
 import type { MenuAction } from '../shared/ipc';
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
+import {
+  DEFAULT_TRANSPARENT_BACKGROUND_MODE,
+  isTransparentBackgroundMode,
+  type TransparentBackgroundMode
+} from '../shared/transparent-background';
 import { buildApplicationMenu, type AppPreferences } from './menu';
 
 type EditorMeta = {
@@ -27,7 +32,8 @@ const PREFERENCES_FILE = 'preferences.json';
 let mainWindow: BrowserWindow | null = null;
 let preferences: AppPreferences = {
   recentFiles: [],
-  lastDirectory: null
+  lastDirectory: null,
+  transparentBackgroundMode: DEFAULT_TRANSPARENT_BACKGROUND_MODE
 };
 
 function getPreferencesPath(): string {
@@ -64,19 +70,27 @@ async function loadPreferences(): Promise<void> {
     const parsed: unknown = JSON.parse(raw);
     const parsedPreferences =
       parsed && typeof parsed === 'object'
-        ? (parsed as { recentFiles?: unknown; lastDirectory?: unknown })
+        ? (parsed as { recentFiles?: unknown; lastDirectory?: unknown; transparentBackgroundMode?: unknown })
         : {};
     const recentFiles = Array.isArray(parsedPreferences.recentFiles)
       ? parsedPreferences.recentFiles.filter((item): item is string => typeof item === 'string')
       : [];
     const lastDirectory =
       typeof parsedPreferences.lastDirectory === 'string' ? parsedPreferences.lastDirectory : null;
+    const transparentBackgroundMode = isTransparentBackgroundMode(parsedPreferences.transparentBackgroundMode)
+      ? parsedPreferences.transparentBackgroundMode
+      : DEFAULT_TRANSPARENT_BACKGROUND_MODE;
     preferences = {
       recentFiles: recentFiles.slice(0, RECENT_MAX),
-      lastDirectory
+      lastDirectory,
+      transparentBackgroundMode
     };
   } catch {
-    preferences = { recentFiles: [], lastDirectory: null };
+    preferences = {
+      recentFiles: [],
+      lastDirectory: null,
+      transparentBackgroundMode: DEFAULT_TRANSPARENT_BACKGROUND_MODE
+    };
   }
 }
 
@@ -113,8 +127,20 @@ function rebuildApplicationMenu(): void {
   buildApplicationMenu({
     preferences,
     createWindow,
-    sendMenuAction
+    sendMenuAction,
+    setTransparentBackgroundMode
   });
+}
+
+function setTransparentBackgroundMode(mode: TransparentBackgroundMode): void {
+  if (preferences.transparentBackgroundMode === mode) {
+    return;
+  }
+
+  preferences.transparentBackgroundMode = mode;
+  void savePreferences();
+  rebuildApplicationMenu();
+  sendMenuAction({ type: 'transparent-background', mode });
 }
 
 function createWindow(): void {
@@ -271,6 +297,10 @@ ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
     metadata
   };
 });
+
+ipcMain.handle('preferences:get', async () => ({
+  transparentBackgroundMode: preferences.transparentBackgroundMode
+}));
 
 ipcMain.handle('palette:import-gpl', async (_, args?: { mode?: 'replace' | 'append' }) => {
   const initialDir = await resolveInitialDirectory();
