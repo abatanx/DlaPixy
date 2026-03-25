@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { createImagePreviewDataUrl } from '../../editor/preview';
+import { getTransparentBackgroundSurfaceClassName } from '../../editor/transparent-background';
 import {
   flipSelectionPixelBlock,
   rotateSelectionPixelBlock,
@@ -10,6 +11,7 @@ import {
   type SelectionRotateDirection
 } from '../../editor/selection-rotate';
 import { useBootstrapModal } from './useBootstrapModal';
+import type { TransparentBackgroundMode } from '../../../shared/transparent-background';
 
 const MIN_PREVIEW_ZOOM = 1;
 const MAX_PREVIEW_ZOOM = 48;
@@ -28,6 +30,7 @@ function clampPreviewZoom(value: number): number {
 
 type SelectionRotateModalProps = {
   isOpen: boolean;
+  transparentBackgroundMode: TransparentBackgroundMode;
   selection: { x: number; y: number; w: number; h: number } | null;
   source: SelectionPixelBlock | null;
   onApply: (result: SelectionPixelBlock) => void;
@@ -37,6 +40,7 @@ type SelectionRotateModalProps = {
 
 export function SelectionRotateModal({
   isOpen,
+  transparentBackgroundMode,
   selection,
   source,
   onApply,
@@ -159,6 +163,7 @@ export function SelectionRotateModal({
   const isSquareSelection = source ? source.width === source.height : false;
   const zoomedWidth = source ? source.width * previewZoom : 0;
   const zoomedHeight = source ? source.height * previewZoom : 0;
+  const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
 
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -297,7 +302,7 @@ export function SelectionRotateModal({
                 </div>
                 <div className="col-12 col-lg-8">
                   <div className="kmeans-quantize-preview-card selection-rotate-preview-card">
-                    <div className="kmeans-quantize-preview-surface selection-rotate-preview-surface">
+                    <div className={`kmeans-quantize-preview-surface selection-rotate-preview-surface ${transparentBackgroundClassName}`}>
                       {previewDataUrl ? (
                         <img
                           src={previewDataUrl}

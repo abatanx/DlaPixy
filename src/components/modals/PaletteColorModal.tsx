@@ -1,11 +1,14 @@
 import { PALETTE_CAPTION_MAX_LENGTH } from '../../editor/constants';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { getTransparentBackgroundSurfaceClassName } from '../../editor/transparent-background';
 import type { PaletteEntry } from '../../editor/types';
 import { hexToRgba, hsvaToRgba, normalizeColorHex, normalizePaletteCaption, rgbaToHex8, rgbaToHsva } from '../../editor/utils';
 import { useBootstrapModal } from './useBootstrapModal';
+import type { TransparentBackgroundMode } from '../../../shared/transparent-background';
 
 type PaletteColorModalProps = {
   isOpen: boolean;
+  transparentBackgroundMode: TransparentBackgroundMode;
   selectedPalette: PaletteEntry;
   palette: PaletteEntry[];
   paletteEditTarget?: string | null;
@@ -113,6 +116,7 @@ function buildHsvaSliderPreview(channel: 'h' | 's' | 'v', hsva: HsvaChannels, al
 
 export function PaletteColorModal({
   isOpen,
+  transparentBackgroundMode,
   selectedPalette,
   palette,
   paletteEditTarget = selectedPalette.color,
@@ -140,6 +144,7 @@ export function PaletteColorModal({
   };
   const originalColorHex = (normalizeColorHex(selectedPalette.color) ?? '#000000ff').toUpperCase();
   const currentColorHex = rgbaToHex8(pendingRgba.r, pendingRgba.g, pendingRgba.b, pendingRgba.a).toUpperCase();
+  const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
 
   const syncFromRgba = useCallback((nextRgba: RgbaChannels) => {
     setPendingRgba(nextRgba);
@@ -384,7 +389,7 @@ export function PaletteColorModal({
               </div>
               <div className="palette-color-modal-preview mb-4">
                 <div className="palette-color-modal-preview-item">
-                  <div className="palette-color-modal-preview-swatch" aria-hidden="true">
+                  <div className={`palette-color-modal-preview-swatch ${transparentBackgroundClassName}`} aria-hidden="true">
                     <div className="palette-color-modal-preview-swatch-fill" style={{ backgroundColor: originalColorHex }} />
                   </div>
                   <div className="palette-color-modal-preview-meta">
@@ -404,7 +409,7 @@ export function PaletteColorModal({
                   <i className="fa-solid fa-arrow-right" />
                 </div>
                 <div className="palette-color-modal-preview-item">
-                  <div className="palette-color-modal-preview-swatch" aria-hidden="true">
+                  <div className={`palette-color-modal-preview-swatch ${transparentBackgroundClassName}`} aria-hidden="true">
                     <div className="palette-color-modal-preview-swatch-fill" style={{ backgroundColor: currentColorHex }} />
                   </div>
                   <div className="palette-color-modal-preview-meta">
@@ -457,7 +462,7 @@ export function PaletteColorModal({
                     {channel.toUpperCase()}
                   </label>
                   <div className="palette-color-modal-slider-control">
-                    <div className="palette-color-modal-slider-preview" aria-hidden="true">
+                    <div className={`palette-color-modal-slider-preview ${transparentBackgroundClassName}`} aria-hidden="true">
                       <div
                         className="palette-color-modal-slider-preview-fill"
                         style={{ backgroundImage: buildRgbaSliderPreview(channel, pendingRgba) }}
@@ -495,7 +500,7 @@ export function PaletteColorModal({
                     {channel.toUpperCase()}
                   </label>
                   <div className="palette-color-modal-slider-control">
-                    <div className="palette-color-modal-slider-preview" aria-hidden="true">
+                    <div className={`palette-color-modal-slider-preview ${transparentBackgroundClassName}`} aria-hidden="true">
                       <div
                         className="palette-color-modal-slider-preview-fill"
                         style={{ backgroundImage: buildHsvaSliderPreview(channel, pendingHsva, pendingRgba.a) }}
@@ -526,7 +531,7 @@ export function PaletteColorModal({
               <div className="palette-color-modal-slider-row mt-3">
                 <label htmlFor="palette-color-alpha-percent" className="palette-color-modal-slider-label">A%</label>
                 <div className="palette-color-modal-slider-control">
-                  <div className="palette-color-modal-slider-preview" aria-hidden="true">
+                  <div className={`palette-color-modal-slider-preview ${transparentBackgroundClassName}`} aria-hidden="true">
                     <div
                       className="palette-color-modal-slider-preview-fill"
                       style={{ backgroundImage: buildRgbaSliderPreview('a', pendingRgba) }}

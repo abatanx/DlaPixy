@@ -116,6 +116,9 @@ npm run dist
   - キャンバスサイズ変更モーダルは `Esc` でキャンセルできる
   - `Canvas -> グリッド線間隔変更...` でモーダルを開く
   - `Cmd/Ctrl + G` でもグリッド線間隔変更モーダルを開ける
+  - `Canvas -> 透過バックグラウンド` で透明部分の表示背景を切り替える
+  - モードは `白チェック` / `黒チェック` / `白` / `黒` / `マゼンタ`
+  - 選んだモードはアプリ全体設定として保存し、編集キャンバス / 左サイド各プレビュー / renderer モーダル内プレビューで共有する
   - サイドバーの常設キャンバスサイズ / グリッド設定UIは廃止
 - フッターステータス表示
   - `キャンバス`, `グリッド線`, `表示倍率`, `現在ファイル` は sidebar ではなく画面下部 footer に表示
@@ -250,6 +253,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 使用数ラベル生成と、同色ピクセルへのジャンプ先情報を持つ
 - `src/editor/preview.ts`
   - 領域/ブロックの PNG Data URL プレビュー helper
+- `src/editor/transparent-background.ts`
+  - 透過背景モードを renderer 共通の surface class 名へ変換する helper
 - `src/editor/types.ts`
   - 共通型定義（`Tool` / `Selection` / `EditorMeta`）
 - `src/editor/utils.ts`
@@ -258,6 +263,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 実行環境共通のパレット型と正規化 helper
 - `shared/palette-gpl.ts`
   - Electron main process と renderer の前提で共有する GPL parser / serializer
+- `shared/transparent-background.ts`
+  - Electron メニューと renderer で共有する透過背景モード / ラベル定義
 - `src/styles.css`
   - レイアウト、スクロール制御、ツールバー見た目
 - `src/main.tsx`
@@ -288,6 +295,9 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 縮小時: 新しい範囲外のピクセルを切り捨てる
   - サイズ変更時は選択状態 / 浮動貼り付け状態を解除する
 - グリッド線間隔変更もネイティブ `Canvas` メニューから開き、値は `0..canvasSize` の範囲で扱う（`0` はなし）。
+- 透過背景モードもネイティブ `Canvas` メニューから選び、Electron 側のアプリ設定へ保存して renderer state に IPC で反映する。
+- 透過背景モードは、メイン編集キャンバス / sidebar の `Preview / Tile / Animation Preview` / renderer モーダル内プレビューへ同じ設定を適用する。
+- 透過背景モードは PNG metadata には保存しない。
 - パレット import/export はネイティブ `Palette` メニューから開き、ダイアログは Electron main process 側で扱う。
 - 選択範囲の減色起動はネイティブ `Palette -> K-Meansで減色する...` だが、条件入力 UI 自体は renderer モーダルで扱う。
 - パレット色選択はブラウザ標準の color picker ではなく renderer モーダルで行う。

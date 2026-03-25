@@ -6,6 +6,7 @@ import type { EditorSidebarProps } from './sidebar/types';
 // プレビューと編集設定をまとめた左サイドパネル。
 export const EditorSidebar = memo(function EditorSidebar({
   canvasSize,
+  transparentBackgroundMode,
   previewDataUrl,
   tilePreviewDataUrl,
   tilePreviewSelection,
@@ -49,6 +50,7 @@ export const EditorSidebar = memo(function EditorSidebar({
         <div className="card-body editor-sidebar-body">
           <SidebarPreviewSection
             canvasSize={canvasSize}
+            transparentBackgroundMode={transparentBackgroundMode}
             previewDataUrl={previewDataUrl}
             tilePreviewDataUrl={tilePreviewDataUrl}
             tilePreviewSelection={tilePreviewSelection}
@@ -81,6 +83,7 @@ export const EditorSidebar = memo(function EditorSidebar({
       <div className="card shadow-sm editor-sidebar-card editor-sidebar-palette-card w-100 d-flex flex-column">
         <div className="card-body editor-sidebar-body d-flex flex-column overflow-hidden">
           <SidebarPaletteSection
+            transparentBackgroundMode={transparentBackgroundMode}
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
             applySelectedColorChange={applySelectedColorChange}
