@@ -5,6 +5,7 @@ type EditorToolbarProps = {
   tool: Tool;
   setTool: (tool: Tool) => void;
   canAddAnimationFrame: boolean;
+  canDeleteSelection: boolean;
   addAnimationFrame: () => void;
   canRotateSelection: boolean;
   openSelectionRotateModal: () => void;
@@ -15,7 +16,6 @@ type EditorToolbarProps = {
   copySelection: () => Promise<void>;
   pasteSelection: () => void;
   deleteSelection: () => void;
-  clearCanvas: () => void;
 };
 
 // ツール選択・ズーム・編集操作を集約した右側ツールバー。
@@ -23,6 +23,7 @@ export function EditorToolbar({
   tool,
   setTool,
   canAddAnimationFrame,
+  canDeleteSelection,
   addAnimationFrame,
   canRotateSelection,
   openSelectionRotateModal,
@@ -32,8 +33,7 @@ export function EditorToolbar({
   doUndo,
   copySelection,
   pasteSelection,
-  deleteSelection,
-  clearCanvas
+  deleteSelection
 }: EditorToolbarProps) {
   return (
     <div className="editor-toolbar" role="toolbar" aria-label="editor controls">
@@ -137,11 +137,17 @@ export function EditorToolbar({
           <span className="editor-shortcut">⌘V</span>
         </span>
       </button>
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={deleteSelection} title="選択範囲を削除">
-        <i className="fa-regular fa-trash-can" aria-hidden="true" />
-      </button>
-      <button type="button" className="btn btn-sm editor-tool-btn" onClick={clearCanvas} title="クリア">
-        <i className="fa-solid fa-broom" aria-hidden="true" />
+      <button
+        type="button"
+        className="btn btn-sm editor-tool-btn"
+        onClick={deleteSelection}
+        disabled={!canDeleteSelection}
+        title="選択範囲を削除 (DEL)"
+      >
+        <span className="editor-btn-inner">
+          <i className="fa-regular fa-trash-can" aria-hidden="true" />
+          <span className="editor-shortcut">DEL</span>
+        </span>
       </button>
 
       <div className="editor-toolbar-separator" />
