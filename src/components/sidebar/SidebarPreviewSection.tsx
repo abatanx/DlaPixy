@@ -1,12 +1,20 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
 import type { SidebarPreviewSectionProps } from './types';
 
 export const SidebarPreviewSection = memo(function SidebarPreviewSection({
   canvasSize,
   previewDataUrl,
-  selectionTilePreviewDataUrl,
+  tilePreviewDataUrl,
   tilePreviewSelection,
   selection,
+  tilePreviewLayerCount,
+  tilePreviewLayers,
+  tilePreviewBaseSize,
+  hasTilePreviewCandidate,
+  clearTilePreviewLayers,
+  reorderTilePreviewLayers,
+  removeTilePreviewLayer,
+  tilePreviewFocusSequence,
   animationPreviewDataUrl,
   animationFrames,
   animationPreviewIndex,
@@ -23,9 +31,13 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
   setAnimationPreviewLoop
 }: SidebarPreviewSectionProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'tiling' | 'animation'>('preview');
+  const [draggingTilePreviewLayerId, setDraggingTilePreviewLayerId] = useState<string | null>(null);
   const previousFrameCountRef = useRef<number>(animationFrames.length);
+  const previousTilePreviewFocusSequenceRef = useRef<number>(tilePreviewFocusSequence);
+  const displayedTilePreviewLayers = [...tilePreviewLayers].reverse();
   const canPlayAnimation = animationFrames.length >= 2;
   const canAddAnimationFrame = selection !== null;
+  const canClearTilePreviewLayers = tilePreviewLayerCount > 0;
 
   useEffect(() => {
     if (animationFrames.length > previousFrameCountRef.current) {
@@ -33,6 +45,50 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
     }
     previousFrameCountRef.current = animationFrames.length;
   }, [animationFrames.length]);
+
+  useEffect(() => {
+    if (tilePreviewFocusSequence > previousTilePreviewFocusSequenceRef.current) {
+      setActiveTab('tiling');
+    }
+    previousTilePreviewFocusSequenceRef.current = tilePreviewFocusSequence;
+  }, [tilePreviewFocusSequence]);
+
+  const onTilePreviewLayerDragStart = (event: ReactDragEvent<HTMLDivElement>, sourceId: string) => {
+    setDraggingTilePreviewLayerId(sourceId);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', sourceId);
+  };
+
+  const onTilePreviewLayerDragEnd = () => {
+    setDraggingTilePreviewLayerId(null);
+  };
+
+  const onTilePreviewLayerDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const onTilePreviewLayerDrop = (event: ReactDragEvent<HTMLDivElement>, targetId: string) => {
+    event.preventDefault();
+    const sourceId = draggingTilePreviewLayerId ?? event.dataTransfer.getData('text/plain');
+    setDraggingTilePreviewLayerId(null);
+    if (!sourceId || sourceId === targetId) {
+      return;
+    }
+
+    const remainingLayerIds = displayedTilePreviewLayers
+      .map((layer) => layer.id)
+      .filter((layerId) => layerId !== sourceId);
+    const targetIndex = remainingLayerIds.findIndex((layerId) => layerId === targetId);
+    if (targetIndex < 0) {
+      return;
+    }
+
+    const targetBounds = event.currentTarget.getBoundingClientRect();
+    const insertAfter = event.clientY >= targetBounds.top + targetBounds.height / 2;
+    remainingLayerIds.splice(insertAfter ? targetIndex + 1 : targetIndex, 0, sourceId);
+    reorderTilePreviewLayers(remainingLayerIds);
+  };
 
   return (
     <div className="sidebar-preview-section flex-shrink-0">
@@ -109,21 +165,92 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
           role="tabpanel"
         >
           <div className="preview-wrap tile-preview-wrap">
-            {selectionTilePreviewDataUrl ? (
+            {tilePreviewDataUrl ? (
               <img
-                src={selectionTilePreviewDataUrl}
+                src={tilePreviewDataUrl}
                 alt="Selection 3x3 Tile Preview"
                 className="preview-image tile-preview-image"
               />
             ) : (
-              <div className="preview-placeholder">矩形選択するとここに3x3タイル表示</div>
+              <div className="preview-placeholder">
+                <span>矩形選択で 3x3 タイル表示</span>
+                <span className="preview-placeholder-hint">Gで重ねプレビューに追加</span>
+              </div>
             )}
           </div>
-          <div className="form-text mt-2 text-center">
-            {tilePreviewSelection
-              ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'}`
-              : '選択範囲なし'}
+          <div className="tile-preview-controls mt-2">
+            <div className="tile-preview-status">
+              {tilePreviewBaseSize
+                ? `${tilePreviewLayerCount}枚重ね / 基準 ${tilePreviewBaseSize.width}x${tilePreviewBaseSize.height}${hasTilePreviewCandidate && selection ? ' / 候補あり' : ''}`
+                : tilePreviewSelection
+                  ? `${tilePreviewSelection.w}x${tilePreviewSelection.h}`
+                  : '重ねなし'}
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-danger animation-preview-icon-button ms-auto"
+              onClick={clearTilePreviewLayers}
+              disabled={!canClearTilePreviewLayers}
+              aria-label="Tile Preview の重ねをすべて削除"
+              title="Tile Preview の重ねをすべて削除"
+            >
+              <i className="fa-solid fa-trash-can" aria-hidden="true" />
+              <span className="visually-hidden">全クリア</span>
+            </button>
           </div>
+          <div className="form-text mt-2 text-center">
+            {tilePreviewLayerCount > 0
+              ? hasTilePreviewCandidate && selection
+                ? `${tilePreviewLayerCount}枚重ね + 現在選択を未確定候補として重ね表示`
+                : `${tilePreviewLayerCount}枚重ねを3x3で表示`
+              : tilePreviewSelection
+                ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'}`
+                : '選択範囲なし'}
+          </div>
+          {tilePreviewLayers.length > 0 ? (
+            <div className="tile-preview-layer-list mt-2" role="list" aria-label="tile preview stacks">
+              {displayedTilePreviewLayers.map((layer, displayIndex) => {
+                const actualIndex = tilePreviewLayers.length - 1 - displayIndex;
+                const isBaseLayer = actualIndex === 0;
+
+                return (
+                  <div
+                    key={layer.id}
+                    className={`tile-preview-layer-item ${isBaseLayer ? 'is-base' : ''} ${draggingTilePreviewLayerId === layer.id ? 'is-dragging' : ''}`}
+                    role="listitem"
+                    title="ドラッグで順序変更"
+                    draggable
+                    onDragStart={(event) => onTilePreviewLayerDragStart(event, layer.id)}
+                    onDragEnd={onTilePreviewLayerDragEnd}
+                    onDragOver={onTilePreviewLayerDragOver}
+                    onDrop={(event) => onTilePreviewLayerDrop(event, layer.id)}
+                  >
+                    <div className="tile-preview-layer-main">
+                      <span className="tile-preview-layer-thumb" aria-hidden="true">
+                        <img src={layer.previewDataUrl} alt="" />
+                      </span>
+                      <span className="tile-preview-layer-number">{actualIndex + 1}</span>
+                      <span className="tile-preview-layer-text">
+                        {layer.width}x{layer.height}
+                        {isBaseLayer ? ' / 基準' : ''}
+                      </span>
+                    </div>
+                    <div className="tile-preview-layer-actions">
+                      <button
+                        type="button"
+                        className="canvas-copy-btn"
+                        onClick={() => removeTilePreviewLayer(layer.id)}
+                        title="削除"
+                        aria-label="削除"
+                      >
+                        <i className="fa-solid fa-xmark" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
         <div
           id="sidebar-animation-pane"
@@ -139,7 +266,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
               />
             ) : (
               <div className="preview-placeholder">
-                矩形選択して A または右ツールバーのボタンでフレーム追加
+                矩形選択して T または右ツールバーのボタンでフレーム追加
               </div>
             )}
           </div>
@@ -150,10 +277,10 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
               onClick={addAnimationFrame}
               disabled={!canAddAnimationFrame}
               aria-label="現在の選択範囲をアニメーションフレームに追加"
-              title="現在の選択範囲をアニメーションフレームに追加 (A)"
+              title="現在の選択範囲をアニメーションフレームに追加 (T)"
             >
               <i className="fa-solid fa-plus" aria-hidden="true" />
-              <span className="visually-hidden">追加 (A)</span>
+              <span className="visually-hidden">追加 (T)</span>
             </button>
             <button
               type="button"

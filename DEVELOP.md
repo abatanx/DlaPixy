@@ -139,6 +139,13 @@ npm run dist
   - Real-time updates while editing pixels
   - Auto-fit to parent width (responsive scale)
   - Preview area is displayed in a square (`1:1`) viewport
+  - `G` registers the current selection as a preview-only stack entry
+  - The first registered stack entry defines the base tile size for the preview stack
+  - Registered stack entries keep referencing their original canvas rectangles, so pixel edits update the stacked preview in real time
+  - While preview stack entries exist, the current selection is shown as an uncommitted top candidate until it is added with `G`
+  - Additional selections are clipped or transparent-padded to the first stack size before being composited
+  - Tile Preview supports clearing all registered preview stack entries without affecting canvas pixels or undo history
+  - Registered preview stack entries are listed under Tile Preview with mini previews, drag-and-drop reorder, and per-entry remove controls
 - Animation preview panel (under Tiling)
   - `T` or the right toolbar button adds the current selection as an animation frame
   - When a frame is added, the sidebar automatically switches to the `Animation Preview` tab
@@ -174,6 +181,7 @@ npm run dist
   - `Cmd/Ctrl + I`: Open canvas size modal
   - `Cmd/Ctrl + G`: Open grid spacing modal
   - `Cmd/Ctrl + R`: Open zoom modal
+  - `G`: Add the current selection to the Tile Preview layer stack
   - `T`: Add current selection to animation preview frames
   - `Y`: Open selection rotation modal for the current selection
   - `F`: Add/update hovered pixel in reference line, and select matching palette color if present
@@ -206,6 +214,10 @@ Current metadata shape:
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - Preview section for 1x preview, tiling preview, and animation preview
   - These three preview blocks are switched by Bootstrap-style tabs
+  - Tile Preview owns the preview-layer add / clear controls, layer list, and summary text
+- `src/editor/preview.ts`
+  - Generates the 1x / tile preview images
+  - Normalizes Tile Preview layers to the first registered size, composites them, then repeats the result in `3x3`
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - Palette section for color selector trigger and palette grid; memoized to reduce rerenders during canvas edits
   - Palette grid is compact + independently scrollable so large palettes (hundreds of colors) stay usable

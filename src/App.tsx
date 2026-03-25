@@ -30,7 +30,15 @@ import {
   MIN_CANVAS_SIZE,
   MIN_ZOOM
 } from './editor/constants';
-import type { AnimationFrame, EditorMeta, HoveredPixelInfo, PaletteEntry, Selection, Tool } from './editor/types';
+import type {
+  AnimationFrame,
+  EditorMeta,
+  HoveredPixelInfo,
+  PaletteEntry,
+  Selection,
+  TilePreviewLayer,
+  Tool
+} from './editor/types';
 import {
   extractSelectionPixels,
   quantizeSelectionWithKMeans,
@@ -44,7 +52,11 @@ import {
   syncPaletteEntriesWithUsage,
   type PaletteUsageAnalysis
 } from './editor/palette-sync';
-import { createRegionPreviewDataUrl } from './editor/preview';
+import {
+  createRegionPreviewDataUrl,
+  createTilePreviewLayerDataUrl,
+  createTilePreviewLayerThumbnailDataUrl
+} from './editor/preview';
 import {
   applySelectionPixelBlock,
   extractSelectionPixelBlock,
@@ -175,6 +187,10 @@ export function App() {
   const [tool, setTool] = useState<Tool>('select');
   const [selection, setSelection] = useState<Selection>(null);
   const [lastTilePreviewSelection, setLastTilePreviewSelection] = useState<Selection>(null);
+  const [tilePreviewLayers, setTilePreviewLayers] = useState<TilePreviewLayer[]>([]);
+  const [tilePreviewFocusSequence, setTilePreviewFocusSequence] = useState<number>(0);
+  const [selectionChangeSequence, setSelectionChangeSequence] = useState<number>(0);
+  const [lastRegisteredTilePreviewSelectionSequence, setLastRegisteredTilePreviewSelectionSequence] = useState<number | null>(null);
   const [animationFrames, setAnimationFrames] = useState<AnimationFrame[]>([]);
   const [animationPreviewIndex, setAnimationPreviewIndex] = useState<number>(0);
   const [animationPreviewFps, setAnimationPreviewFpsRaw] = useState<number>(DEFAULT_ANIMATION_PREVIEW_FPS);
@@ -213,11 +229,16 @@ export function App() {
   const pendingZoomAnchorRef = useRef<ZoomAnchor | null>(null);
   const spaceWheelZoomAccumRef = useRef<number>(0);
   const spaceWheelZoomResetTimerRef = useRef<number | null>(null);
+  const tilePreviewLayerIdRef = useRef<number>(1);
   const animationFrameIdRef = useRef<number>(1);
 
   useEffect(() => {
     document.title = `DlaPixy${hasUnsavedChanges ? ' *' : ''}`;
   }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    setSelectionChangeSequence((prev) => prev + 1);
+  }, [selection]);
   // drawStateRef: pointer interaction state machine for draw/select/move.
   const drawStateRef = useRef<{
     active: boolean;
@@ -300,12 +321,77 @@ export function App() {
     setLastTilePreviewSelection(selection);
   }, [selection]);
 
-  const selectionTilePreviewDataUrl = useMemo(() => {
+  const tilePreviewCandidateLayer = useMemo(() => {
+    if (!selection) {
+      return null;
+    }
+    const block = extractSelectionPixelBlock(pixels, canvasSize, selection);
+    return {
+      width: block.width,
+      height: block.height,
+      pixels: block.pixels
+    };
+  }, [canvasSize, pixels, selection]);
+  const tilePreviewRenderLayers = useMemo(
+    () =>
+      tilePreviewLayers.map((layer) => {
+        const block = extractSelectionPixelBlock(pixels, canvasSize, {
+          x: layer.x,
+          y: layer.y,
+          w: layer.width,
+          h: layer.height
+        });
+
+        return {
+          id: layer.id,
+          x: layer.x,
+          y: layer.y,
+          width: layer.width,
+          height: layer.height,
+          pixels: block.pixels
+        };
+      }),
+    [canvasSize, pixels, tilePreviewLayers]
+  );
+  const tilePreviewBaseSize = tilePreviewLayers[0]
+    ? { width: tilePreviewLayers[0].width, height: tilePreviewLayers[0].height }
+    : null;
+  const hasTilePreviewCandidate =
+    selection !== null &&
+    (tilePreviewLayers.length === 0 || selectionChangeSequence !== lastRegisteredTilePreviewSelectionSequence);
+  const tilePreviewDataUrl = useMemo(() => {
+    if (tilePreviewRenderLayers.length > 0) {
+      return createTilePreviewLayerDataUrl(
+        tilePreviewRenderLayers,
+        hasTilePreviewCandidate ? tilePreviewCandidateLayer : null
+      );
+    }
     if (!tilePreviewSelection) {
       return '';
     }
     return createRegionPreviewDataUrl(pixels, canvasSize, tilePreviewSelection, 3, 3);
-  }, [canvasSize, pixels, tilePreviewSelection]);
+  }, [
+    canvasSize,
+    hasTilePreviewCandidate,
+    pixels,
+    tilePreviewCandidateLayer,
+    tilePreviewRenderLayers,
+    tilePreviewSelection
+  ]);
+  const tilePreviewLayerSummaries = useMemo(
+    () =>
+      tilePreviewRenderLayers.map((layer) => ({
+        id: layer.id,
+        width: layer.width,
+        height: layer.height,
+        previewDataUrl: createTilePreviewLayerThumbnailDataUrl(
+          layer,
+          tilePreviewBaseSize?.width ?? layer.width,
+          tilePreviewBaseSize?.height ?? layer.height
+        )
+      })),
+    [tilePreviewBaseSize?.height, tilePreviewBaseSize?.width, tilePreviewRenderLayers]
+  );
   const animationPreviewFrame = animationFrames[animationPreviewIndex] ?? null;
   const animationPreviewDataUrl = useMemo(() => {
     if (!animationPreviewFrame) {
@@ -327,6 +413,11 @@ export function App() {
       undoStackRef.current.shift();
     }
   }, [canvasSize, palette, pixels, selectedColor, selection]);
+
+  const resetTilePreviewLayers = useCallback(() => {
+    setTilePreviewLayers([]);
+    setLastRegisteredTilePreviewSelectionSequence(null);
+  }, []);
 
   const resetAnimationFrames = useCallback(() => {
     setAnimationFrames([]);
@@ -1629,12 +1720,13 @@ export function App() {
     setPixels((prev) => resizeCanvasPixels(prev, canvasSize, normalized));
     setSelection(null);
     setLastTilePreviewSelection(null);
+    resetTilePreviewLayers();
     resetAnimationFrames();
     clearFloatingPaste();
     setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
     setHasUnsavedChanges(true);
     setIsCanvasSizeModalOpen(false);
-  }, [canvasSize, clearFloatingPaste, pushUndo, resetAnimationFrames, setStatusText]);
+  }, [canvasSize, clearFloatingPaste, pushUndo, resetAnimationFrames, resetTilePreviewLayers, setStatusText]);
 
   const openCanvasSizeModal = useCallback(() => {
     setIsCanvasSizeModalOpen(true);
@@ -1872,6 +1964,84 @@ export function App() {
     setHasUnsavedChanges(true);
     setStatusText('1手戻しました', 'success');
   }, [canvasSize, clearFloatingPaste, resetAnimationFrames]);
+
+  const addTilePreviewLayer = useCallback(() => {
+    if (!selection) {
+      setStatusText('Tile Preview 追加: 先に矩形選択してください', 'warning');
+      return;
+    }
+
+    const nextLayer: TilePreviewLayer = {
+      id: `tpl-${tilePreviewLayerIdRef.current}`,
+      x: selection.x,
+      y: selection.y,
+      width: selection.w,
+      height: selection.h
+    };
+    tilePreviewLayerIdRef.current += 1;
+
+    setTilePreviewLayers((prev) => [...prev, nextLayer]);
+    setLastRegisteredTilePreviewSelectionSequence(selectionChangeSequence);
+    setTilePreviewFocusSequence((prev) => prev + 1);
+    setStatusText(
+      tilePreviewLayers.length === 0
+        ? `Tile Preview の基準重ねを追加しました: #1 (${selection.w}x${selection.h})`
+        : `Tile Preview の重ねを追加しました: #${tilePreviewLayers.length + 1} (${selection.w}x${selection.h})`,
+      'success'
+    );
+  }, [selection, selectionChangeSequence, setStatusText, tilePreviewLayers.length]);
+
+  const clearTilePreviewLayers = useCallback(() => {
+    if (tilePreviewLayers.length === 0) {
+      setStatusText('Tile Preview の重ねは空です', 'warning');
+      return;
+    }
+    resetTilePreviewLayers();
+    setStatusText('Tile Preview の重ねをすべてクリアしました', 'success');
+  }, [resetTilePreviewLayers, setStatusText, tilePreviewLayers.length]);
+
+  const removeTilePreviewLayer = useCallback(
+    (layerId: string) => {
+      const removeIndex = tilePreviewLayers.findIndex((layer) => layer.id === layerId);
+      if (removeIndex < 0) {
+        return;
+      }
+
+      const nextLength = tilePreviewLayers.length - 1;
+      if (nextLength <= 0) {
+        resetTilePreviewLayers();
+      } else {
+        setTilePreviewLayers((prev) => prev.filter((layer) => layer.id !== layerId));
+      }
+      setStatusText('Tile Preview の重ねを削除しました', 'success');
+    },
+    [resetTilePreviewLayers, setStatusText, tilePreviewLayers]
+  );
+
+  const reorderTilePreviewLayers = useCallback(
+    (topFirstLayerIds: string[]) => {
+      if (topFirstLayerIds.length !== tilePreviewLayers.length) {
+        return;
+      }
+
+      const nextTopFirstLayers = topFirstLayerIds
+        .map((layerId) => tilePreviewLayers.find((layer) => layer.id === layerId) ?? null)
+        .filter((layer): layer is TilePreviewLayer => layer !== null);
+      if (nextTopFirstLayers.length !== tilePreviewLayers.length) {
+        return;
+      }
+
+      const nextInternalOrder = [...nextTopFirstLayers].reverse();
+      const hasChanged = nextInternalOrder.some((layer, index) => layer.id !== tilePreviewLayers[index]?.id);
+      if (!hasChanged) {
+        return;
+      }
+
+      setTilePreviewLayers(nextInternalOrder);
+      setStatusText('Tile Preview の重ね順を変更しました', 'success');
+    },
+    [setStatusText, tilePreviewLayers]
+  );
 
   const addAnimationFrame = useCallback(() => {
     if (!selection) {
@@ -2271,6 +2441,10 @@ export function App() {
           event.preventDefault();
           addAnimationFrame();
           break;
+        case 'KeyG':
+          event.preventDefault();
+          addTilePreviewLayer();
+          break;
         case 'KeyY':
           event.preventDefault();
           openSelectionRotateModal();
@@ -2310,6 +2484,7 @@ export function App() {
     };
   }, [
     addAnimationFrame,
+    addTilePreviewLayer,
     cancelFloatingPaste,
     copySelection,
     doUndo,
@@ -2736,6 +2911,7 @@ export function App() {
       setPixels(loadedPixels);
       setSelection(null);
       setLastTilePreviewSelection(null);
+      resetTilePreviewLayers();
       resetAnimationFrames();
       clearFloatingPaste();
       undoStackRef.current = [];
@@ -2774,7 +2950,7 @@ export function App() {
       const message = error instanceof Error ? error.message : '不明なエラー';
       setStatusText(`読み込みに失敗しました: ${message}`, 'error');
     }
-  }, [clearFloatingPaste, confirmBeforeOpen, resetAnimationFrames, selectedColor]);
+  }, [clearFloatingPaste, confirmBeforeOpen, resetAnimationFrames, resetTilePreviewLayers, selectedColor]);
 
   useEffect(() => {
     const isEditableElement = (target: EventTarget | null): boolean => {
@@ -2892,9 +3068,17 @@ export function App() {
           <EditorSidebar
             canvasSize={canvasSize}
             previewDataUrl={previewDataUrl}
-            selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
+            tilePreviewDataUrl={tilePreviewDataUrl}
             tilePreviewSelection={tilePreviewSelection}
             selection={selection}
+            tilePreviewLayerCount={tilePreviewLayers.length}
+            tilePreviewLayers={tilePreviewLayerSummaries}
+            tilePreviewBaseSize={tilePreviewBaseSize}
+            hasTilePreviewCandidate={hasTilePreviewCandidate}
+            clearTilePreviewLayers={clearTilePreviewLayers}
+            reorderTilePreviewLayers={reorderTilePreviewLayers}
+            removeTilePreviewLayer={removeTilePreviewLayer}
+            tilePreviewFocusSequence={tilePreviewFocusSequence}
             animationPreviewDataUrl={animationPreviewDataUrl}
             animationFrames={animationFrames}
             animationPreviewIndex={animationPreviewIndex}

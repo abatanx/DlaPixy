@@ -14,6 +14,14 @@ export type AnimationFrame = {
   h: number;
 };
 
+export type TilePreviewLayer = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type HoveredPixelInfo = {
   x: number;
   y: number;

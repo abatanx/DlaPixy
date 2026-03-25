@@ -1,4 +1,4 @@
-import type { AnimationFrame, PaletteEntry, Selection } from '../../editor/types';
+import type { AnimationFrame, PaletteEntry, Selection, TilePreviewLayer } from '../../editor/types';
 import type { PaletteUsageEntry } from '../../editor/palette-sync';
 
 export type PaletteColorModalRequest = {
@@ -6,12 +6,24 @@ export type PaletteColorModalRequest = {
   entry: PaletteEntry;
 } | null;
 
+export type TilePreviewLayerSummary = Pick<TilePreviewLayer, 'id' | 'width' | 'height'> & {
+  previewDataUrl: string;
+};
+
 export type EditorSidebarProps = {
   canvasSize: number;
   previewDataUrl: string;
-  selectionTilePreviewDataUrl: string;
+  tilePreviewDataUrl: string;
   tilePreviewSelection: Selection;
   selection: Selection;
+  tilePreviewLayerCount: number;
+  tilePreviewLayers: TilePreviewLayerSummary[];
+  tilePreviewBaseSize: { width: number; height: number } | null;
+  hasTilePreviewCandidate: boolean;
+  clearTilePreviewLayers: () => void;
+  reorderTilePreviewLayers: (topFirstLayerIds: string[]) => void;
+  removeTilePreviewLayer: (layerId: string) => void;
+  tilePreviewFocusSequence: number;
   animationPreviewDataUrl: string;
   animationFrames: AnimationFrame[];
   animationPreviewIndex: number;
@@ -42,9 +54,17 @@ export type SidebarPreviewSectionProps = Pick<
   EditorSidebarProps,
   | 'canvasSize'
   | 'previewDataUrl'
-  | 'selectionTilePreviewDataUrl'
+  | 'tilePreviewDataUrl'
   | 'tilePreviewSelection'
   | 'selection'
+  | 'tilePreviewLayerCount'
+  | 'tilePreviewLayers'
+  | 'tilePreviewBaseSize'
+  | 'hasTilePreviewCandidate'
+  | 'clearTilePreviewLayers'
+  | 'reorderTilePreviewLayers'
+  | 'removeTilePreviewLayer'
+  | 'tilePreviewFocusSequence'
   | 'animationPreviewDataUrl'
   | 'animationFrames'
   | 'animationPreviewIndex'
