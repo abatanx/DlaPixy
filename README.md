@@ -33,7 +33,7 @@ npm run dist
 - 選択範囲のコピー / 削除
 - Undo
 - PNG 保存 / 読込
+- PNG の隣に編集用 sidecar JSON を保存 / 読込（`<filename>.dla-pixy.json`）
 - ネイティブメニュー
   - `File`: 新規 / 開く / 保存 / 別名保存 / 最近使ったファイル
   - `Canvas`: キャンバスサイズ変更モーダル / グリッド線間隔変更モーダル
-- PNG `tEXt` チャンクに編集メタ情報保存 (`dla-pixy-meta`)

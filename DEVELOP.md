@@ -2,7 +2,7 @@
 
 ## 1. Project Summary
 - Project: `DlaPixy` (Electron desktop app)
-- Goal: PNG pixel editor for macOS/Windows with palette, grid, selection, undo, save/load, metadata embedding.
+- Goal: PNG pixel editor for macOS/Windows with palette, grid, selection, undo, save/load, and sidecar-based editor metadata.
 - Current status: Core editor functions are implemented and runnable.
 
 ## 2. Stack / Runtime
@@ -110,6 +110,11 @@ npm run dist
   - File operations are now centered in native File menu (`New / Open / Save / Save As / Recent Files`)
   - Last-used directory is persisted and reused as dialog initial directory (fallback: home directory)
   - Recent files are capped, deduplicated, and missing paths are removed on selection
+  - Editor metadata is stored in a sidecar JSON next to the PNG (`<filename>.dla-pixy.json`)
+  - Opening `foo.png` auto-loads `foo.dla-pixy.json` if present; if missing, the PNG is opened standalone
+  - If the sidecar JSON exists but is invalid, a warning dialog is shown and the PNG is opened standalone
+  - PNG-embedded metadata (including `dla-pixy-meta`) is ignored on load
+  - Saving writes/updates the sidecar JSON and keeps existing PNG metadata chunks intact
 - Native Canvas menu
   - `Canvas -> Change Canvas Size...` opens modal dialog in renderer
   - `Cmd/Ctrl + I` also opens the canvas size modal
@@ -194,19 +199,24 @@ npm run dist
   - `Enter`: Finalize floating paste/move
   - `Esc`: Cancel floating paste/move (if active), otherwise clear current selection
 
-## 6. PNG Metadata Contract
-Stored in PNG `tEXt` chunk keyword: `dla-pixy-meta`.
+## 6. Sidecar JSON Contract
+Stored next to the PNG as `<filename>.dla-pixy.json`.
 
 Current metadata shape:
 ```ts
 {
-  version: number,
+  version: number, // sidecar schema version
   canvasSize?: number,
   gridSpacing?: number,
   palette: Array<{ color: string, caption: string, locked: boolean }>,
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
 }
 ```
+
+- `foo.png` pairs with `foo.dla-pixy.json`
+- If the sidecar is missing, the PNG is treated as a plain standalone image
+- If the sidecar is invalid, DlaPixy shows a warning dialog and falls back to plain PNG load
+- Existing PNG metadata chunks are preserved on save, but are not used as DlaPixy editor state
 
 ## 7. Key File Map
 - `src/App.tsx`
@@ -271,7 +281,8 @@ Current metadata shape:
 - `src/main.tsx`
   - Bootstrap + FontAwesome CSS import
 - `electron/main.ts`
-  - Electron window, IPC, PNG save/load, metadata embedding
+  - Electron window, IPC, PNG save/load, sidecar JSON read/write
+  - Preserves existing PNG metadata chunks while keeping DlaPixy editor state in the sidecar file
   - Native GPL palette import/export dialogs and file I/O
 - `electron/menu.ts`
   - Native File/Canvas/Palette menu construction and menu action wiring

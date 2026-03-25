@@ -6,7 +6,6 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
-import * as pngText from 'png-chunk-text';
 import type { MenuAction } from '../shared/ipc';
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
@@ -25,9 +24,11 @@ type EditorMeta = {
   lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
 };
 
-const META_KEYWORD = 'dla-pixy-meta';
+type PngChunk = ReturnType<typeof extractChunks>[number];
+
 const RECENT_MAX = 10;
 const PREFERENCES_FILE = 'preferences.json';
+const SIDECAR_SUFFIX = '.dla-pixy.json';
 
 let mainWindow: BrowserWindow | null = null;
 let preferences: AppPreferences = {
@@ -38,6 +39,11 @@ let preferences: AppPreferences = {
 
 function getPreferencesPath(): string {
   return path.join(app.getPath('userData'), PREFERENCES_FILE);
+}
+
+function getSidecarPath(pngFilePath: string): string {
+  const parsed = path.parse(pngFilePath);
+  return path.join(parsed.dir, `${parsed.name}${SIDECAR_SUFFIX}`);
 }
 
 async function pathExists(targetPath: string): Promise<boolean> {
@@ -170,50 +176,192 @@ function createWindow(): void {
   });
 }
 
-function attachMetadataToPng(buffer: Buffer, metadata: EditorMeta): Buffer {
-  // Replace existing editor metadata chunk to avoid duplicates on re-save.
-  const chunks = extractChunks(new Uint8Array(buffer));
-  const filtered = chunks.filter((chunk) => {
-    if (chunk.name !== 'tEXt') {
-      return true;
-    }
-    try {
-      const decoded = pngText.decode(chunk.data);
-      return decoded.keyword !== META_KEYWORD;
-    } catch {
-      return true;
-    }
-  });
-
-  const iendIndex = filtered.findIndex((chunk) => chunk.name === 'IEND');
-  const metaChunk = pngText.encode(META_KEYWORD, JSON.stringify(metadata));
-
-  if (iendIndex === -1) {
-    filtered.push(metaChunk);
-  } else {
-    filtered.splice(iendIndex, 0, metaChunk);
+function isPaletteEntry(value: unknown): value is PaletteEntry {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
   }
 
-  return Buffer.from(encodeChunks(filtered));
+  const candidate = value as { color?: unknown; caption?: unknown; locked?: unknown };
+  return (
+    typeof candidate.color === 'string' &&
+    typeof candidate.caption === 'string' &&
+    typeof candidate.locked === 'boolean'
+  );
 }
 
-function parseMetadataFromPng(buffer: Buffer): EditorMeta | null {
-  // Read first matching tEXt chunk and parse editor metadata.
-  const chunks = extractChunks(new Uint8Array(buffer));
-  for (const chunk of chunks) {
-    if (chunk.name !== 'tEXt') {
-      continue;
-    }
-    try {
-      const decoded = pngText.decode(chunk.data);
-      if (decoded.keyword === META_KEYWORD) {
-        return JSON.parse(decoded.text) as EditorMeta;
-      }
-    } catch {
-      // ignore invalid chunk
-    }
+function isTool(value: unknown): value is EditorMeta['lastTool'] {
+  return value === 'pencil' || value === 'eraser' || value === 'fill' || value === 'select';
+}
+
+function parseEditorMeta(rawText: string): EditorMeta | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    return null;
   }
-  return null;
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
+
+  const candidate = parsed as {
+    version?: unknown;
+    canvasSize?: unknown;
+    gridSpacing?: unknown;
+    palette?: unknown;
+    lastTool?: unknown;
+  };
+
+  if (typeof candidate.version !== 'number' || !Number.isFinite(candidate.version)) {
+    return null;
+  }
+  if (candidate.canvasSize !== undefined && (typeof candidate.canvasSize !== 'number' || !Number.isFinite(candidate.canvasSize))) {
+    return null;
+  }
+  if (
+    candidate.gridSpacing !== undefined &&
+    (typeof candidate.gridSpacing !== 'number' || !Number.isFinite(candidate.gridSpacing))
+  ) {
+    return null;
+  }
+  if (!Array.isArray(candidate.palette) || !candidate.palette.every(isPaletteEntry)) {
+    return null;
+  }
+  if (!isTool(candidate.lastTool)) {
+    return null;
+  }
+
+  return {
+    version: candidate.version,
+    canvasSize: candidate.canvasSize,
+    gridSpacing: candidate.gridSpacing,
+    palette: candidate.palette,
+    lastTool: candidate.lastTool
+  };
+}
+
+async function showInvalidSidecarAlert(sidecarPath: string): Promise<void> {
+  const focusedWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined;
+  const options: MessageBoxOptions = {
+    type: 'warning',
+    title: '編集メタ情報の読み込みに失敗しました',
+    message: `編集メタ情報の読み込みに失敗したため、PNG 単体として開きます。\n${sidecarPath}`,
+    buttons: ['OK'],
+    defaultId: 0,
+    noLink: true
+  };
+
+  if (focusedWindow && !focusedWindow.isDestroyed()) {
+    await dialog.showMessageBox(focusedWindow, options);
+    return;
+  }
+
+  await dialog.showMessageBox(options);
+}
+
+async function loadSidecarMetadata(
+  pngFilePath: string
+): Promise<{ metadata: EditorMeta | null }> {
+  const sidecarPath = getSidecarPath(pngFilePath);
+
+  let rawText: string;
+  try {
+    rawText = await fs.readFile(sidecarPath, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { metadata: null };
+    }
+    await showInvalidSidecarAlert(sidecarPath);
+    return { metadata: null };
+  }
+
+  const metadata = parseEditorMeta(rawText);
+  if (metadata) {
+    return { metadata };
+  }
+
+  await showInvalidSidecarAlert(sidecarPath);
+  return { metadata: null };
+}
+
+async function writeSidecarMetadata(pngFilePath: string, metadata: EditorMeta): Promise<void> {
+  const sidecarPath = getSidecarPath(pngFilePath);
+  await fs.writeFile(sidecarPath, JSON.stringify(metadata, null, 2), 'utf8');
+}
+
+function mergeRenderedPngWithExistingMetadata(renderedBuffer: Buffer, sourceBuffer?: Buffer): Buffer {
+  if (!sourceBuffer) {
+    return renderedBuffer;
+  }
+
+  try {
+    const renderedChunks = extractChunks(new Uint8Array(renderedBuffer));
+    const sourceChunks = extractChunks(new Uint8Array(sourceBuffer));
+
+    const renderedIhdr = renderedChunks.find((chunk) => chunk.name === 'IHDR');
+    const renderedIdats = renderedChunks.filter((chunk) => chunk.name === 'IDAT');
+    const renderedIend = renderedChunks.find((chunk) => chunk.name === 'IEND');
+
+    if (!renderedIhdr || renderedIdats.length === 0 || !renderedIend) {
+      return renderedBuffer;
+    }
+
+    const mergedChunks: PngChunk[] = [];
+    let insertedIhdr = false;
+    let insertedIdats = false;
+    let insertedIend = false;
+
+    for (const chunk of sourceChunks) {
+      if (chunk.name === 'IHDR') {
+        if (!insertedIhdr) {
+          mergedChunks.push(renderedIhdr);
+          insertedIhdr = true;
+        }
+        continue;
+      }
+
+      if (chunk.name === 'IDAT') {
+        if (!insertedIdats) {
+          mergedChunks.push(...renderedIdats);
+          insertedIdats = true;
+        }
+        continue;
+      }
+
+      if (chunk.name === 'IEND') {
+        if (!insertedIdats) {
+          mergedChunks.push(...renderedIdats);
+          insertedIdats = true;
+        }
+        mergedChunks.push(renderedIend);
+        insertedIend = true;
+        continue;
+      }
+
+      // These chunks depend on source transparency/palette encoding and can become invalid
+      // when the pixel data is regenerated through the canvas save path.
+      if (chunk.name === 'tRNS' || chunk.name === 'hIST') {
+        continue;
+      }
+
+      mergedChunks.push(chunk);
+    }
+
+    if (!insertedIhdr) {
+      mergedChunks.unshift(renderedIhdr);
+    }
+    if (!insertedIdats) {
+      mergedChunks.push(...renderedIdats);
+    }
+    if (!insertedIend) {
+      mergedChunks.push(renderedIend);
+    }
+
+    return Buffer.from(encodeChunks(mergedChunks));
+  } catch {
+    return renderedBuffer;
+  }
 }
 
 app.whenReady().then(async () => {
@@ -238,9 +386,8 @@ app.on('window-all-closed', () => {
 ipcMain.handle(
   'png:save',
   async (_, args: { base64Png: string; metadata: EditorMeta; filePath?: string; saveAs?: boolean }) => {
-  // Renderer sends raw PNG bytes + metadata; main process writes file.
+  // Renderer sends regenerated PNG bytes + sidecar metadata; main process writes both.
   const rawBuffer = Buffer.from(args.base64Png, 'base64');
-  const bufferWithMetadata = attachMetadataToPng(rawBuffer, args.metadata);
 
   let outputPath = args.filePath;
   if (!outputPath || args.saveAs) {
@@ -255,13 +402,24 @@ ipcMain.handle(
     outputPath = result.filePath;
   }
 
-  await fs.writeFile(outputPath, bufferWithMetadata);
+  let sourceBuffer: Buffer | undefined;
+  if (args.filePath) {
+    try {
+      sourceBuffer = await fs.readFile(args.filePath);
+    } catch {
+      sourceBuffer = undefined;
+    }
+  }
+
+  const outputBuffer = mergeRenderedPngWithExistingMetadata(rawBuffer, sourceBuffer);
+  await fs.writeFile(outputPath, outputBuffer);
+  await writeSidecarMetadata(outputPath, args.metadata);
   addRecentFile(outputPath);
   return { canceled: false, filePath: outputPath };
 });
 
 ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
-  // Main process returns PNG bytes + embedded metadata to renderer.
+  // Main process returns PNG bytes and optional sidecar metadata to renderer.
   let filePath = args?.filePath;
   if (!filePath) {
     const initialDir = await resolveInitialDirectory();
@@ -287,7 +445,7 @@ ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
     }
     return { canceled: false, error: 'read-failed' as const, filePath };
   }
-  const metadata = parseMetadataFromPng(fileBuffer);
+  const { metadata } = await loadSidecarMetadata(filePath);
   addRecentFile(filePath);
 
   return {
