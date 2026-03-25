@@ -101,7 +101,7 @@ npm run dist
   - Select ツール中は `canvas-stage` の余白クリックで現在の選択範囲を解除できる
   - Selectツールでドラッグせずクリックした場合、現在のグリッド間隔に沿った1タイルを選択
   - 矩形選択の解除は、Selectツールで選択範囲外をクリックした場合のみ（他ツール操作では選択維持）
-  - 選択範囲があるとき、描画/消しゴム/塗りつぶし/クリアは選択範囲内ピクセルのみを処理
+  - 選択範囲があるとき、描画/消しゴム/塗りつぶしは選択範囲内ピクセルのみを処理
   - 貼り付け直後のドラッグ移動（Selectツール）
   - 浮動貼り付け/移動の操作: `Enter` で確定、`Esc` でキャンセルして貼り付け前状態に復元
   - 矩形選択したピクセルのドラッグ移動（貼り付け移動と同じ挙動）
@@ -182,6 +182,7 @@ npm run dist
   - `Cmd/Ctrl + A`: キャンバス全体を選択
   - `Cmd/Ctrl + C`: 選択範囲コピー
   - `Cmd/Ctrl + V`: 貼り付け
+  - `Delete` / `Backspace`: 現在の選択範囲を削除（選択なし時は何もしない）
   - `Cmd/Ctrl + I`: キャンバスサイズ変更モーダルを開く
   - `Cmd/Ctrl + G`: グリッド線間隔変更モーダルを開く
   - `Cmd/Ctrl + R`: 表示倍率モーダルを開く
@@ -227,7 +228,7 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - `src/components/sidebar/types.ts`
   - サイドバー各セクションで共有する props 型
 - `src/components/EditorToolbar.tsx`
-  - 右ツールバーUI（ツール切替、アニメーションフレーム追加、ズーム、Undo、コピー/貼り付け/削除/クリア）
+  - 右ツールバーUI（ツール切替、アニメーションフレーム追加、ズーム、Undo、コピー/貼り付け/削除）
 - `src/components/modals/CanvasSizeModal.tsx`
   - キャンバスサイズ変更モーダルのUIと入力検証/適用トリガー
 - `src/components/modals/GridSpacingModal.tsx`
@@ -326,7 +327,6 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - 選択範囲ドラッグ開始時に、選択ピクセルを浮動ブロック化して移動
 - 浮動貼り付け状態は以下で解除される。
   - キャンバスサイズ変更
-  - クリア
   - 選択削除
   - PNG読込
   - Undo
@@ -362,6 +362,20 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
   - https://github.com/abatanx/DlaPixy/issues/33
 - #42 `refactor: スウォッチ整理処理を共通化する`
   - https://github.com/abatanx/DlaPixy/issues/42
+- #46 `feat: パレットの並び替えと削除を追加する`
+  - https://github.com/abatanx/DlaPixy/issues/46
+- #47 `feat: パレット色統合機能を追加する`
+  - https://github.com/abatanx/DlaPixy/issues/47
+- #48 `release: App Store 登録とサブスク関連ロジックを整備する`
+  - https://github.com/abatanx/DlaPixy/issues/48
+- #49 `feat: OSSライセンス表示画面を追加する`
+  - https://github.com/abatanx/DlaPixy/issues/49
+- #50 `feat: 貼り付け時に拡大縮小して配置できるようにする`
+  - https://github.com/abatanx/DlaPixy/issues/50
+- #51 `feat: アルファ付き画像貼り付け時のブレンド仕様を追加する`
+  - https://github.com/abatanx/DlaPixy/issues/51
+- #52 `update: PNGメタ保存から外部JSON管理へ移行する`
+  - https://github.com/abatanx/DlaPixy/issues/52
 
 ## 13. Issue #42 仕様メモ（2026-03-24）
 - 目的:

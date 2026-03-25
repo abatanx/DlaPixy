@@ -1936,40 +1936,6 @@ export function App() {
     stepZoom(-1);
   }, [stepZoom]);
 
-  const clearCanvas = useCallback(() => {
-    pushUndo();
-    if (selection) {
-      // With active selection, clear only selected pixels (not full canvas).
-      setPixels((prev) => {
-        const next = clonePixels(prev);
-        let changed = false;
-        for (let y = selection.y; y < selection.y + selection.h; y += 1) {
-          for (let x = selection.x; x < selection.x + selection.w; x += 1) {
-            const idx = (y * canvasSize + x) * 4;
-            if (next[idx + 3] === 0) {
-              continue;
-            }
-            next[idx] = 0;
-            next[idx + 1] = 0;
-            next[idx + 2] = 0;
-            next[idx + 3] = 0;
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-      setHasUnsavedChanges(true);
-      setStatusText('選択範囲をクリアしました', 'success');
-    } else {
-      // Without selection, keep existing "clear all" behavior.
-      setPixels(createEmptyPixels(canvasSize));
-      setSelection(null);
-      setHasUnsavedChanges(true);
-      setStatusText('キャンバスをクリアしました', 'success');
-    }
-    clearFloatingPaste();
-  }, [canvasSize, clearFloatingPaste, pushUndo, selection]);
-
   const doUndo = useCallback(() => {
     const previous = undoStackRef.current.pop();
     if (!previous) {
@@ -2191,7 +2157,6 @@ export function App() {
 
   const deleteSelection = useCallback(() => {
     if (!selection) {
-      setStatusText('選択範囲がありません', 'warning');
       return;
     }
 
@@ -2357,6 +2322,12 @@ export function App() {
         return;
       }
 
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        deleteSelection();
+        return;
+      }
+
       switch (event.code) {
         case 'Digit1':
         case 'Numpad1':
@@ -2517,6 +2488,7 @@ export function App() {
     focusHoveredPixel,
     freezeHoveredPixelInfo,
     pasteSelection,
+    deleteSelection,
     openSelectionRotateModal,
     selectEntireCanvas,
     selectReferenceByNumber,
@@ -3323,6 +3295,7 @@ export function App() {
                 tool={tool}
                 setTool={setTool}
                 canAddAnimationFrame={selection !== null}
+                canDeleteSelection={selection !== null}
                 addAnimationFrame={addAnimationFrame}
                 canRotateSelection={selection !== null}
                 openSelectionRotateModal={openSelectionRotateModal}
@@ -3333,7 +3306,6 @@ export function App() {
                 copySelection={copySelection}
                 pasteSelection={pasteSelection}
                 deleteSelection={deleteSelection}
-                clearCanvas={clearCanvas}
               />
             </div>
           </main>

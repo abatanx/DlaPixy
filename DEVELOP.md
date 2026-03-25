@@ -101,7 +101,7 @@ npm run dist
   - With Select tool active, clicking empty space in `canvas-stage` clears the current selection
   - Click (without drag) with Select tool chooses one tile aligned to current grid spacing
   - Selection is cleared only when clicking outside the selected area with Select tool; other tool operations keep selection
-  - When selection is active, Pencil/Eraser/Fill/Clear are constrained to selected pixels only
+  - When selection is active, Pencil/Eraser/Fill are constrained to selected pixels only
   - After paste: pasted block is draggable immediately (with Select tool)
   - Floating paste/move controls: `Enter` to finalize, `Esc` to cancel and restore pre-paste state
   - Selected pixels are draggable directly (same behavior as pasted floating block)
@@ -181,6 +181,7 @@ npm run dist
   - `Cmd/Ctrl + A`: Select entire canvas
   - `Cmd/Ctrl + C`: Copy selection
   - `Cmd/Ctrl + V`: Paste selection
+  - `Delete` / `Backspace`: Delete current selection (silently ignored when no selection)
   - `Cmd/Ctrl + I`: Open canvas size modal
   - `Cmd/Ctrl + G`: Open grid spacing modal
   - `Cmd/Ctrl + R`: Open zoom modal
@@ -229,7 +230,7 @@ Current metadata shape:
 - `src/components/sidebar/types.ts`
   - Shared prop types for sidebar sections
 - `src/components/EditorToolbar.tsx`
-  - Right toolbar UI (tool switch, animation frame add, zoom, undo, copy/paste/delete/clear)
+  - Right toolbar UI (tool switch, animation frame add, zoom, undo, copy/paste/delete)
 - `src/components/modals/CanvasSizeModal.tsx`
   - Canvas size modal UI and validation/apply trigger
 - `src/components/modals/GridSpacingModal.tsx`
@@ -324,7 +325,7 @@ Current metadata shape:
 - Selection drag-move also reuses `floatingPasteRef` flow:
   - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.
 - Floating pasted state is cleared on destructive/reset flows:
-  - canvas resize, clear, delete selection, load, undo.
+  - canvas resize, delete selection, load, undo.
 - Undo snapshots include at least `canvasSize`, `pixels`, `selection`, `palette`, and `selectedColor`.
 - Tile preview keeps last valid selection (`lastTilePreviewSelection`) so preview does not disappear when selection is cleared.
 - Fill tool uses flood-fill over contiguous same-color pixels (4-neighbor).
@@ -358,6 +359,20 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/33
 - #42 `refactor: スウォッチ整理処理を共通化する`
   - https://github.com/abatanx/DlaPixy/issues/42
+- #46 `feat: パレットの並び替えと削除を追加する`
+  - https://github.com/abatanx/DlaPixy/issues/46
+- #47 `feat: パレット色統合機能を追加する`
+  - https://github.com/abatanx/DlaPixy/issues/47
+- #48 `release: App Store 登録とサブスク関連ロジックを整備する`
+  - https://github.com/abatanx/DlaPixy/issues/48
+- #49 `feat: OSSライセンス表示画面を追加する`
+  - https://github.com/abatanx/DlaPixy/issues/49
+- #50 `feat: 貼り付け時に拡大縮小して配置できるようにする`
+  - https://github.com/abatanx/DlaPixy/issues/50
+- #51 `feat: アルファ付き画像貼り付け時のブレンド仕様を追加する`
+  - https://github.com/abatanx/DlaPixy/issues/51
+- #52 `update: PNGメタ保存から外部JSON管理へ移行する`
+  - https://github.com/abatanx/DlaPixy/issues/52
 
 ## 13. Issue #42 Draft Notes (2026-03-24)
 - Goal:
