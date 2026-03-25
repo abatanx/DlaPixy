@@ -7,9 +7,17 @@ import type { EditorSidebarProps } from './sidebar/types';
 export const EditorSidebar = memo(function EditorSidebar({
   canvasSize,
   previewDataUrl,
-  selectionTilePreviewDataUrl,
+  tilePreviewDataUrl,
   tilePreviewSelection,
   selection,
+  tilePreviewLayerCount,
+  tilePreviewLayers,
+  tilePreviewBaseSize,
+  hasTilePreviewCandidate,
+  clearTilePreviewLayers,
+  reorderTilePreviewLayers,
+  removeTilePreviewLayer,
+  tilePreviewFocusSequence,
   animationPreviewDataUrl,
   animationFrames,
   animationPreviewIndex,
@@ -42,9 +50,17 @@ export const EditorSidebar = memo(function EditorSidebar({
           <SidebarPreviewSection
             canvasSize={canvasSize}
             previewDataUrl={previewDataUrl}
-            selectionTilePreviewDataUrl={selectionTilePreviewDataUrl}
+            tilePreviewDataUrl={tilePreviewDataUrl}
             tilePreviewSelection={tilePreviewSelection}
             selection={selection}
+            tilePreviewLayerCount={tilePreviewLayerCount}
+            tilePreviewLayers={tilePreviewLayers}
+            tilePreviewBaseSize={tilePreviewBaseSize}
+            hasTilePreviewCandidate={hasTilePreviewCandidate}
+            clearTilePreviewLayers={clearTilePreviewLayers}
+            reorderTilePreviewLayers={reorderTilePreviewLayers}
+            removeTilePreviewLayer={removeTilePreviewLayer}
+            tilePreviewFocusSequence={tilePreviewFocusSequence}
             animationPreviewDataUrl={animationPreviewDataUrl}
             animationFrames={animationFrames}
             animationPreviewIndex={animationPreviewIndex}

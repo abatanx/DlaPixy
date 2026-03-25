@@ -5,6 +5,12 @@ type PreviewRegion = {
   h: number;
 };
 
+type PreviewLayerSource = {
+  width: number;
+  height: number;
+  pixels: Uint8ClampedArray;
+};
+
 // RGBAピクセル配列から PNG Data URL を生成する。
 export function createImagePreviewDataUrl(
   pixels: Uint8ClampedArray,
@@ -75,4 +81,113 @@ export function createRegionPreviewDataUrl(
   }
 
   return createImagePreviewDataUrl(regionPixels, region.w, region.h, repeatX, repeatY);
+}
+
+function normalizePreviewLayerPixels(
+  layer: PreviewLayerSource,
+  targetWidth: number,
+  targetHeight: number
+): Uint8ClampedArray {
+  const normalizedPixels = new Uint8ClampedArray(targetWidth * targetHeight * 4);
+  const copyWidth = Math.min(layer.width, targetWidth);
+  const copyHeight = Math.min(layer.height, targetHeight);
+
+  for (let y = 0; y < copyHeight; y += 1) {
+    for (let x = 0; x < copyWidth; x += 1) {
+      const sourceIndex = (y * layer.width + x) * 4;
+      const targetIndex = (y * targetWidth + x) * 4;
+      normalizedPixels[targetIndex] = layer.pixels[sourceIndex];
+      normalizedPixels[targetIndex + 1] = layer.pixels[sourceIndex + 1];
+      normalizedPixels[targetIndex + 2] = layer.pixels[sourceIndex + 2];
+      normalizedPixels[targetIndex + 3] = layer.pixels[sourceIndex + 3];
+    }
+  }
+
+  return normalizedPixels;
+}
+
+function compositePreviewLayer(
+  destinationPixels: Uint8ClampedArray,
+  sourcePixels: Uint8ClampedArray,
+  width: number,
+  height: number
+): void {
+  const totalPixels = width * height;
+
+  for (let index = 0; index < totalPixels; index += 1) {
+    const offset = index * 4;
+    const sourceAlpha = sourcePixels[offset + 3] / 255;
+    if (sourceAlpha <= 0) {
+      continue;
+    }
+
+    const destinationAlpha = destinationPixels[offset + 3] / 255;
+    const outAlpha = sourceAlpha + destinationAlpha * (1 - sourceAlpha);
+
+    if (outAlpha <= 0) {
+      destinationPixels[offset] = 0;
+      destinationPixels[offset + 1] = 0;
+      destinationPixels[offset + 2] = 0;
+      destinationPixels[offset + 3] = 0;
+      continue;
+    }
+
+    const sourceRed = sourcePixels[offset] / 255;
+    const sourceGreen = sourcePixels[offset + 1] / 255;
+    const sourceBlue = sourcePixels[offset + 2] / 255;
+    const destinationRed = destinationPixels[offset] / 255;
+    const destinationGreen = destinationPixels[offset + 1] / 255;
+    const destinationBlue = destinationPixels[offset + 2] / 255;
+
+    const outRed = (sourceRed * sourceAlpha + destinationRed * destinationAlpha * (1 - sourceAlpha)) / outAlpha;
+    const outGreen = (sourceGreen * sourceAlpha + destinationGreen * destinationAlpha * (1 - sourceAlpha)) / outAlpha;
+    const outBlue = (sourceBlue * sourceAlpha + destinationBlue * destinationAlpha * (1 - sourceAlpha)) / outAlpha;
+
+    destinationPixels[offset] = Math.round(outRed * 255);
+    destinationPixels[offset + 1] = Math.round(outGreen * 255);
+    destinationPixels[offset + 2] = Math.round(outBlue * 255);
+    destinationPixels[offset + 3] = Math.round(outAlpha * 255);
+  }
+}
+
+export function createTilePreviewLayerDataUrl(
+  layers: PreviewLayerSource[],
+  candidateLayer?: PreviewLayerSource | null,
+  repeatX = 3,
+  repeatY = 3
+): string {
+  const baseLayer = layers[0] ?? candidateLayer ?? null;
+  if (!baseLayer || baseLayer.width <= 0 || baseLayer.height <= 0) {
+    return '';
+  }
+
+  const composedPixels = new Uint8ClampedArray(baseLayer.width * baseLayer.height * 4);
+  const sources = candidateLayer ? [...layers, candidateLayer] : layers;
+
+  for (const sourceLayer of sources) {
+    const normalizedLayerPixels =
+      sourceLayer.width === baseLayer.width && sourceLayer.height === baseLayer.height
+        ? sourceLayer.pixels
+        : normalizePreviewLayerPixels(sourceLayer, baseLayer.width, baseLayer.height);
+    compositePreviewLayer(composedPixels, normalizedLayerPixels, baseLayer.width, baseLayer.height);
+  }
+
+  return createImagePreviewDataUrl(composedPixels, baseLayer.width, baseLayer.height, repeatX, repeatY);
+}
+
+export function createTilePreviewLayerThumbnailDataUrl(
+  layer: PreviewLayerSource,
+  targetWidth: number,
+  targetHeight: number
+): string {
+  if (targetWidth <= 0 || targetHeight <= 0) {
+    return '';
+  }
+
+  const normalizedPixels =
+    layer.width === targetWidth && layer.height === targetHeight
+      ? layer.pixels
+      : normalizePreviewLayerPixels(layer, targetWidth, targetHeight);
+
+  return createImagePreviewDataUrl(normalizedPixels, targetWidth, targetHeight);
 }
