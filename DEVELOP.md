@@ -270,6 +270,9 @@ Current metadata shape:
 - `src/hooks/useCanvasEditingCore.ts`
   - Canvas render sync, floating preview sync, coordinate resolution, stroke, and flood fill primitives
   - Owns low-level canvas editing logic so `App.tsx` no longer carries that render/draw callback cluster
+- `src/hooks/useFloatingSelectionState.ts`
+  - Floating selection refs, clipboard ref, and floating-clear helper
+  - Owns floating selection state holders so `App.tsx` no longer carries those bridge refs directly
 - `src/hooks/useCanvasPointerInteractions.ts`
   - Pointer event hook for draw/select/fill interactions on the canvas and stage
   - Owns `onMouseDown` / `onMouseMove` / `onMouseUp` orchestration while delegating floating move/resize to dedicated hook

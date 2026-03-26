@@ -4,6 +4,7 @@ import {
   useState,
   type Dispatch,
   type DragEvent as ReactDragEvent,
+  type MutableRefObject,
   type SetStateAction
 } from 'react';
 import type { PaletteColorModalRequest } from '../components/sidebar/types';
@@ -18,10 +19,12 @@ type SelectionRect = Exclude<Selection, null>;
 type UsePixelReferencesOptions = {
   canvasSize: number;
   pixels: Uint8ClampedArray;
+  zoom: number;
   palette: PaletteEntry[];
   paletteUsageByColor: Record<string, PaletteUsageEntry>;
   floatingPasteRef: { current: unknown };
-  scrollCanvasStageToCell: (cell: { x: number; y: number }) => void;
+  canvasStageRef: MutableRefObject<HTMLDivElement | null>;
+  canvasRef: MutableRefObject<HTMLCanvasElement | null>;
   setSelection: Dispatch<SetStateAction<Selection>>;
   setLastTilePreviewSelection: Dispatch<SetStateAction<Selection>>;
   setSelectedColor: Dispatch<SetStateAction<string>>;
@@ -59,10 +62,12 @@ function hasHoveredPixelInfoSameContent(
 export function usePixelReferences({
   canvasSize,
   pixels,
+  zoom,
   palette,
   paletteUsageByColor,
   floatingPasteRef,
-  scrollCanvasStageToCell,
+  canvasStageRef,
+  canvasRef,
   setSelection,
   setLastTilePreviewSelection,
   setSelectedColor,
@@ -166,6 +171,30 @@ export function usePixelReferences({
   const clearHoveredPixelInfo = useCallback(() => {
     setHoveredPixelInfo(null);
   }, []);
+
+  const scrollCanvasStageToCell = useCallback(
+    (cell: { x: number; y: number }) => {
+      const stage = canvasStageRef.current;
+      const canvas = canvasRef.current;
+      if (!stage || !canvas) {
+        return;
+      }
+
+      const targetCenterX = canvas.offsetLeft + (cell.x + 0.5) * zoom;
+      const targetCenterY = canvas.offsetTop + (cell.y + 0.5) * zoom;
+      const maxScrollLeft = Math.max(0, stage.scrollWidth - stage.clientWidth);
+      const maxScrollTop = Math.max(0, stage.scrollHeight - stage.clientHeight);
+      const nextScrollLeft = Math.max(0, Math.min(targetCenterX - stage.clientWidth / 2, maxScrollLeft));
+      const nextScrollTop = Math.max(0, Math.min(targetCenterY - stage.clientHeight / 2, maxScrollTop));
+
+      stage.scrollTo({
+        left: nextScrollLeft,
+        top: nextScrollTop,
+        behavior: 'smooth'
+      });
+    },
+    [canvasRef, canvasStageRef, zoom]
+  );
 
   const jumpToPaletteUsage = useCallback(
     (color: string): boolean => {

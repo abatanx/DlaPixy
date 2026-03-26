@@ -1,7 +1,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import type { GplExportFormat } from '../../shared/palette-gpl';
 import { getFileNameFromPath, hasSamePaletteEntries, replaceFileExtension, resolveNextSelectedColor } from '../editor/app-utils';
-import type { PaletteUsageEntry } from '../editor/palette-sync';
+import { syncPaletteEntriesFromPixels, type PaletteUsageEntry } from '../editor/palette-sync';
 import type { PaletteEntry } from '../editor/types';
 import { clonePaletteEntries, clonePixels, hexToRgba, normalizePaletteEntries } from '../editor/utils';
 
@@ -13,6 +13,7 @@ export type PaletteRemovalRequest = {
 };
 
 type UsePaletteManagementOptions = {
+  canvasSize: number;
   currentFilePath?: string;
   palette: PaletteEntry[];
   selectedColor: string;
@@ -27,6 +28,7 @@ type UsePaletteManagementOptions = {
 };
 
 export function usePaletteManagement({
+  canvasSize,
   currentFilePath,
   palette,
   selectedColor,
@@ -40,6 +42,20 @@ export function usePaletteManagement({
   setStatusText
 }: UsePaletteManagementOptions) {
   const [paletteRemovalRequest, setPaletteRemovalRequest] = useState<PaletteRemovalRequest | null>(null);
+
+  const syncPaletteAfterPaste = useCallback(
+    (nextPixels: Uint8ClampedArray) => {
+      const { palette: nextPalette } = syncPaletteEntriesFromPixels(palette, nextPixels, canvasSize, {
+        removeUnusedColors: false,
+        addUsedColors: true
+      });
+      if (!hasSamePaletteEntries(palette, nextPalette)) {
+        setPalette(nextPalette);
+        setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
+      }
+    },
+    [canvasSize, palette, selectedColor, setPalette, setSelectedColor]
+  );
 
   const removePaletteColor = useCallback(
     (colorToRemove: string, clearUsedPixels: boolean) => {
@@ -318,6 +334,7 @@ export function usePaletteManagement({
 
   return {
     paletteRemovalRequest,
+    syncPaletteAfterPaste,
     addPaletteColor,
     removeSelectedColorFromPalette,
     applySelectedColorChange,

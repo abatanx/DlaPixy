@@ -13,6 +13,7 @@ import { useCanvasViewport } from './hooks/useCanvasViewport';
 import { useCanvasPointerInteractions } from './hooks/useCanvasPointerInteractions';
 import { useCanvasEditingCore } from './hooks/useCanvasEditingCore';
 import { useDocumentFileActions } from './hooks/useDocumentFileActions';
+import { useFloatingSelectionState } from './hooks/useFloatingSelectionState';
 import { usePaletteManagement } from './hooks/usePaletteManagement';
 import { useEditorPreviews } from './hooks/useEditorPreviews';
 import { useSelectionOperations } from './hooks/useSelectionOperations';
@@ -37,20 +38,13 @@ import type {
   Selection,
   Tool
 } from './editor/types';
-import type { ClipboardPixelBlock, FloatingPasteState } from './editor/floating-paste';
 import type { DrawState } from './editor/canvas-pointer';
-import { hasSamePaletteEntries, resolveNextSelectedColor } from './editor/app-utils';
 import {
   FLOATING_HANDLE_ORDER,
   FLOATING_STAGE_PADDING_PX,
-  getFloatingHandleStyle,
-  type FloatingResizeSession
+  getFloatingHandleStyle
 } from './editor/floating-interaction';
-import {
-  collectPaletteUsageFromPixels,
-  syncPaletteEntriesFromPixels,
-  type PaletteUsageAnalysis
-} from './editor/palette-sync';
+import { collectPaletteUsageFromPixels, type PaletteUsageAnalysis } from './editor/palette-sync';
 import { getTransparentBackgroundSurfaceClassName } from './editor/transparent-background';
 import { clonePaletteEntries, createEmptyPixels, normalizePaletteEntries } from './editor/utils';
 
@@ -112,11 +106,9 @@ export function App() {
     moveStartPoint: null,
     moveStartOrigin: null
   });
-  // Internal clipboard for pixel-exact copy/paste behavior.
-  const selectionClipboardRef = useRef<ClipboardPixelBlock | null>(null);
-  // Floating block used by paste/selection move until user confirms or cancels.
-  const floatingPasteRef = useRef<FloatingPasteState | null>(null);
-  const floatingResizeRef = useRef<FloatingResizeSession | null>(null);
+  const { selectionClipboardRef, floatingPasteRef, floatingResizeRef, clearFloatingPaste } = useFloatingSelectionState({
+    drawStateRef
+  });
 
   const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
   const {
@@ -146,20 +138,6 @@ export function App() {
   const paletteUsage = useMemo<PaletteUsageAnalysis>(
     () => collectPaletteUsageFromPixels(pixels, canvasSize),
     [canvasSize, pixels]
-  );
-
-  const syncPaletteAfterPaste = useCallback(
-    (nextPixels: Uint8ClampedArray) => {
-      const { palette: nextPalette } = syncPaletteEntriesFromPixels(palette, nextPixels, canvasSize, {
-        removeUnusedColors: false,
-        addUsedColors: true
-      });
-      if (!hasSamePaletteEntries(palette, nextPalette)) {
-        setPalette(nextPalette);
-        setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
-      }
-    },
-    [canvasSize, palette, selectedColor]
   );
 
   const {
@@ -228,13 +206,6 @@ export function App() {
     }, 3000);
     return () => window.clearTimeout(timer);
   }, [isToastVisible, toastSequence]);
-
-  const clearFloatingPaste = useCallback(() => {
-    floatingPasteRef.current = null;
-    floatingResizeRef.current = null;
-    drawStateRef.current.moveStartPoint = null;
-    drawStateRef.current.moveStartOrigin = null;
-  }, []);
   const { undoStackRef, pushUndo, doUndo } = useUndoHistory({
     canvasSize,
     pixels,
@@ -260,8 +231,10 @@ export function App() {
     importGplPalette,
     exportGplPalette,
     confirmPaletteRemoval,
-    closePaletteRemovalModal
+    closePaletteRemovalModal,
+    syncPaletteAfterPaste
   } = usePaletteManagement({
+    canvasSize,
     currentFilePath,
     palette,
     selectedColor,
@@ -303,30 +276,6 @@ export function App() {
     setStatusText
   });
 
-  const scrollCanvasStageToCell = useCallback(
-    (cell: { x: number; y: number }) => {
-      const stage = canvasStageRef.current;
-      const canvas = canvasRef.current;
-      if (!stage || !canvas) {
-        return;
-      }
-
-      const targetCenterX = canvas.offsetLeft + (cell.x + 0.5) * zoom;
-      const targetCenterY = canvas.offsetTop + (cell.y + 0.5) * zoom;
-      const maxScrollLeft = Math.max(0, stage.scrollWidth - stage.clientWidth);
-      const maxScrollTop = Math.max(0, stage.scrollHeight - stage.clientHeight);
-      const nextScrollLeft = Math.max(0, Math.min(targetCenterX - stage.clientWidth / 2, maxScrollLeft));
-      const nextScrollTop = Math.max(0, Math.min(targetCenterY - stage.clientHeight / 2, maxScrollTop));
-
-      stage.scrollTo({
-        left: nextScrollLeft,
-        top: nextScrollTop,
-        behavior: 'smooth'
-      });
-    },
-    [zoom]
-  );
-
   const {
     hoveredPixelInfo,
     setHoveredPaletteColor,
@@ -352,10 +301,12 @@ export function App() {
   } = usePixelReferences({
     canvasSize,
     pixels,
+    zoom,
     palette,
     paletteUsageByColor: paletteUsage.byColor,
     floatingPasteRef,
-    scrollCanvasStageToCell,
+    canvasStageRef,
+    canvasRef,
     setSelection,
     setLastTilePreviewSelection,
     setSelectedColor,
