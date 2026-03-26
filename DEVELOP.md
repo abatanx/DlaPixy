@@ -107,11 +107,12 @@ npm run dist
   - Floating paste resize uses nearest-neighbor scaling and keeps aspect ratio fixed
   - Floating paste/move controls: `Enter` to finalize, `Esc` to cancel and restore pre-paste state
   - Floating paste can also be nudged by keyboard with arrow keys (`1px` per press)
-  - Floating paste can be moved slightly outside the canvas while previewing
+  - Floating paste can be moved slightly outside the canvas while previewing, but at least `1px` remains visible
   - Out-of-canvas floating preview is visually clipped; only the in-canvas portion is shown
   - Finalize clips pasted pixels to the canvas bounds; only the visible in-canvas area is applied
   - Selection overlay shows compact numeric labels outside the rectangle (`w` on top/bottom, `h` on left/right, `x,y` at top-left)
   - Selection overlay UI (frame / handles / labels) can overflow into the stage padding and is not clipped by the canvas surface
+  - Selection frame uses a lightweight animated marching-ants style
   - Finalizing floating paste adds missing palette swatches for pasted colors and does not remove existing swatches
   - Selected pixels are draggable directly (same behavior as pasted floating block)
 - Undo

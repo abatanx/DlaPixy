@@ -214,12 +214,10 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function clampFloatingRectToStageBounds(
+function clampFloatingRectToVisibleCanvasBounds(
   rect: { x: number; y: number; width: number; height: number },
-  canvasSize: number,
-  paddingCells: number
+  canvasSize: number
 ): { x: number; y: number; width: number; height: number } {
-  void paddingCells;
   const minX = 1 - rect.width;
   const minY = 1 - rect.height;
   const maxX = canvasSize - 1;
@@ -395,7 +393,7 @@ function createResizedRectFromHandle(
       break;
   }
 
-  return clampFloatingRectToStageBounds({ x, y, width, height }, canvasSize, stagePaddingCells);
+  return clampFloatingRectToVisibleCanvasBounds({ x, y, width, height }, canvasSize);
 }
 
 function hasHoveredPixelInfoSameContent(
@@ -869,15 +867,14 @@ export function App() {
       }
 
       const origin = resolveDefaultPasteOrigin(clip, mode);
-      const nextRect = clampFloatingRectToStageBounds(
+      const nextRect = clampFloatingRectToVisibleCanvasBounds(
         {
           x: origin.x,
           y: origin.y,
           width: clip.width,
           height: clip.height
         },
-        canvasSize,
-        floatingStagePaddingCells
+        canvasSize
       );
 
       pushUndo();
@@ -914,7 +911,7 @@ export function App() {
       setStatusText(`画像を貼り付けました (${clip.width}x${clip.height}) - Enterで確定 / Escでキャンセル`, 'success');
       return true;
     },
-    [canvasSize, floatingStagePaddingCells, pixels, pushUndo, resolveDefaultPasteOrigin, selection, setStatusText, tool]
+    [canvasSize, pixels, pushUndo, resolveDefaultPasteOrigin, selection, setStatusText, tool]
   );
 
   const resetTilePreviewLayers = useCallback(() => {
@@ -1989,15 +1986,14 @@ export function App() {
         const floating = floatingPasteRef.current;
         const dx = pointer.x - drawStateRef.current.moveStartPoint.x;
         const dy = pointer.y - drawStateRef.current.moveStartPoint.y;
-        const nextRect = clampFloatingRectToStageBounds(
+        const nextRect = clampFloatingRectToVisibleCanvasBounds(
           {
             x: Math.round(drawStateRef.current.moveStartOrigin.x + dx),
             y: Math.round(drawStateRef.current.moveStartOrigin.y + dy),
             width: floating.width,
             height: floating.height
           },
-          canvasSize,
-          floatingStagePaddingCells
+          canvasSize
         );
 
         if (nextRect.x !== floating.x || nextRect.y !== floating.y) {
@@ -2018,15 +2014,14 @@ export function App() {
         return false;
       }
 
-      const nextRect = clampFloatingRectToStageBounds(
+      const nextRect = clampFloatingRectToVisibleCanvasBounds(
         {
           x: floating.x + dx,
           y: floating.y + dy,
           width: floating.width,
           height: floating.height
         },
-        canvasSize,
-        floatingStagePaddingCells
+        canvasSize
       );
       if (nextRect.x === floating.x && nextRect.y === floating.y) {
         return false;
@@ -2035,7 +2030,7 @@ export function App() {
       applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, floating.width, floating.height);
       return true;
     },
-    [applyFloatingPasteBlock, canvasSize, floatingStagePaddingCells]
+    [applyFloatingPasteBlock, canvasSize]
   );
 
   const onMouseDown = useCallback(

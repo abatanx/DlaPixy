@@ -714,8 +714,29 @@ body {
   content: '';
   position: absolute;
   inset: -2px;
-  border: 2px dashed rgba(255, 0, 0, 0.95);
   pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.95) 0 6px, transparent 6px 10px) 0 0 / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.95) 0 6px, transparent 6px 10px) 0 100% / 100% 2px no-repeat,
+    repeating-linear-gradient(0deg, rgba(255, 0, 0, 0.95) 0 6px, transparent 6px 10px) 0 0 / 2px 100% no-repeat,
+    repeating-linear-gradient(0deg, rgba(255, 0, 0, 0.95) 0 6px, transparent 6px 10px) 100% 0 / 2px 100% no-repeat;
+  animation: canvas-selection-border-march 0.8s linear infinite;
+}
+
+@keyframes canvas-selection-border-march {
+  to {
+    background-position:
+      10px 0,
+      -10px 100%,
+      0 -10px,
+      100% 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-selection-overlay::before {
+    animation: none;
+  }
 }
 
 .canvas-selection-overlay.is-floating {
