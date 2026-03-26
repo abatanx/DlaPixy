@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { CanvasSizeModal } from './modals/CanvasSizeModal';
 import { ConfirmModal } from './modals/ConfirmModal';
 import { GridSpacingModal } from './modals/GridSpacingModal';

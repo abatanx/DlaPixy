@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { MAX_ZOOM, MIN_ZOOM } from '../editor/constants';
 import type { Tool } from '../editor/types';
 

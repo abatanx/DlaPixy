@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { memo } from 'react';
 import { SidebarPaletteSection } from './sidebar/SidebarPaletteSection';
 import { SidebarPreviewSection } from './sidebar/SidebarPreviewSection';

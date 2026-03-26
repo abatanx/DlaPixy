@@ -448,7 +448,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 3. 大規模改修より、小さい差分で機能追加/修正する
 4. メタ情報のスキーマは `EditorMeta` 定義に合わせる
 5. 右端縦ツールバー + FontAwesome のUIルールを維持する
-6. リポジトリ管理下の `.ts` / `.css` ソースは、先頭の共通 copyright header を維持する
+6. リポジトリ管理下の `.ts` / `.tsx` / `.css` ソースは、先頭の共通 copyright header を維持する
 
 ## 11. ワークスペースメモ
 - ルートに `+` という未使用ファイルが存在（`/Users/abatan/Develop/DlaPixy/+`）

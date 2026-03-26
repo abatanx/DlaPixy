@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { PALETTE_CAPTION_MAX_LENGTH } from '../../editor/constants';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { getTransparentBackgroundSurfaceClassName } from '../../editor/transparent-background';

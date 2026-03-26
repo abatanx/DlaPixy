@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { createImagePreviewDataUrl } from '../../editor/preview';
 import { getTransparentBackgroundSurfaceClassName } from '../../editor/transparent-background';

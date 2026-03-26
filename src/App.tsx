@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useMemo, useRef, useState } from 'react';
 import { EditorCanvasWorkspace } from './components/EditorCanvasWorkspace';
 import { EditorModalLayer } from './components/EditorModalLayer';

@@ -444,7 +444,7 @@ Current metadata shape:
 3. Avoid rewriting full editor flow; prefer small, isolated diffs.
 4. Keep metadata schema aligned with current `EditorMeta` definition.
 5. Keep UI consistency with right-side vertical toolbar and FontAwesome icon language.
-6. Keep the common copyright header at the top of repository-managed `.ts` / `.css` source files.
+6. Keep the common copyright header at the top of repository-managed `.ts` / `.tsx` / `.css` source files.
 
 ## 11. Local Workspace Note
 - There is a stray root file named `+` in workspace (`/Users/abatan/Develop/DlaPixy/+`).

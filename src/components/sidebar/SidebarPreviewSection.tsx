@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { memo, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
 import { getTransparentBackgroundSurfaceClassName } from '../../editor/transparent-background';
 import type { SidebarPreviewSectionProps } from './types';
