@@ -251,6 +251,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/useEditorShortcuts.ts`
   - グローバルショートカットとネイティブメニュー action の配線をまとめる hook
   - shortcut 系の副作用を root JSX から切り離す
+- `src/hooks/useCanvasViewport.ts`
+  - Space キー中の pan、wheel zoom、zoom anchor 復元、viewport 復元をまとめる hook
+  - ドキュメント読込/保存やキャンバス操作が viewport 副作用を `App.tsx` で直接持たないようにする
 - `src/hooks/usePixelReferences.ts`
   - ホバー中ピクセル、参照ライン、パレット hover からの `F` 固定、drag/copy 操作をまとめる hook
   - キャンバスの参照/インスペクタ挙動を 1 か所に寄せて、`App.tsx` から callback 群を減らす

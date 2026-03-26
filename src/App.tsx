@@ -17,6 +17,7 @@ import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
 import { SelectionRotateModal } from './components/modals/SelectionRotateModal';
 import { ZoomModal } from './components/modals/ZoomModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
+import { useCanvasViewport } from './hooks/useCanvasViewport';
 import { useDocumentFileActions } from './hooks/useDocumentFileActions';
 import { useFloatingInteraction } from './hooks/useFloatingInteraction';
 import { useEditorShortcuts } from './hooks/useEditorShortcuts';
@@ -33,10 +34,8 @@ import {
   DEFAULT_PALETTE,
   DEFAULT_ZOOM,
   MAX_CANVAS_SIZE,
-  MAX_ZOOM,
   MAX_UNDO,
-  MIN_CANVAS_SIZE,
-  MIN_ZOOM
+  MIN_CANVAS_SIZE
 } from './editor/constants';
 import type {
   AnimationFrame,
@@ -118,20 +117,11 @@ type PaletteRemovalRequest = {
   usedPixelCount: number;
 };
 
-type ZoomAnchor = {
-  canvasX: number;
-  canvasY: number;
-  viewportX: number;
-  viewportY: number;
-};
-
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 const DEFAULT_ANIMATION_PREVIEW_FPS = 6;
 const MIN_ANIMATION_PREVIEW_FPS = 1;
 const MAX_ANIMATION_PREVIEW_FPS = 24;
-const SPACE_WHEEL_ZOOM_THRESHOLD = 120;
-const SPACE_WHEEL_ZOOM_RESET_MS = 160;
 const CANVAS_FRAME_PX = 1;
 
 function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boolean {
@@ -175,13 +165,10 @@ export function App() {
   const [toastType, setToastType] = useState<ToastType>('info');
   const [isToastVisible, setIsToastVisible] = useState<boolean>(false);
   const [toastSequence, setToastSequence] = useState<number>(0);
-  const [viewportRestoreSequence, setViewportRestoreSequence] = useState<number>(0);
   const [paletteColorModalRequest, setPaletteColorModalRequest] = useState<PaletteColorModalRequest>(null);
   const [paletteRemovalRequest, setPaletteRemovalRequest] = useState<PaletteRemovalRequest | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
-  const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
-  const [isPanning, setIsPanning] = useState<boolean>(false);
   const [isCanvasSizeModalOpen, setIsCanvasSizeModalOpen] = useState<boolean>(false);
   const [isGridSpacingModalOpen, setIsGridSpacingModalOpen] = useState<boolean>(false);
   const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
@@ -199,10 +186,6 @@ export function App() {
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const floatingPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
-  const pendingZoomAnchorRef = useRef<ZoomAnchor | null>(null);
-  const pendingViewportRestoreRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
-  const spaceWheelZoomAccumRef = useRef<number>(0);
-  const spaceWheelZoomResetTimerRef = useRef<number | null>(null);
   const tilePreviewLayerIdRef = useRef<number>(1);
   const animationFrameIdRef = useRef<number>(1);
   const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
@@ -236,20 +219,6 @@ export function App() {
     moveStartPoint: null,
     moveStartOrigin: null
   });
-  // panStateRef: remembers scroll origin while Space + drag panning.
-  const panStateRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    startScrollLeft: number;
-    startScrollTop: number;
-  }>({
-    active: false,
-    startX: 0,
-    startY: 0,
-    startScrollLeft: 0,
-    startScrollTop: 0
-  });
   // Internal clipboard for pixel-exact copy/paste behavior.
   const selectionClipboardRef = useRef<ClipboardPixelBlock | null>(null);
   // Floating block used by paste/selection move until user confirms or cancels.
@@ -258,6 +227,28 @@ export function App() {
   const undoStackRef = useRef<UndoSnapshot[]>([]);
 
   const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
+  const {
+    isSpacePressed,
+    isPanning,
+    panStateRef,
+    beginPan,
+    updatePan,
+    endPan,
+    pendingZoomAnchorRef,
+    pendingViewportRestoreRef,
+    setViewportRestoreSequence,
+    applyZoom,
+    zoomIn,
+    zoomOut
+  } = useCanvasViewport({
+    canvasSize,
+    zoom,
+    setZoom,
+    canvasRef,
+    canvasStageRef,
+    canvasPointerRef,
+    setStatusText
+  });
   const isFloatingPasteActive = floatingPasteRef.current !== null;
   const floatingStagePaddingCells = useMemo(() => Math.max(1, Math.ceil(FLOATING_STAGE_PADDING_PX / zoom)), [zoom]);
   const paletteUsage = useMemo<PaletteUsageAnalysis>(
@@ -563,123 +554,6 @@ export function App() {
     ctx.putImageData(new ImageData(floating.pixels.slice(), floating.width, floating.height), 0, 0);
   }, [pixels, selection]);
 
-  const endPan = useCallback(() => {
-    if (!panStateRef.current.active) {
-      return;
-    }
-    panStateRef.current.active = false;
-    setIsPanning(false);
-  }, []);
-
-  const beginPan = useCallback((clientX: number, clientY: number) => {
-    const stage = canvasStageRef.current;
-    if (!stage) {
-      return;
-    }
-
-    panStateRef.current = {
-      active: true,
-      startX: clientX,
-      startY: clientY,
-      startScrollLeft: stage.scrollLeft,
-      startScrollTop: stage.scrollTop
-    };
-    setIsPanning(true);
-  }, []);
-
-  const updatePan = useCallback((clientX: number, clientY: number) => {
-    const stage = canvasStageRef.current;
-    if (!stage || !panStateRef.current.active) {
-      return;
-    }
-
-    const dx = clientX - panStateRef.current.startX;
-    const dy = clientY - panStateRef.current.startY;
-    stage.scrollLeft = panStateRef.current.startScrollLeft - dx;
-    stage.scrollTop = panStateRef.current.startScrollTop - dy;
-  }, []);
-
-  const resetSpaceWheelZoomAccumulation = useCallback(() => {
-    spaceWheelZoomAccumRef.current = 0;
-    if (spaceWheelZoomResetTimerRef.current !== null) {
-      window.clearTimeout(spaceWheelZoomResetTimerRef.current);
-      spaceWheelZoomResetTimerRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    const isEditableElement = (target: EventTarget | null): boolean => {
-      if (!(target instanceof HTMLElement)) {
-        return false;
-      }
-      const tag = target.tagName;
-      return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== 'Space') {
-        return;
-      }
-      if (isEditableElement(event.target)) {
-        return;
-      }
-      event.preventDefault();
-      setIsSpacePressed(true);
-    };
-
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (event.code !== 'Space') {
-        return;
-      }
-      setIsSpacePressed(false);
-      endPan();
-      resetSpaceWheelZoomAccumulation();
-    };
-
-    const onBlur = () => {
-      setIsSpacePressed(false);
-      endPan();
-      resetSpaceWheelZoomAccumulation();
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
-
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
-    };
-  }, [endPan, resetSpaceWheelZoomAccumulation]);
-
-  useEffect(() => {
-    return () => {
-      resetSpaceWheelZoomAccumulation();
-    };
-  }, [resetSpaceWheelZoomAccumulation]);
-
-  useEffect(() => {
-    if (!isPanning) {
-      return;
-    }
-
-    const onMouseMove = (event: MouseEvent) => {
-      updatePan(event.clientX, event.clientY);
-    };
-    const onMouseUp = () => {
-      endPan();
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [isPanning, updatePan, endPan]);
-
   useEffect(() => {
     if (!isToastVisible) {
       return;
@@ -902,156 +776,6 @@ export function App() {
       });
     },
     [zoom]
-  );
-
-  const clampCanvasCoordinate = useCallback((value: number) => {
-    return Math.max(0, Math.min(value, canvasSize));
-  }, [canvasSize]);
-
-  const resolveZoomAnchorFromClientPoint = useCallback(
-    (clientX: number, clientY: number): ZoomAnchor | null => {
-      const stage = canvasStageRef.current;
-      const canvas = canvasRef.current;
-      if (!stage || !canvas) {
-        return null;
-      }
-
-      const canvasRect = canvas.getBoundingClientRect();
-      if (
-        clientX < canvasRect.left ||
-        clientX > canvasRect.right ||
-        clientY < canvasRect.top ||
-        clientY > canvasRect.bottom
-      ) {
-        return null;
-      }
-
-      const stageRect = stage.getBoundingClientRect();
-      return {
-        canvasX: clampCanvasCoordinate((clientX - canvasRect.left) / zoom),
-        canvasY: clampCanvasCoordinate((clientY - canvasRect.top) / zoom),
-        viewportX: clientX - stageRect.left,
-        viewportY: clientY - stageRect.top
-      };
-    },
-    [clampCanvasCoordinate, zoom]
-  );
-
-  const resolveViewportCenterZoomAnchor = useCallback((): ZoomAnchor | null => {
-    const stage = canvasStageRef.current;
-    const canvas = canvasRef.current;
-    if (!stage || !canvas) {
-      return null;
-    }
-
-    const viewportX = stage.clientWidth / 2;
-    const viewportY = stage.clientHeight / 2;
-    return {
-      canvasX: clampCanvasCoordinate((stage.scrollLeft + viewportX - canvas.offsetLeft) / zoom),
-      canvasY: clampCanvasCoordinate((stage.scrollTop + viewportY - canvas.offsetTop) / zoom),
-      viewportX,
-      viewportY
-    };
-  }, [clampCanvasCoordinate, zoom]);
-
-  const resolveZoomAnchor = useCallback(
-    (clientPoint?: { clientX: number; clientY: number } | null): ZoomAnchor | null => {
-      if (clientPoint) {
-        const hoveredAnchor = resolveZoomAnchorFromClientPoint(clientPoint.clientX, clientPoint.clientY);
-        if (hoveredAnchor) {
-          return hoveredAnchor;
-        }
-      }
-
-      if (canvasPointerRef.current) {
-        const pointerAnchor = resolveZoomAnchorFromClientPoint(
-          canvasPointerRef.current.clientX,
-          canvasPointerRef.current.clientY
-        );
-        if (pointerAnchor) {
-          return pointerAnchor;
-        }
-      }
-
-      return resolveViewportCenterZoomAnchor();
-    },
-    [resolveViewportCenterZoomAnchor, resolveZoomAnchorFromClientPoint]
-  );
-
-  const restoreZoomAnchor = useCallback(
-    (anchor: ZoomAnchor) => {
-      const stage = canvasStageRef.current;
-      const canvas = canvasRef.current;
-      if (!stage || !canvas) {
-        return;
-      }
-
-      const maxScrollLeft = Math.max(0, stage.scrollWidth - stage.clientWidth);
-      const maxScrollTop = Math.max(0, stage.scrollHeight - stage.clientHeight);
-      const nextScrollLeft = Math.max(
-        0,
-        Math.min(canvas.offsetLeft + anchor.canvasX * zoom - anchor.viewportX, maxScrollLeft)
-      );
-      const nextScrollTop = Math.max(
-        0,
-        Math.min(canvas.offsetTop + anchor.canvasY * zoom - anchor.viewportY, maxScrollTop)
-      );
-
-      stage.scrollLeft = nextScrollLeft;
-      stage.scrollTop = nextScrollTop;
-    },
-    [zoom]
-  );
-
-  const restoreCanvasViewport = useCallback((viewport: { scrollLeft: number; scrollTop: number }) => {
-    const stage = canvasStageRef.current;
-    if (!stage) {
-      return;
-    }
-
-    const maxScrollLeft = Math.max(0, stage.scrollWidth - stage.clientWidth);
-    const maxScrollTop = Math.max(0, stage.scrollHeight - stage.clientHeight);
-    stage.scrollLeft = Math.max(0, Math.min(viewport.scrollLeft, maxScrollLeft));
-    stage.scrollTop = Math.max(0, Math.min(viewport.scrollTop, maxScrollTop));
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!pendingZoomAnchorRef.current) {
-      return;
-    }
-
-    restoreZoomAnchor(pendingZoomAnchorRef.current);
-    pendingZoomAnchorRef.current = null;
-  }, [restoreZoomAnchor, zoom]);
-
-  useLayoutEffect(() => {
-    if (!pendingViewportRestoreRef.current) {
-      return;
-    }
-
-    restoreCanvasViewport(pendingViewportRestoreRef.current);
-    pendingViewportRestoreRef.current = null;
-  }, [canvasSize, restoreCanvasViewport, viewportRestoreSequence, zoom]);
-
-  const setZoomWithAnchor = useCallback(
-    (nextZoom: number, clientPoint?: { clientX: number; clientY: number } | null) => {
-      const normalizedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.trunc(nextZoom)));
-      if (normalizedZoom !== zoom) {
-        pendingZoomAnchorRef.current = resolveZoomAnchor(clientPoint);
-      } else {
-        pendingZoomAnchorRef.current = null;
-      }
-      setZoom(normalizedZoom);
-      setStatusText(`表示倍率: ${normalizedZoom}x`, 'success');
-    },
-    [resolveZoomAnchor, setStatusText, zoom]
-  );
-
-  const stepZoom = useCallback(
-    (delta: number, clientPoint?: { clientX: number; clientY: number } | null) => {
-      setZoomWithAnchor(zoom + delta, clientPoint);
-    },
-    [setZoomWithAnchor, zoom]
   );
 
   const resetDrawState = useCallback(() => {
@@ -1357,70 +1081,6 @@ export function App() {
     };
   }, [onMouseUp, updateFloatingInteractionFromClient]);
 
-  useEffect(() => {
-    const stage = canvasStageRef.current;
-    if (!stage) {
-      return;
-    }
-
-    const handleWheel = (event: WheelEvent) => {
-      if (!isSpacePressed) {
-        return;
-      }
-
-      // Space + wheel is reserved for zoom, so suppress native stage scrolling.
-      event.preventDefault();
-      event.stopPropagation();
-
-      if (isPanning) {
-        return;
-      }
-
-      if (event.deltaY === 0) {
-        return;
-      }
-
-      const normalizedDelta =
-        event.deltaMode === 1
-          ? event.deltaY * 40
-          : event.deltaMode === 2
-            ? event.deltaY * stage.clientHeight
-            : event.deltaY;
-
-      if (Math.abs(normalizedDelta) < 1) {
-        return;
-      }
-
-      spaceWheelZoomAccumRef.current += normalizedDelta;
-      if (spaceWheelZoomResetTimerRef.current !== null) {
-        window.clearTimeout(spaceWheelZoomResetTimerRef.current);
-      }
-      spaceWheelZoomResetTimerRef.current = window.setTimeout(() => {
-        resetSpaceWheelZoomAccumulation();
-      }, SPACE_WHEEL_ZOOM_RESET_MS);
-
-      const anchorPoint = {
-        clientX: event.clientX,
-        clientY: event.clientY
-      };
-
-      while (spaceWheelZoomAccumRef.current <= -SPACE_WHEEL_ZOOM_THRESHOLD) {
-        stepZoom(1, anchorPoint);
-        spaceWheelZoomAccumRef.current += SPACE_WHEEL_ZOOM_THRESHOLD;
-      }
-
-      while (spaceWheelZoomAccumRef.current >= SPACE_WHEEL_ZOOM_THRESHOLD) {
-        stepZoom(-1, anchorPoint);
-        spaceWheelZoomAccumRef.current -= SPACE_WHEEL_ZOOM_THRESHOLD;
-      }
-    };
-
-    stage.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      stage.removeEventListener('wheel', handleWheel);
-    };
-  }, [isPanning, isSpacePressed, resetSpaceWheelZoomAccumulation, stepZoom]);
-
   const onCanvasStageMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (event.target !== event.currentTarget) {
@@ -1481,10 +1141,6 @@ export function App() {
   const closeGridSpacingModal = useCallback(() => {
     setIsGridSpacingModalOpen(false);
   }, []);
-
-  const applyZoom = useCallback((value: number) => {
-    setZoomWithAnchor(value);
-  }, [setZoomWithAnchor]);
 
   const openZoomModal = useCallback(() => {
     setIsZoomModalOpen(true);
@@ -1633,14 +1289,6 @@ export function App() {
     },
     [canvasSize, kMeansQuantizeRequest, palette, pixels, pushUndo, selectedColor, setStatusText]
   );
-
-  const zoomIn = useCallback(() => {
-    stepZoom(1);
-  }, [stepZoom]);
-
-  const zoomOut = useCallback(() => {
-    stepZoom(-1);
-  }, [stepZoom]);
 
   const doUndo = useCallback(() => {
     const previous = undoStackRef.current.pop();
