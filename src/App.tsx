@@ -18,6 +18,7 @@ import { SelectionRotateModal } from './components/modals/SelectionRotateModal';
 import { ZoomModal } from './components/modals/ZoomModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
 import { useDocumentFileActions } from './hooks/useDocumentFileActions';
+import { useFloatingInteraction } from './hooks/useFloatingInteraction';
 import { useEditorShortcuts } from './hooks/useEditorShortcuts';
 import { useFloatingPaste } from './hooks/useFloatingPaste';
 import { usePixelReferences } from './hooks/usePixelReferences';
@@ -47,6 +48,12 @@ import type {
 import type { ClipboardPixelBlock, FloatingPasteState } from './editor/floating-paste';
 import { getFileNameFromPath, replaceFileExtension, resolveNextSelectedColor } from './editor/app-utils';
 import {
+  FLOATING_HANDLE_ORDER,
+  FLOATING_STAGE_PADDING_PX,
+  getFloatingHandleStyle,
+  type FloatingResizeSession
+} from './editor/floating-interaction';
+import {
   extractSelectionPixels,
   quantizeSelectionWithKMeans,
   suggestKMeansColorCount,
@@ -71,7 +78,6 @@ import {
   type SelectionPixelBlock
 } from './editor/selection-rotate';
 import {
-  blitBlockOnCanvas,
   clampSelectionToCanvas,
   clonePaletteEntries,
   clonePixels,
@@ -81,8 +87,7 @@ import {
   normalizePaletteEntries,
   pointInSelection,
   rasterLinePoints,
-  resizeCanvasPixels,
-  resizePixelBlockNearest
+  resizeCanvasPixels
 } from './editor/utils';
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
@@ -120,24 +125,6 @@ type ZoomAnchor = {
   viewportY: number;
 };
 
-type FloatingResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
-
-type FloatingResizeAnchor = {
-  x: number;
-  y: number;
-};
-
-type FloatingResizeSession = {
-  handle: FloatingResizeHandle;
-  anchor: FloatingResizeAnchor;
-  startRect: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-};
-
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 const DEFAULT_ANIMATION_PREVIEW_FPS = 6;
@@ -146,9 +133,6 @@ const MAX_ANIMATION_PREVIEW_FPS = 24;
 const SPACE_WHEEL_ZOOM_THRESHOLD = 120;
 const SPACE_WHEEL_ZOOM_RESET_MS = 160;
 const CANVAS_FRAME_PX = 1;
-const FLOATING_HANDLE_RADIUS = 10;
-const FLOATING_STAGE_PADDING_PX = 72;
-const FLOATING_HANDLE_ORDER: FloatingResizeHandle[] = ['tl', 'tc', 'tr', 'ml', 'mr', 'bl', 'bc', 'br'];
 
 function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boolean {
   if (left.length !== right.length) {
@@ -161,192 +145,6 @@ function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boo
       entry.caption === right[index]?.caption &&
       entry.locked === right[index]?.locked
   );
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function clampFloatingRectToVisibleCanvasBounds(
-  rect: { x: number; y: number; width: number; height: number },
-  canvasSize: number
-): { x: number; y: number; width: number; height: number } {
-  const minX = 1 - rect.width;
-  const minY = 1 - rect.height;
-  const maxX = canvasSize - 1;
-  const maxY = canvasSize - 1;
-
-  return {
-    x: clampNumber(rect.x, Math.min(minX, maxX), Math.max(minX, maxX)),
-    y: clampNumber(rect.y, Math.min(minY, maxY), Math.max(minY, maxY)),
-    width: rect.width,
-    height: rect.height
-  };
-}
-
-function getFloatingHandleStyle(handle: FloatingResizeHandle): CSSProperties {
-  const baseStyle: CSSProperties = {
-    transform: 'translate(-50%, -50%)'
-  };
-
-  switch (handle) {
-    case 'tl':
-      return { ...baseStyle, left: '0%', top: '0%', cursor: 'nwse-resize' };
-    case 'tc':
-      return { ...baseStyle, left: '50%', top: '0%', cursor: 'ns-resize' };
-    case 'tr':
-      return { ...baseStyle, left: '100%', top: '0%', cursor: 'nesw-resize' };
-    case 'ml':
-      return { ...baseStyle, left: '0%', top: '50%', cursor: 'ew-resize' };
-    case 'mr':
-      return { ...baseStyle, left: '100%', top: '50%', cursor: 'ew-resize' };
-    case 'bl':
-      return { ...baseStyle, left: '0%', top: '100%', cursor: 'nesw-resize' };
-    case 'bc':
-      return { ...baseStyle, left: '50%', top: '100%', cursor: 'ns-resize' };
-    case 'br':
-      return { ...baseStyle, left: '100%', top: '100%', cursor: 'nwse-resize' };
-  }
-}
-
-function getFloatingHandlePoints(selection: SelectionRect, zoom: number): Array<{
-  handle: FloatingResizeHandle;
-  x: number;
-  y: number;
-}> {
-  const left = selection.x * zoom;
-  const centerX = (selection.x + selection.w / 2) * zoom;
-  const right = (selection.x + selection.w) * zoom;
-  const top = selection.y * zoom;
-  const centerY = (selection.y + selection.h / 2) * zoom;
-  const bottom = (selection.y + selection.h) * zoom;
-
-  return [
-    { handle: 'tl', x: left, y: top },
-    { handle: 'tc', x: centerX, y: top },
-    { handle: 'tr', x: right, y: top },
-    { handle: 'ml', x: left, y: centerY },
-    { handle: 'mr', x: right, y: centerY },
-    { handle: 'bl', x: left, y: bottom },
-    { handle: 'bc', x: centerX, y: bottom },
-    { handle: 'br', x: right, y: bottom }
-  ];
-}
-
-function getResizeAnchorForHandle(handle: FloatingResizeHandle, selection: SelectionRect): FloatingResizeAnchor {
-  switch (handle) {
-    case 'tl':
-      return { x: selection.x + selection.w, y: selection.y + selection.h };
-    case 'tc':
-      return { x: selection.x + selection.w / 2, y: selection.y + selection.h };
-    case 'tr':
-      return { x: selection.x, y: selection.y + selection.h };
-    case 'ml':
-      return { x: selection.x + selection.w, y: selection.y + selection.h / 2 };
-    case 'mr':
-      return { x: selection.x, y: selection.y + selection.h / 2 };
-    case 'bl':
-      return { x: selection.x + selection.w, y: selection.y };
-    case 'bc':
-      return { x: selection.x + selection.w / 2, y: selection.y };
-    case 'br':
-      return { x: selection.x, y: selection.y };
-  }
-}
-
-function resolveScaleFromHandle(
-  handle: FloatingResizeHandle,
-  rawWidth: number,
-  rawHeight: number,
-  sourceWidth: number,
-  sourceHeight: number,
-  currentWidth: number,
-  currentHeight: number
-): number {
-  const scaleX = rawWidth / sourceWidth;
-  const scaleY = rawHeight / sourceHeight;
-  const currentScaleX = currentWidth / sourceWidth;
-  const currentScaleY = currentHeight / sourceHeight;
-
-  if (handle === 'tc' || handle === 'bc') {
-    return scaleY;
-  }
-  if (handle === 'ml' || handle === 'mr') {
-    return scaleX;
-  }
-
-  return Math.abs(scaleX - currentScaleX) >= Math.abs(scaleY - currentScaleY) ? scaleX : scaleY;
-}
-
-function createResizedRectFromHandle(
-  handle: FloatingResizeHandle,
-  anchor: FloatingResizeAnchor,
-  pointerX: number,
-  pointerY: number,
-  floating: FloatingPasteState,
-  currentRect: FloatingResizeSession['startRect'],
-  canvasSize: number,
-  stagePaddingCells: number
-): { x: number; y: number; width: number; height: number } {
-  const rawWidth = Math.max(1 / floating.sourceWidth, Math.abs(anchor.x - pointerX));
-  const rawHeight = Math.max(1 / floating.sourceHeight, Math.abs(anchor.y - pointerY));
-  const minScale = Math.max(1 / floating.sourceWidth, 1 / floating.sourceHeight);
-  const stageSpan = canvasSize + stagePaddingCells * 2;
-  const maxScale = Math.min(stageSpan / floating.sourceWidth, stageSpan / floating.sourceHeight);
-  const nextScale = clampNumber(
-    resolveScaleFromHandle(
-      handle,
-      rawWidth,
-      rawHeight,
-      floating.sourceWidth,
-      floating.sourceHeight,
-      currentRect.width,
-      currentRect.height
-    ),
-    minScale,
-    maxScale
-  );
-  const width = Math.max(1, Math.round(floating.sourceWidth * nextScale));
-  const height = Math.max(1, Math.round(floating.sourceHeight * nextScale));
-
-  let x = currentRect.x;
-  let y = currentRect.y;
-  switch (handle) {
-    case 'tl':
-      x = Math.round(anchor.x - width);
-      y = Math.round(anchor.y - height);
-      break;
-    case 'tc':
-      x = Math.round(anchor.x - width / 2);
-      y = Math.round(anchor.y - height);
-      break;
-    case 'tr':
-      x = Math.round(anchor.x);
-      y = Math.round(anchor.y - height);
-      break;
-    case 'ml':
-      x = Math.round(anchor.x - width);
-      y = Math.round(anchor.y - height / 2);
-      break;
-    case 'mr':
-      x = Math.round(anchor.x);
-      y = Math.round(anchor.y - height / 2);
-      break;
-    case 'bl':
-      x = Math.round(anchor.x - width);
-      y = Math.round(anchor.y);
-      break;
-    case 'bc':
-      x = Math.round(anchor.x - width / 2);
-      y = Math.round(anchor.y);
-      break;
-    case 'br':
-      x = Math.round(anchor.x);
-      y = Math.round(anchor.y);
-      break;
-  }
-
-  return clampFloatingRectToVisibleCanvasBounds({ x, y, width, height }, canvasSize);
 }
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
@@ -516,36 +314,6 @@ export function App() {
     [canvasSize, resolveCanvasPointFromClient]
   );
 
-  const resolveFloatingResizeHandleFromClientPoint = useCallback(
-    (clientX: number, clientY: number): FloatingResizeHandle | null => {
-      if (!selection || !floatingPasteRef.current) {
-        return null;
-      }
-
-      const canvas = canvasRef.current;
-      if (!canvas) {
-        return null;
-      }
-
-      const rect = canvas.getBoundingClientRect();
-      const localX = ((clientX - rect.left) / rect.width) * canvas.width;
-      const localY = ((clientY - rect.top) / rect.height) * canvas.height;
-
-      let nearest: { handle: FloatingResizeHandle; distance: number } | null = null;
-      for (const point of getFloatingHandlePoints(selection, zoom)) {
-        const distance = Math.hypot(localX - point.x, localY - point.y);
-        if (distance > FLOATING_HANDLE_RADIUS) {
-          continue;
-        }
-        if (!nearest || distance < nearest.distance) {
-          nearest = { handle: point.handle, distance };
-        }
-      }
-
-      return nearest?.handle ?? null;
-    },
-    [selection, zoom]
-  );
   const previewDataUrl = useMemo(() => {
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = canvasSize;
@@ -1086,6 +854,7 @@ export function App() {
 
   const {
     applyFloatingPasteBlock,
+    liftSelectionToFloatingPaste,
     copySelection,
     pasteSelection,
     finalizeFloatingPaste,
@@ -1296,37 +1065,6 @@ export function App() {
     floatingResizeRef.current = null;
   }, []);
 
-  const beginFloatingMove = useCallback((point: { x: number; y: number }, origin: { x: number; y: number }) => {
-    drawStateRef.current.active = true;
-    drawStateRef.current.selectionStart = null;
-    drawStateRef.current.selectionMoved = false;
-    drawStateRef.current.clearSelectionOnMouseUp = false;
-    drawStateRef.current.lastDrawCell = null;
-    drawStateRef.current.moveStartPoint = point;
-    drawStateRef.current.moveStartOrigin = origin;
-    floatingResizeRef.current = null;
-  }, []);
-
-  const beginFloatingResize = useCallback((handle: FloatingResizeHandle, selectionRect: SelectionRect) => {
-    drawStateRef.current.active = true;
-    drawStateRef.current.selectionStart = null;
-    drawStateRef.current.selectionMoved = false;
-    drawStateRef.current.clearSelectionOnMouseUp = false;
-    drawStateRef.current.lastDrawCell = null;
-    drawStateRef.current.moveStartPoint = null;
-    drawStateRef.current.moveStartOrigin = null;
-    floatingResizeRef.current = {
-      handle,
-      anchor: getResizeAnchorForHandle(handle, selectionRect),
-      startRect: {
-        x: selectionRect.x,
-        y: selectionRect.y,
-        width: selectionRect.w,
-        height: selectionRect.h
-      }
-    };
-  }, []);
-
   const {
     hoveredPixelInfo,
     setHoveredPaletteColor,
@@ -1363,65 +1101,26 @@ export function App() {
     setStatusText
   });
 
-  const updateFloatingInteractionFromClient = useCallback(
-    (clientX: number, clientY: number): boolean => {
-      if (floatingResizeRef.current && floatingPasteRef.current) {
-        const pointer = resolveCanvasPointFromClient(clientX, clientY);
-        if (!pointer) {
-          return false;
-        }
-
-        const floating = floatingPasteRef.current;
-        const nextRect = createResizedRectFromHandle(
-          floatingResizeRef.current.handle,
-          floatingResizeRef.current.anchor,
-          pointer.x,
-          pointer.y,
-          floating,
-          floatingResizeRef.current.startRect,
-          canvasSize,
-          floatingStagePaddingCells
-        );
-        if (
-          nextRect.x !== floating.x ||
-          nextRect.y !== floating.y ||
-          nextRect.width !== floating.width ||
-          nextRect.height !== floating.height
-        ) {
-          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, nextRect.width, nextRect.height);
-        }
-        return true;
-      }
-
-      if (drawStateRef.current.moveStartPoint && drawStateRef.current.moveStartOrigin && floatingPasteRef.current) {
-        const pointer = resolveCanvasPointFromClient(clientX, clientY);
-        if (!pointer) {
-          return false;
-        }
-
-        const floating = floatingPasteRef.current;
-        const dx = pointer.x - drawStateRef.current.moveStartPoint.x;
-        const dy = pointer.y - drawStateRef.current.moveStartPoint.y;
-        const nextRect = clampFloatingRectToVisibleCanvasBounds(
-          {
-            x: Math.round(drawStateRef.current.moveStartOrigin.x + dx),
-            y: Math.round(drawStateRef.current.moveStartOrigin.y + dy),
-            width: floating.width,
-            height: floating.height
-          },
-          canvasSize
-        );
-
-        if (nextRect.x !== floating.x || nextRect.y !== floating.y) {
-          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, floating.width, floating.height);
-        }
-        return true;
-      }
-
-      return false;
-    },
-    [applyFloatingPasteBlock, canvasSize, floatingStagePaddingCells, resolveCanvasPointFromClient]
-  );
+  const {
+    resolveFloatingResizeHandleFromClientPoint,
+    beginFloatingMove,
+    beginFloatingResize,
+    updateFloatingInteractionFromClient,
+    onFloatingOverlayMouseDown
+  } = useFloatingInteraction({
+    canvasSize,
+    zoom,
+    selection,
+    tool,
+    canvasRef,
+    drawStateRef,
+    floatingPasteRef,
+    floatingResizeRef,
+    floatingStagePaddingCells,
+    resolveCanvasPointFromClient,
+    applyFloatingPasteBlock,
+    setStatusText
+  });
 
   const onMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -1455,51 +1154,11 @@ export function App() {
 
       if (tool === 'select' && selection && pointInSelection(cell, selection)) {
         // Dragging existing selection converts it to floating block for move.
-        pushUndo();
-        const basePixels = clonePixels(pixels);
-        const selectedPixels = new Uint8ClampedArray(selection.w * selection.h * 4);
-        for (let y = 0; y < selection.h; y += 1) {
-          for (let x = 0; x < selection.w; x += 1) {
-            const srcIdx = ((selection.y + y) * canvasSize + (selection.x + x)) * 4;
-            const dstIdx = (y * selection.w + x) * 4;
-            selectedPixels[dstIdx] = pixels[srcIdx];
-            selectedPixels[dstIdx + 1] = pixels[srcIdx + 1];
-            selectedPixels[dstIdx + 2] = pixels[srcIdx + 2];
-            selectedPixels[dstIdx + 3] = pixels[srcIdx + 3];
-
-            basePixels[srcIdx] = 0;
-            basePixels[srcIdx + 1] = 0;
-            basePixels[srcIdx + 2] = 0;
-            basePixels[srcIdx + 3] = 0;
-          }
+        const floating = liftSelectionToFloatingPaste();
+        if (floating) {
+          beginFloatingMove(pointer, { x: floating.x, y: floating.y });
+          setStatusText('選択範囲を移動中', 'info');
         }
-
-        const composited = blitBlockOnCanvas(
-          basePixels,
-          canvasSize,
-          selectedPixels,
-          selection.w,
-          selection.h,
-          selection.x,
-          selection.y
-        );
-        setPixels(composited);
-        floatingPasteRef.current = {
-          x: selection.x,
-          y: selection.y,
-          width: selection.w,
-          height: selection.h,
-          pixels: selectedPixels,
-          sourceWidth: selection.w,
-          sourceHeight: selection.h,
-          sourcePixels: clonePixels(selectedPixels),
-          basePixels,
-          restorePixels: clonePixels(pixels),
-          restoreSelection: cloneSelection(selection),
-          restoreTool: tool
-        };
-        beginFloatingMove(pointer, { x: selection.x, y: selection.y });
-        setStatusText('選択範囲を移動中', 'info');
         return;
       }
 
@@ -1554,7 +1213,7 @@ export function App() {
       getCellFromEvent,
       gridSpacing,
       isSpacePressed,
-      pixels,
+      liftSelectionToFloatingPaste,
       pushUndo,
       resolveCanvasPointFromClient,
       resolveFloatingResizeHandleFromClientPoint,
@@ -2237,33 +1896,6 @@ export function App() {
     setHasUnsavedChanges(true);
     setStatusText('選択範囲を削除しました', 'success');
   }, [canvasSize, clearFloatingPaste, pushUndo, selection]);
-
-  const onFloatingOverlayMouseDown = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>) => {
-      if (tool !== 'select' || !selection || !floatingPasteRef.current) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      const handle = (event.target as HTMLElement | null)?.dataset.handle as FloatingResizeHandle | undefined;
-      if (handle) {
-        beginFloatingResize(handle, selection);
-        setStatusText('選択範囲のサイズを変更中', 'info');
-        return;
-      }
-
-      const pointer = resolveCanvasPointFromClient(event.clientX, event.clientY);
-      if (!pointer) {
-        return;
-      }
-
-      beginFloatingMove(pointer, { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y });
-      setStatusText('選択範囲を移動中', 'info');
-    },
-    [beginFloatingMove, beginFloatingResize, resolveCanvasPointFromClient, selection, setStatusText, tool]
-  );
 
   const selectEntireCanvas = useCallback(() => {
     if (floatingPasteRef.current) {

@@ -5,9 +5,8 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { EditorToolbar } from './EditorToolbar';
+import type { FloatingResizeHandle } from '../editor/floating-interaction';
 import type { HoveredPixelInfo, Selection, Tool } from '../editor/types';
-
-type FloatingResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
 
 type PixelInfoFields = {
   rgba: string;

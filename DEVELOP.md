@@ -262,8 +262,11 @@ Current metadata shape:
   - Hovered pixel state, reference-line state, palette-hover freeze (`F`), and related drag/copy actions
   - Keeps canvas inspector/reference behavior together so `App.tsx` no longer owns that callback cluster
 - `src/hooks/useFloatingPaste.ts`
-  - Clipboard-driven paste lifecycle for copy/paste/finalize/cancel/nudge
-  - Keeps floating-paste side effects together while drag/resize interaction logic can be split later
+  - Clipboard-driven paste lifecycle for copy/paste/finalize/cancel/nudge plus lifting a committed selection into floating state
+  - Keeps floating-paste side effects and selection-to-floating conversion together outside `App.tsx`
+- `src/hooks/useFloatingInteraction.ts`
+  - Pointer-driven floating selection move/resize interaction hook
+  - Owns resize-handle hit testing and floating overlay drag behavior while reusing `App.tsx` refs/state
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - Preview section for 1x preview, tiling preview, and animation preview
   - These three preview blocks are switched by Bootstrap-style tabs
@@ -275,6 +278,8 @@ Current metadata shape:
   - Small shared helpers extracted from `App.tsx` for file-name handling and selected-color resolution
 - `src/editor/floating-paste.ts`
   - Shared floating-paste and internal clipboard types used by `App.tsx` and floating-paste hook
+- `src/editor/floating-interaction.ts`
+  - Shared floating selection resize/move geometry, handle metadata, and overlay styles
 - `src/editor/transparent-background.ts`
   - Maps transparent background mode to reusable renderer surface classes
 - `src/components/sidebar/SidebarPaletteSection.tsx`

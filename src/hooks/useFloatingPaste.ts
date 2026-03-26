@@ -231,6 +231,59 @@ export function useFloatingPaste({
     ]
   );
 
+  const liftSelectionToFloatingPaste = useCallback(() => {
+    if (floatingPasteRef.current || !selection) {
+      return null;
+    }
+
+    pushUndo();
+    const basePixels = clonePixels(pixels);
+    const selectedPixels = new Uint8ClampedArray(selection.w * selection.h * 4);
+    for (let y = 0; y < selection.h; y += 1) {
+      for (let x = 0; x < selection.w; x += 1) {
+        const srcIdx = ((selection.y + y) * canvasSize + (selection.x + x)) * 4;
+        const dstIdx = (y * selection.w + x) * 4;
+        selectedPixels[dstIdx] = pixels[srcIdx];
+        selectedPixels[dstIdx + 1] = pixels[srcIdx + 1];
+        selectedPixels[dstIdx + 2] = pixels[srcIdx + 2];
+        selectedPixels[dstIdx + 3] = pixels[srcIdx + 3];
+
+        basePixels[srcIdx] = 0;
+        basePixels[srcIdx + 1] = 0;
+        basePixels[srcIdx + 2] = 0;
+        basePixels[srcIdx + 3] = 0;
+      }
+    }
+
+    const composited = blitBlockOnCanvas(
+      basePixels,
+      canvasSize,
+      selectedPixels,
+      selection.w,
+      selection.h,
+      selection.x,
+      selection.y
+    );
+    const floating: FloatingPasteState = {
+      x: selection.x,
+      y: selection.y,
+      width: selection.w,
+      height: selection.h,
+      pixels: selectedPixels,
+      sourceWidth: selection.w,
+      sourceHeight: selection.h,
+      sourcePixels: clonePixels(selectedPixels),
+      basePixels,
+      restorePixels: clonePixels(pixels),
+      restoreSelection: cloneSelection(selection),
+      restoreTool: tool
+    };
+
+    setPixels(composited);
+    floatingPasteRef.current = floating;
+    return floating;
+  }, [canvasSize, floatingPasteRef, pixels, pushUndo, selection, setPixels, tool]);
+
   const finalizeFloatingPaste = useCallback(() => {
     const floating = floatingPasteRef.current;
     if (!floating) {
@@ -348,6 +401,7 @@ export function useFloatingPaste({
 
   return {
     applyFloatingPasteBlock,
+    liftSelectionToFloatingPaste,
     copySelection,
     pasteSelection,
     finalizeFloatingPaste,
