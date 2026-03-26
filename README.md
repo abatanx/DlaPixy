@@ -31,6 +31,8 @@ npm run dist
 - パレット選択・色追加
 - 描画 / 消去 / 矩形選択
 - 選択範囲のコピー / 削除
+- DlaPixy 内コピー / OS クリップボード画像の貼り付け
+  - 貼り付け中は 8 箇所ハンドルで拡大縮小して配置可能
 - Undo
 - PNG 保存 / 読込
 - PNG の隣に編集用 sidecar JSON を保存 / 読込（`<filename>.dla-pixy.json`）

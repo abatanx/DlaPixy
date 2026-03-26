@@ -169,6 +169,40 @@ export function resizeCanvasPixels(
   return next;
 }
 
+// 最近傍補間で任意サイズのピクセルブロックを拡大縮小する。
+export function resizePixelBlockNearest(
+  sourcePixels: Uint8ClampedArray,
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number
+): Uint8ClampedArray {
+  const normalizedTargetWidth = Math.max(1, Math.trunc(targetWidth));
+  const normalizedTargetHeight = Math.max(1, Math.trunc(targetHeight));
+  const next = new Uint8ClampedArray(normalizedTargetWidth * normalizedTargetHeight * 4);
+
+  for (let y = 0; y < normalizedTargetHeight; y += 1) {
+    const sourceY = Math.min(
+      sourceHeight - 1,
+      Math.floor((y / normalizedTargetHeight) * sourceHeight)
+    );
+    for (let x = 0; x < normalizedTargetWidth; x += 1) {
+      const sourceX = Math.min(
+        sourceWidth - 1,
+        Math.floor((x / normalizedTargetWidth) * sourceWidth)
+      );
+      const sourceIndex = (sourceY * sourceWidth + sourceX) * 4;
+      const targetIndex = (y * normalizedTargetWidth + x) * 4;
+      next[targetIndex] = sourcePixels[sourceIndex];
+      next[targetIndex + 1] = sourcePixels[sourceIndex + 1];
+      next[targetIndex + 2] = sourcePixels[sourceIndex + 2];
+      next[targetIndex + 3] = sourcePixels[sourceIndex + 3];
+    }
+  }
+
+  return next;
+}
+
 // 2点間を結ぶラスター線分の全ピクセル座標を返す（Bresenham系）。
 export function rasterLinePoints(x0: number, y0: number, x1: number, y1: number): Array<{ x: number; y: number }> {
   const points: Array<{ x: number; y: number }> = [];

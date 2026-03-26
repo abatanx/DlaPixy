@@ -92,7 +92,7 @@ npm run dist
 - Selection operations:
   - Copy selection
   - Delete selection
-  - Paste selection
+  - Paste DlaPixy internal copied selection or OS clipboard image
   - `Y` or the right toolbar button opens a selection rotation modal for the active selection
   - Inside the rotation modal, arrow keys rotate-scroll the preview by `1px` with wraparound
   - The rotation modal also has `90° left / 90° right` buttons, enabled only for square selections
@@ -103,7 +103,10 @@ npm run dist
   - Selection is cleared only when clicking outside the selected area with Select tool; other tool operations keep selection
   - When selection is active, Pencil/Eraser/Fill are constrained to selected pixels only
   - After paste: pasted block is draggable immediately (with Select tool)
+  - Floating paste shows 8 resize handles (`TL / TC / TR / ML / MR / BL / BC / BR`)
+  - Floating paste resize uses nearest-neighbor scaling and keeps aspect ratio fixed
   - Floating paste/move controls: `Enter` to finalize, `Esc` to cancel and restore pre-paste state
+  - Finalizing floating paste adds missing palette swatches for pasted colors and does not remove existing swatches
   - Selected pixels are draggable directly (same behavior as pasted floating block)
 - Undo
 - Save/Load PNG
@@ -124,7 +127,7 @@ npm run dist
   - `Cmd/Ctrl + G` also opens the grid spacing modal
   - `Canvas -> 透過バックグラウンド` switches the transparent preview background mode
   - Modes: `White Check`, `Black Check`, `White`, `Black`, `Magenta`
-  - The chosen mode is saved as an app-wide preference and shared by the editor canvas, left sidebar previews, and renderer modal previews
+  - The chosen mode is mirrored to the native menu from renderer state and is also stored in sidecar editor metadata
   - Sidebar no longer shows persistent canvas size / grid spacing inputs
 - Footer status row
   - `Canvas`, `Grid`, `Zoom`, and `Current File` status are shown in the bottom footer instead of the sidebar

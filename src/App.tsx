@@ -83,7 +83,8 @@ import {
   rasterLinePoints,
   rgbaToHex8,
   rgbaToHsva,
-  resizeCanvasPixels
+  resizeCanvasPixels,
+  resizePixelBlockNearest
 } from './editor/utils';
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
@@ -121,6 +122,48 @@ type ZoomAnchor = {
   viewportY: number;
 };
 
+type ClipboardPixelBlock = {
+  width: number;
+  height: number;
+  pixels: Uint8ClampedArray;
+  sourceX: number;
+  sourceY: number;
+  markerToken?: string;
+};
+
+type FloatingResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
+
+type FloatingPasteState = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pixels: Uint8ClampedArray;
+  sourceWidth: number;
+  sourceHeight: number;
+  sourcePixels: Uint8ClampedArray;
+  basePixels: Uint8ClampedArray;
+  restorePixels: Uint8ClampedArray;
+  restoreSelection: Selection;
+  restoreTool: Tool;
+};
+
+type FloatingResizeAnchor = {
+  x: number;
+  y: number;
+};
+
+type FloatingResizeSession = {
+  handle: FloatingResizeHandle;
+  anchor: FloatingResizeAnchor;
+  startRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+};
+
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 const DEFAULT_ANIMATION_PREVIEW_FPS = 6;
@@ -128,6 +171,8 @@ const MIN_ANIMATION_PREVIEW_FPS = 1;
 const MAX_ANIMATION_PREVIEW_FPS = 24;
 const SPACE_WHEEL_ZOOM_THRESHOLD = 120;
 const SPACE_WHEEL_ZOOM_RESET_MS = 160;
+const FLOATING_HANDLE_RADIUS = 10;
+const FLOATING_HANDLE_DRAW_SIZE = 8;
 
 function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boolean {
   if (left.length !== right.length) {
@@ -160,6 +205,153 @@ function getFileNameFromPath(filePath?: string): string | null {
 function replaceFileExtension(fileName: string, nextExtension: string): string {
   const baseName = fileName.replace(/\.[^.]+$/, '') || fileName;
   return `${baseName}${nextExtension}`;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getFloatingHandlePoints(selection: SelectionRect, zoom: number): Array<{
+  handle: FloatingResizeHandle;
+  x: number;
+  y: number;
+}> {
+  const left = selection.x * zoom;
+  const centerX = (selection.x + selection.w / 2) * zoom;
+  const right = (selection.x + selection.w) * zoom;
+  const top = selection.y * zoom;
+  const centerY = (selection.y + selection.h / 2) * zoom;
+  const bottom = (selection.y + selection.h) * zoom;
+
+  return [
+    { handle: 'tl', x: left, y: top },
+    { handle: 'tc', x: centerX, y: top },
+    { handle: 'tr', x: right, y: top },
+    { handle: 'ml', x: left, y: centerY },
+    { handle: 'mr', x: right, y: centerY },
+    { handle: 'bl', x: left, y: bottom },
+    { handle: 'bc', x: centerX, y: bottom },
+    { handle: 'br', x: right, y: bottom }
+  ];
+}
+
+function getResizeAnchorForHandle(handle: FloatingResizeHandle, selection: SelectionRect): FloatingResizeAnchor {
+  switch (handle) {
+    case 'tl':
+      return { x: selection.x + selection.w, y: selection.y + selection.h };
+    case 'tc':
+      return { x: selection.x + selection.w / 2, y: selection.y + selection.h };
+    case 'tr':
+      return { x: selection.x, y: selection.y + selection.h };
+    case 'ml':
+      return { x: selection.x + selection.w, y: selection.y + selection.h / 2 };
+    case 'mr':
+      return { x: selection.x, y: selection.y + selection.h / 2 };
+    case 'bl':
+      return { x: selection.x + selection.w, y: selection.y };
+    case 'bc':
+      return { x: selection.x + selection.w / 2, y: selection.y };
+    case 'br':
+      return { x: selection.x, y: selection.y };
+  }
+}
+
+function resolveScaleFromHandle(
+  handle: FloatingResizeHandle,
+  rawWidth: number,
+  rawHeight: number,
+  sourceWidth: number,
+  sourceHeight: number,
+  currentWidth: number,
+  currentHeight: number
+): number {
+  const scaleX = rawWidth / sourceWidth;
+  const scaleY = rawHeight / sourceHeight;
+  const currentScaleX = currentWidth / sourceWidth;
+  const currentScaleY = currentHeight / sourceHeight;
+
+  if (handle === 'tc' || handle === 'bc') {
+    return scaleY;
+  }
+  if (handle === 'ml' || handle === 'mr') {
+    return scaleX;
+  }
+
+  return Math.abs(scaleX - currentScaleX) >= Math.abs(scaleY - currentScaleY) ? scaleX : scaleY;
+}
+
+function createResizedRectFromHandle(
+  handle: FloatingResizeHandle,
+  anchor: FloatingResizeAnchor,
+  pointerX: number,
+  pointerY: number,
+  floating: FloatingPasteState,
+  currentRect: FloatingResizeSession['startRect'],
+  canvasSize: number
+): { x: number; y: number; width: number; height: number } {
+  const rawWidth = Math.max(1 / floating.sourceWidth, Math.abs(anchor.x - pointerX));
+  const rawHeight = Math.max(1 / floating.sourceHeight, Math.abs(anchor.y - pointerY));
+  const minScale = Math.max(1 / floating.sourceWidth, 1 / floating.sourceHeight);
+  const maxScale = Math.min(canvasSize / floating.sourceWidth, canvasSize / floating.sourceHeight);
+  const nextScale = clampNumber(
+    resolveScaleFromHandle(
+      handle,
+      rawWidth,
+      rawHeight,
+      floating.sourceWidth,
+      floating.sourceHeight,
+      currentRect.width,
+      currentRect.height
+    ),
+    minScale,
+    maxScale
+  );
+  const width = clampNumber(Math.round(floating.sourceWidth * nextScale), 1, canvasSize);
+  const height = clampNumber(Math.round(floating.sourceHeight * nextScale), 1, canvasSize);
+
+  let x = currentRect.x;
+  let y = currentRect.y;
+  switch (handle) {
+    case 'tl':
+      x = Math.round(anchor.x - width);
+      y = Math.round(anchor.y - height);
+      break;
+    case 'tc':
+      x = Math.round(anchor.x - width / 2);
+      y = Math.round(anchor.y - height);
+      break;
+    case 'tr':
+      x = Math.round(anchor.x);
+      y = Math.round(anchor.y - height);
+      break;
+    case 'ml':
+      x = Math.round(anchor.x - width);
+      y = Math.round(anchor.y - height / 2);
+      break;
+    case 'mr':
+      x = Math.round(anchor.x);
+      y = Math.round(anchor.y - height / 2);
+      break;
+    case 'bl':
+      x = Math.round(anchor.x - width);
+      y = Math.round(anchor.y);
+      break;
+    case 'bc':
+      x = Math.round(anchor.x - width / 2);
+      y = Math.round(anchor.y);
+      break;
+    case 'br':
+      x = Math.round(anchor.x);
+      y = Math.round(anchor.y);
+      break;
+  }
+
+  return {
+    x: clampNumber(x, 0, canvasSize - width),
+    y: clampNumber(y, 0, canvasSize - height),
+    width,
+    height
+  };
 }
 
 function hasHoveredPixelInfoSameContent(
@@ -294,19 +486,11 @@ export function App() {
     pixels: Uint8ClampedArray;
     sourceX: number;
     sourceY: number;
+    markerToken?: string;
   } | null>(null);
   // Floating block used by paste/selection move until user confirms or cancels.
-  const floatingPasteRef = useRef<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    pixels: Uint8ClampedArray;
-    basePixels: Uint8ClampedArray;
-    restorePixels: Uint8ClampedArray;
-    restoreSelection: Selection;
-    restoreTool: Tool;
-  } | null>(null);
+  const floatingPasteRef = useRef<FloatingPasteState | null>(null);
+  const floatingResizeRef = useRef<FloatingResizeSession | null>(null);
   const undoStackRef = useRef<UndoSnapshot[]>([]);
 
   const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
@@ -314,6 +498,184 @@ export function App() {
     () => collectPaletteUsageFromPixels(pixels, canvasSize),
     [canvasSize, pixels]
   );
+
+  const syncPaletteAfterPaste = useCallback(
+    (nextPixels: Uint8ClampedArray) => {
+      const { palette: nextPalette } = syncPaletteEntriesFromPixels(palette, nextPixels, canvasSize, {
+        removeUnusedColors: false,
+        addUsedColors: true
+      });
+      if (!hasSamePaletteEntries(palette, nextPalette)) {
+        setPalette(nextPalette);
+        setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
+      }
+    },
+    [canvasSize, palette, selectedColor]
+  );
+
+  const resolveCanvasPointFromClient = useCallback(
+    (clientX: number, clientY: number): { x: number; y: number } | null => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return null;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) {
+        return null;
+      }
+      const x = ((clientX - rect.left) / rect.width) * canvas.width / zoom;
+      const y = ((clientY - rect.top) / rect.height) * canvas.height / zoom;
+      return { x, y };
+    },
+    [zoom]
+  );
+
+  const resolveDefaultPasteOrigin = useCallback(
+    (clip: ClipboardPixelBlock, mode: 'internal' | 'external') => {
+      if (selection) {
+        return { x: selection.x, y: selection.y };
+      }
+      if (mode === 'internal') {
+        return {
+          x: Math.min(clip.sourceX + 1, canvasSize - 1),
+          y: Math.min(clip.sourceY + 1, canvasSize - 1)
+        };
+      }
+
+      const stage = canvasStageRef.current;
+      const canvas = canvasRef.current;
+      if (!stage || !canvas) {
+        return { x: 0, y: 0 };
+      }
+
+      const centerX = (stage.scrollLeft + stage.clientWidth / 2 - canvas.offsetLeft) / zoom;
+      const centerY = (stage.scrollTop + stage.clientHeight / 2 - canvas.offsetTop) / zoom;
+      return {
+        x: Math.round(centerX - clip.width / 2),
+        y: Math.round(centerY - clip.height / 2)
+      };
+    },
+    [canvasSize, selection, zoom]
+  );
+
+  const resolveFloatingResizeHandleFromClientPoint = useCallback(
+    (clientX: number, clientY: number): FloatingResizeHandle | null => {
+      if (!selection || !floatingPasteRef.current) {
+        return null;
+      }
+
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return null;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const localX = ((clientX - rect.left) / rect.width) * canvas.width;
+      const localY = ((clientY - rect.top) / rect.height) * canvas.height;
+
+      let nearest: { handle: FloatingResizeHandle; distance: number } | null = null;
+      for (const point of getFloatingHandlePoints(selection, zoom)) {
+        const distance = Math.hypot(localX - point.x, localY - point.y);
+        if (distance > FLOATING_HANDLE_RADIUS) {
+          continue;
+        }
+        if (!nearest || distance < nearest.distance) {
+          nearest = { handle: point.handle, distance };
+        }
+      }
+
+      return nearest?.handle ?? null;
+    },
+    [selection, zoom]
+  );
+
+  const applyFloatingPasteBlock = useCallback(
+    (floating: FloatingPasteState, nextX: number, nextY: number, nextWidth: number, nextHeight: number) => {
+      const nextPixels = resizePixelBlockNearest(
+        floating.sourcePixels,
+        floating.sourceWidth,
+        floating.sourceHeight,
+        nextWidth,
+        nextHeight
+      );
+      const composited = blitBlockOnCanvas(
+        floating.basePixels,
+        canvasSize,
+        nextPixels,
+        nextWidth,
+        nextHeight,
+        nextX,
+        nextY
+      );
+
+      floating.x = nextX;
+      floating.y = nextY;
+      floating.width = nextWidth;
+      floating.height = nextHeight;
+      floating.pixels = nextPixels;
+      setPixels(composited);
+      setSelection({ x: nextX, y: nextY, w: nextWidth, h: nextHeight });
+    },
+    [canvasSize]
+  );
+
+  const loadPixelBlockFromDataUrl = useCallback(async (dataUrl: string): Promise<ClipboardPixelBlock | null> => {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('クリップボード画像の読み込みに失敗しました'));
+      img.src = dataUrl;
+    });
+
+    const width = Math.max(1, Math.trunc(img.width));
+    const height = Math.max(1, Math.trunc(img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, width, height);
+    return {
+      width,
+      height,
+      pixels: new Uint8ClampedArray(imageData.data),
+      sourceX: 0,
+      sourceY: 0
+    };
+  }, []);
+
+  const readPasteSourceFromClipboard = useCallback(async (): Promise<{
+    block: ClipboardPixelBlock | null;
+    mode: 'internal' | 'external' | null;
+  }> => {
+    const internalClip = selectionClipboardRef.current;
+    const clipboardResult = await window.pixelApi.readClipboardImageDataUrl().catch(() => ({
+      ok: false,
+      hasImage: false,
+      dataUrl: undefined,
+      markerToken: undefined
+    }));
+
+    if (clipboardResult.hasImage && clipboardResult.markerToken && internalClip?.markerToken === clipboardResult.markerToken) {
+      return { block: internalClip, mode: 'internal' };
+    }
+    if (clipboardResult.hasImage && clipboardResult.dataUrl) {
+      const externalBlock = await loadPixelBlockFromDataUrl(clipboardResult.dataUrl);
+      return { block: externalBlock, mode: externalBlock ? 'external' : null };
+    }
+    if (internalClip) {
+      return { block: internalClip, mode: 'internal' };
+    }
+
+    return { block: null, mode: null };
+  }, [loadPixelBlockFromDataUrl]);
   const previewDataUrl = useMemo(() => {
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = canvasSize;
@@ -430,6 +792,56 @@ export function App() {
     }
   }, [canvasSize, palette, pixels, selectedColor, selection]);
 
+  const beginFloatingPaste = useCallback(
+    (clip: ClipboardPixelBlock, mode: 'internal' | 'external') => {
+      if (floatingPasteRef.current) {
+        setStatusText('貼り付け前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+        return false;
+      }
+
+      const origin = resolveDefaultPasteOrigin(clip, mode);
+      const pasteX = clampNumber(origin.x, 0, canvasSize - 1);
+      const pasteY = clampNumber(origin.y, 0, canvasSize - 1);
+      const pasteWidth = Math.max(0, Math.min(clip.width, canvasSize - pasteX));
+      const pasteHeight = Math.max(0, Math.min(clip.height, canvasSize - pasteY));
+
+      if (pasteWidth === 0 || pasteHeight === 0) {
+        setStatusText('貼り付け先がキャンバス外です', 'warning');
+        return false;
+      }
+
+      pushUndo();
+      const basePixels = clonePixels(pixels);
+      const pastedPixels =
+        pasteWidth === clip.width && pasteHeight === clip.height
+          ? clonePixels(clip.pixels)
+          : resizePixelBlockNearest(clip.pixels, clip.width, clip.height, pasteWidth, pasteHeight);
+      const composited = blitBlockOnCanvas(basePixels, canvasSize, pastedPixels, pasteWidth, pasteHeight, pasteX, pasteY);
+
+      setPixels(composited);
+      floatingPasteRef.current = {
+        x: pasteX,
+        y: pasteY,
+        width: pasteWidth,
+        height: pasteHeight,
+        pixels: pastedPixels,
+        sourceWidth: pasteWidth,
+        sourceHeight: pasteHeight,
+        sourcePixels: clonePixels(pastedPixels),
+        basePixels,
+        restorePixels: clonePixels(pixels),
+        restoreSelection: cloneSelection(selection),
+        restoreTool: tool
+      };
+      floatingResizeRef.current = null;
+      setTool('select');
+      setSelection({ x: pasteX, y: pasteY, w: pasteWidth, h: pasteHeight });
+      setStatusText(`画像を貼り付けました (${pasteWidth}x${pasteHeight}) - Enterで確定 / Escでキャンセル`, 'success');
+      return true;
+    },
+    [canvasSize, pixels, pushUndo, resolveDefaultPasteOrigin, selection, setStatusText, tool]
+  );
+
   const resetTilePreviewLayers = useCallback(() => {
     setTilePreviewLayers([]);
     setLastRegisteredTilePreviewSelectionSequence(null);
@@ -542,6 +954,26 @@ export function App() {
           maybeSelection.h * zoom
         );
         ctx.setLineDash([]);
+
+        if (floatingPasteRef.current) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.strokeStyle = 'rgba(220, 20, 60, 0.95)';
+          ctx.lineWidth = 2;
+          for (const point of getFloatingHandlePoints(maybeSelection, zoom)) {
+            ctx.fillRect(
+              point.x - FLOATING_HANDLE_DRAW_SIZE / 2,
+              point.y - FLOATING_HANDLE_DRAW_SIZE / 2,
+              FLOATING_HANDLE_DRAW_SIZE,
+              FLOATING_HANDLE_DRAW_SIZE
+            );
+            ctx.strokeRect(
+              point.x - FLOATING_HANDLE_DRAW_SIZE / 2,
+              point.y - FLOATING_HANDLE_DRAW_SIZE / 2,
+              FLOATING_HANDLE_DRAW_SIZE,
+              FLOATING_HANDLE_DRAW_SIZE
+            );
+          }
+        }
       }
     },
     [canvasSize, gridSpacing, zoom]
@@ -843,6 +1275,7 @@ export function App() {
 
   const clearFloatingPaste = useCallback(() => {
     floatingPasteRef.current = null;
+    floatingResizeRef.current = null;
     drawStateRef.current.moveStartCell = null;
     drawStateRef.current.moveStartOrigin = null;
   }, []);
@@ -1101,6 +1534,7 @@ export function App() {
     drawStateRef.current.lastDrawCell = null;
     drawStateRef.current.moveStartCell = null;
     drawStateRef.current.moveStartOrigin = null;
+    floatingResizeRef.current = null;
   }, []);
 
   const beginFloatingMove = useCallback((cell: { x: number; y: number }, origin: { x: number; y: number }) => {
@@ -1111,6 +1545,27 @@ export function App() {
     drawStateRef.current.lastDrawCell = null;
     drawStateRef.current.moveStartCell = cell;
     drawStateRef.current.moveStartOrigin = origin;
+    floatingResizeRef.current = null;
+  }, []);
+
+  const beginFloatingResize = useCallback((handle: FloatingResizeHandle, selectionRect: SelectionRect) => {
+    drawStateRef.current.active = true;
+    drawStateRef.current.selectionStart = null;
+    drawStateRef.current.selectionMoved = false;
+    drawStateRef.current.clearSelectionOnMouseUp = false;
+    drawStateRef.current.lastDrawCell = null;
+    drawStateRef.current.moveStartCell = null;
+    drawStateRef.current.moveStartOrigin = null;
+    floatingResizeRef.current = {
+      handle,
+      anchor: getResizeAnchorForHandle(handle, selectionRect),
+      startRect: {
+        x: selectionRect.x,
+        y: selectionRect.y,
+        width: selectionRect.w,
+        height: selectionRect.h
+      }
+    };
   }, []);
 
   const updateHoveredPixelInfo = useCallback(
@@ -1411,10 +1866,11 @@ export function App() {
     if (!floatingPasteRef.current) {
       return;
     }
+    syncPaletteAfterPaste(pixels);
     clearFloatingPaste();
     setHasUnsavedChanges(true);
     setStatusText('貼り付け移動を確定しました', 'success');
-  }, [clearFloatingPaste]);
+  }, [clearFloatingPaste, pixels, syncPaletteAfterPaste]);
 
   const cancelFloatingPaste = useCallback(() => {
     const floating = floatingPasteRef.current;
@@ -1432,6 +1888,16 @@ export function App() {
     (event: ReactMouseEvent<HTMLCanvasElement>) => {
       if (isSpacePressed) {
         beginPan(event.clientX, event.clientY);
+        return;
+      }
+
+      const floatingHandle =
+        tool === 'select' && floatingPasteRef.current && selection
+          ? resolveFloatingResizeHandleFromClientPoint(event.clientX, event.clientY)
+          : null;
+      if (floatingHandle && selection) {
+        beginFloatingResize(floatingHandle, selection);
+        setStatusText('選択範囲のサイズを変更中', 'info');
         return;
       }
 
@@ -1484,6 +1950,9 @@ export function App() {
           width: selection.w,
           height: selection.h,
           pixels: selectedPixels,
+          sourceWidth: selection.w,
+          sourceHeight: selection.h,
+          sourcePixels: clonePixels(selectedPixels),
           basePixels,
           restorePixels: clonePixels(pixels),
           restoreSelection: cloneSelection(selection),
@@ -1538,6 +2007,7 @@ export function App() {
     [
       applyStrokeSegment,
       beginFloatingMove,
+      beginFloatingResize,
       beginPan,
       clearFloatingPaste,
       createFloodFillResult,
@@ -1546,8 +2016,10 @@ export function App() {
       isSpacePressed,
       pixels,
       pushUndo,
+      resolveFloatingResizeHandleFromClientPoint,
       resetDrawState,
       selection,
+      setStatusText,
       tool
     ]
   );
@@ -1564,6 +2036,33 @@ export function App() {
       }
 
       if (!drawStateRef.current.active) {
+        return;
+      }
+
+      if (floatingResizeRef.current && floatingPasteRef.current) {
+        const pointer = resolveCanvasPointFromClient(event.clientX, event.clientY);
+        if (!pointer) {
+          return;
+        }
+
+        const floating = floatingPasteRef.current;
+        const nextRect = createResizedRectFromHandle(
+          floatingResizeRef.current.handle,
+          floatingResizeRef.current.anchor,
+          pointer.x,
+          pointer.y,
+          floating,
+          floatingResizeRef.current.startRect,
+          canvasSize
+        );
+        if (
+          nextRect.x !== floating.x ||
+          nextRect.y !== floating.y ||
+          nextRect.width !== floating.width ||
+          nextRect.height !== floating.height
+        ) {
+          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, nextRect.width, nextRect.height);
+        }
         return;
       }
 
@@ -1617,7 +2116,17 @@ export function App() {
       applyStrokeSegment(lastCell, cell, tool === 'eraser');
       drawStateRef.current.lastDrawCell = cell;
     },
-    [applyStrokeSegment, canvasSize, getCellFromEvent, normalizeSelection, tool, updateHoveredPixelInfo, updatePan]
+    [
+      applyFloatingPasteBlock,
+      applyStrokeSegment,
+      canvasSize,
+      getCellFromEvent,
+      normalizeSelection,
+      resolveCanvasPointFromClient,
+      tool,
+      updateHoveredPixelInfo,
+      updatePan
+    ]
   );
 
   const onMouseUp = useCallback(() => {
@@ -1627,6 +2136,7 @@ export function App() {
     }
 
     const wasMovingPaste = drawStateRef.current.moveStartCell !== null && floatingPasteRef.current !== null;
+    const wasResizingPaste = floatingResizeRef.current !== null && floatingPasteRef.current !== null;
     const selectStart = drawStateRef.current.selectionStart;
     const shouldClearSelection =
       tool === 'select' &&
@@ -1637,7 +2147,8 @@ export function App() {
       tool === 'select' &&
       selectStart !== null &&
       !drawStateRef.current.selectionMoved &&
-      !drawStateRef.current.clearSelectionOnMouseUp;
+      !drawStateRef.current.clearSelectionOnMouseUp &&
+      !wasResizingPaste;
     // Single click in Select tool creates grid-aligned tile selection.
     if (shouldClearSelection) {
       setSelection(null);
@@ -1654,6 +2165,9 @@ export function App() {
     resetDrawState();
     if (wasMovingPaste && !shouldSelectSingleTile) {
       setStatusText('選択範囲を配置しました', 'success');
+    }
+    if (wasResizingPaste) {
+      setStatusText('選択範囲のサイズを変更しました', 'success');
     }
   }, [endPan, gridSpacing, resetDrawState, resolveSingleTileSelection, tool]);
 
@@ -2217,68 +2731,34 @@ export function App() {
       }
     }
     ctx.putImageData(imageData, 0, 0);
+    const markerToken =
+      typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `dlapixy-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     selectionClipboardRef.current = {
       width: selection.w,
       height: selection.h,
       pixels: new Uint8ClampedArray(imageData.data),
       sourceX: selection.x,
-      sourceY: selection.y
+      sourceY: selection.y,
+      markerToken
     };
 
-    await window.pixelApi.copyImageDataUrl(canvas.toDataURL('image/png'));
+    await window.pixelApi.copyImageDataUrl({ dataUrl: canvas.toDataURL('image/png'), markerToken });
     setStatusText('選択範囲をクリップボードにコピーしました', 'success');
   }, [canvasSize, pixels, selection]);
 
   const pasteSelection = useCallback(() => {
-    const clip = selectionClipboardRef.current;
-    if (!clip) {
-      setStatusText('貼り付けできる選択コピーがありません', 'warning');
-      return;
-    }
-
-    const baseX = selection ? selection.x : Math.min(clip.sourceX + 1, canvasSize - 1);
-    const baseY = selection ? selection.y : Math.min(clip.sourceY + 1, canvasSize - 1);
-    const pasteX = Math.max(0, Math.min(baseX, canvasSize - 1));
-    const pasteY = Math.max(0, Math.min(baseY, canvasSize - 1));
-    const pasteWidth = Math.max(0, Math.min(clip.width, canvasSize - pasteX));
-    const pasteHeight = Math.max(0, Math.min(clip.height, canvasSize - pasteY));
-
-    if (pasteWidth === 0 || pasteHeight === 0) {
-      setStatusText('貼り付け先がキャンバス外です', 'warning');
-      return;
-    }
-
-    pushUndo();
-    const basePixels = clonePixels(pixels);
-    const pastedPixels = new Uint8ClampedArray(pasteWidth * pasteHeight * 4);
-    for (let y = 0; y < pasteHeight; y += 1) {
-      for (let x = 0; x < pasteWidth; x += 1) {
-        const srcIdx = (y * clip.width + x) * 4;
-        const dstIdx = (y * pasteWidth + x) * 4;
-        pastedPixels[dstIdx] = clip.pixels[srcIdx];
-        pastedPixels[dstIdx + 1] = clip.pixels[srcIdx + 1];
-        pastedPixels[dstIdx + 2] = clip.pixels[srcIdx + 2];
-        pastedPixels[dstIdx + 3] = clip.pixels[srcIdx + 3];
+    void (async () => {
+      const { block, mode } = await readPasteSourceFromClipboard();
+      if (!block || !mode) {
+        setStatusText('貼り付けできる画像がクリップボードにありません', 'warning');
+        return;
       }
-    }
-
-    const composited = blitBlockOnCanvas(basePixels, canvasSize, pastedPixels, pasteWidth, pasteHeight, pasteX, pasteY);
-    setPixels(composited);
-    floatingPasteRef.current = {
-      x: pasteX,
-      y: pasteY,
-      width: pasteWidth,
-      height: pasteHeight,
-      pixels: pastedPixels,
-      basePixels,
-      restorePixels: clonePixels(pixels),
-      restoreSelection: cloneSelection(selection),
-      restoreTool: tool
-    };
-    setTool('select');
-    setSelection({ x: pasteX, y: pasteY, w: pasteWidth, h: pasteHeight });
-    setStatusText(`選択範囲を貼り付けました (${pasteWidth}x${pasteHeight}) - Enterで確定 / Escでキャンセル`, 'success');
-  }, [canvasSize, pixels, pushUndo, selection, tool]);
+      beginFloatingPaste(block, mode);
+    })();
+  }, [beginFloatingPaste, readPasteSourceFromClipboard, setStatusText]);
 
   const selectEntireCanvas = useCallback(() => {
     if (floatingPasteRef.current) {
