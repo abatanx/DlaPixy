@@ -64,17 +64,18 @@ body {
 }
 
 .canvas-stage {
+  --floating-stage-padding: 0.5rem;
   overflow: auto;
   width: 100%;
   flex: 1 1 0;
   min-height: 0;
   max-height: none;
   align-items: flex-start;
-  padding: 0.5rem;
+  padding: var(--floating-stage-padding);
 }
 
 .canvas-stage-with-toolbar {
-  padding-right: 4.75rem;
+  padding-right: calc(4.75rem + var(--floating-stage-padding));
 }
 
 .canvas-stage.is-panning {
@@ -688,6 +689,124 @@ body {
   border: 1px solid #cbd5e1;
   cursor: crosshair;
   image-rendering: pixelated;
+}
+
+.canvas-surface {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.canvas-floating-visual {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.canvas-selection-overlay {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: visible;
+  z-index: 2;
+}
+
+.canvas-selection-overlay::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.95) 0 6px, transparent 6px 10px) 0 0 / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.95) 0 6px, transparent 6px 10px) 0 100% / 100% 2px no-repeat,
+    repeating-linear-gradient(0deg, rgba(255, 0, 0, 0.95) 0 6px, transparent 6px 10px) 0 0 / 2px 100% no-repeat,
+    repeating-linear-gradient(0deg, rgba(255, 0, 0, 0.95) 0 6px, transparent 6px 10px) 100% 0 / 2px 100% no-repeat;
+  animation: canvas-selection-border-march 0.8s linear infinite;
+}
+
+@keyframes canvas-selection-border-march {
+  to {
+    background-position:
+      10px 0,
+      -10px 100%,
+      0 -10px,
+      100% 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-selection-overlay::before {
+    animation: none;
+  }
+}
+
+.canvas-selection-overlay.is-floating {
+  pointer-events: auto;
+  cursor: move;
+}
+
+.canvas-selection-overlay.is-static {
+  pointer-events: none;
+  cursor: default;
+}
+
+.canvas-floating-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.canvas-floating-handle {
+  position: absolute;
+  width: 0.7rem;
+  height: 0.7rem;
+  padding: 0;
+  border: 2px solid rgba(220, 20, 60, 0.95);
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 0;
+}
+
+.canvas-selection-size-label {
+  position: absolute;
+  padding: 0.08rem 0.28rem;
+  border: 1px solid rgba(220, 20, 60, 0.95);
+  background: rgba(255, 255, 255, 0.96);
+  color: #b91c1c;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.canvas-selection-size-label.top {
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, calc(-100% - 0.28rem));
+}
+
+.canvas-selection-size-label.corner {
+  left: 0;
+  top: 0;
+  transform: translate(calc(-100% - 0.28rem), calc(-100% - 0.28rem));
+}
+
+.canvas-selection-size-label.bottom {
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, calc(100% + 0.28rem));
+}
+
+.canvas-selection-size-label.left {
+  left: 0;
+  top: 50%;
+  transform: translate(calc(-100% - 0.28rem), -50%) rotate(-90deg);
+}
+
+.canvas-selection-size-label.right {
+  right: 0;
+  top: 50%;
+  transform: translate(calc(100% + 0.28rem), -50%) rotate(-90deg);
 }
 
 .pixel-canvas.is-space-pan {

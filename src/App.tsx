@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -83,7 +84,8 @@ import {
   rasterLinePoints,
   rgbaToHex8,
   rgbaToHsva,
-  resizeCanvasPixels
+  resizeCanvasPixels,
+  resizePixelBlockNearest
 } from './editor/utils';
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
@@ -121,6 +123,48 @@ type ZoomAnchor = {
   viewportY: number;
 };
 
+type ClipboardPixelBlock = {
+  width: number;
+  height: number;
+  pixels: Uint8ClampedArray;
+  sourceX: number;
+  sourceY: number;
+  markerToken?: string;
+};
+
+type FloatingResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
+
+type FloatingPasteState = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pixels: Uint8ClampedArray;
+  sourceWidth: number;
+  sourceHeight: number;
+  sourcePixels: Uint8ClampedArray;
+  basePixels: Uint8ClampedArray;
+  restorePixels: Uint8ClampedArray;
+  restoreSelection: Selection;
+  restoreTool: Tool;
+};
+
+type FloatingResizeAnchor = {
+  x: number;
+  y: number;
+};
+
+type FloatingResizeSession = {
+  handle: FloatingResizeHandle;
+  anchor: FloatingResizeAnchor;
+  startRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+};
+
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 const DEFAULT_ANIMATION_PREVIEW_FPS = 6;
@@ -128,6 +172,10 @@ const MIN_ANIMATION_PREVIEW_FPS = 1;
 const MAX_ANIMATION_PREVIEW_FPS = 24;
 const SPACE_WHEEL_ZOOM_THRESHOLD = 120;
 const SPACE_WHEEL_ZOOM_RESET_MS = 160;
+const CANVAS_FRAME_PX = 1;
+const FLOATING_HANDLE_RADIUS = 10;
+const FLOATING_STAGE_PADDING_PX = 72;
+const FLOATING_HANDLE_ORDER: FloatingResizeHandle[] = ['tl', 'tc', 'tr', 'ml', 'mr', 'bl', 'bc', 'br'];
 
 function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boolean {
   if (left.length !== right.length) {
@@ -160,6 +208,192 @@ function getFileNameFromPath(filePath?: string): string | null {
 function replaceFileExtension(fileName: string, nextExtension: string): string {
   const baseName = fileName.replace(/\.[^.]+$/, '') || fileName;
   return `${baseName}${nextExtension}`;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function clampFloatingRectToVisibleCanvasBounds(
+  rect: { x: number; y: number; width: number; height: number },
+  canvasSize: number
+): { x: number; y: number; width: number; height: number } {
+  const minX = 1 - rect.width;
+  const minY = 1 - rect.height;
+  const maxX = canvasSize - 1;
+  const maxY = canvasSize - 1;
+
+  return {
+    x: clampNumber(rect.x, Math.min(minX, maxX), Math.max(minX, maxX)),
+    y: clampNumber(rect.y, Math.min(minY, maxY), Math.max(minY, maxY)),
+    width: rect.width,
+    height: rect.height
+  };
+}
+
+function getFloatingHandleStyle(handle: FloatingResizeHandle): CSSProperties {
+  const baseStyle: CSSProperties = {
+    transform: 'translate(-50%, -50%)'
+  };
+
+  switch (handle) {
+    case 'tl':
+      return { ...baseStyle, left: '0%', top: '0%', cursor: 'nwse-resize' };
+    case 'tc':
+      return { ...baseStyle, left: '50%', top: '0%', cursor: 'ns-resize' };
+    case 'tr':
+      return { ...baseStyle, left: '100%', top: '0%', cursor: 'nesw-resize' };
+    case 'ml':
+      return { ...baseStyle, left: '0%', top: '50%', cursor: 'ew-resize' };
+    case 'mr':
+      return { ...baseStyle, left: '100%', top: '50%', cursor: 'ew-resize' };
+    case 'bl':
+      return { ...baseStyle, left: '0%', top: '100%', cursor: 'nesw-resize' };
+    case 'bc':
+      return { ...baseStyle, left: '50%', top: '100%', cursor: 'ns-resize' };
+    case 'br':
+      return { ...baseStyle, left: '100%', top: '100%', cursor: 'nwse-resize' };
+  }
+}
+
+function getFloatingHandlePoints(selection: SelectionRect, zoom: number): Array<{
+  handle: FloatingResizeHandle;
+  x: number;
+  y: number;
+}> {
+  const left = selection.x * zoom;
+  const centerX = (selection.x + selection.w / 2) * zoom;
+  const right = (selection.x + selection.w) * zoom;
+  const top = selection.y * zoom;
+  const centerY = (selection.y + selection.h / 2) * zoom;
+  const bottom = (selection.y + selection.h) * zoom;
+
+  return [
+    { handle: 'tl', x: left, y: top },
+    { handle: 'tc', x: centerX, y: top },
+    { handle: 'tr', x: right, y: top },
+    { handle: 'ml', x: left, y: centerY },
+    { handle: 'mr', x: right, y: centerY },
+    { handle: 'bl', x: left, y: bottom },
+    { handle: 'bc', x: centerX, y: bottom },
+    { handle: 'br', x: right, y: bottom }
+  ];
+}
+
+function getResizeAnchorForHandle(handle: FloatingResizeHandle, selection: SelectionRect): FloatingResizeAnchor {
+  switch (handle) {
+    case 'tl':
+      return { x: selection.x + selection.w, y: selection.y + selection.h };
+    case 'tc':
+      return { x: selection.x + selection.w / 2, y: selection.y + selection.h };
+    case 'tr':
+      return { x: selection.x, y: selection.y + selection.h };
+    case 'ml':
+      return { x: selection.x + selection.w, y: selection.y + selection.h / 2 };
+    case 'mr':
+      return { x: selection.x, y: selection.y + selection.h / 2 };
+    case 'bl':
+      return { x: selection.x + selection.w, y: selection.y };
+    case 'bc':
+      return { x: selection.x + selection.w / 2, y: selection.y };
+    case 'br':
+      return { x: selection.x, y: selection.y };
+  }
+}
+
+function resolveScaleFromHandle(
+  handle: FloatingResizeHandle,
+  rawWidth: number,
+  rawHeight: number,
+  sourceWidth: number,
+  sourceHeight: number,
+  currentWidth: number,
+  currentHeight: number
+): number {
+  const scaleX = rawWidth / sourceWidth;
+  const scaleY = rawHeight / sourceHeight;
+  const currentScaleX = currentWidth / sourceWidth;
+  const currentScaleY = currentHeight / sourceHeight;
+
+  if (handle === 'tc' || handle === 'bc') {
+    return scaleY;
+  }
+  if (handle === 'ml' || handle === 'mr') {
+    return scaleX;
+  }
+
+  return Math.abs(scaleX - currentScaleX) >= Math.abs(scaleY - currentScaleY) ? scaleX : scaleY;
+}
+
+function createResizedRectFromHandle(
+  handle: FloatingResizeHandle,
+  anchor: FloatingResizeAnchor,
+  pointerX: number,
+  pointerY: number,
+  floating: FloatingPasteState,
+  currentRect: FloatingResizeSession['startRect'],
+  canvasSize: number,
+  stagePaddingCells: number
+): { x: number; y: number; width: number; height: number } {
+  const rawWidth = Math.max(1 / floating.sourceWidth, Math.abs(anchor.x - pointerX));
+  const rawHeight = Math.max(1 / floating.sourceHeight, Math.abs(anchor.y - pointerY));
+  const minScale = Math.max(1 / floating.sourceWidth, 1 / floating.sourceHeight);
+  const stageSpan = canvasSize + stagePaddingCells * 2;
+  const maxScale = Math.min(stageSpan / floating.sourceWidth, stageSpan / floating.sourceHeight);
+  const nextScale = clampNumber(
+    resolveScaleFromHandle(
+      handle,
+      rawWidth,
+      rawHeight,
+      floating.sourceWidth,
+      floating.sourceHeight,
+      currentRect.width,
+      currentRect.height
+    ),
+    minScale,
+    maxScale
+  );
+  const width = Math.max(1, Math.round(floating.sourceWidth * nextScale));
+  const height = Math.max(1, Math.round(floating.sourceHeight * nextScale));
+
+  let x = currentRect.x;
+  let y = currentRect.y;
+  switch (handle) {
+    case 'tl':
+      x = Math.round(anchor.x - width);
+      y = Math.round(anchor.y - height);
+      break;
+    case 'tc':
+      x = Math.round(anchor.x - width / 2);
+      y = Math.round(anchor.y - height);
+      break;
+    case 'tr':
+      x = Math.round(anchor.x);
+      y = Math.round(anchor.y - height);
+      break;
+    case 'ml':
+      x = Math.round(anchor.x - width);
+      y = Math.round(anchor.y - height / 2);
+      break;
+    case 'mr':
+      x = Math.round(anchor.x);
+      y = Math.round(anchor.y - height / 2);
+      break;
+    case 'bl':
+      x = Math.round(anchor.x - width);
+      y = Math.round(anchor.y);
+      break;
+    case 'bc':
+      x = Math.round(anchor.x - width / 2);
+      y = Math.round(anchor.y);
+      break;
+    case 'br':
+      x = Math.round(anchor.x);
+      y = Math.round(anchor.y);
+      break;
+  }
+
+  return clampFloatingRectToVisibleCanvasBounds({ x, y, width, height }, canvasSize);
 }
 
 function hasHoveredPixelInfoSameContent(
@@ -235,6 +469,7 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
+  const floatingPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const pendingZoomAnchorRef = useRef<ZoomAnchor | null>(null);
   const pendingViewportRestoreRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
@@ -262,7 +497,7 @@ export function App() {
     selectionMoved: boolean;
     clearSelectionOnMouseUp: boolean;
     lastDrawCell: { x: number; y: number } | null;
-    moveStartCell: { x: number; y: number } | null;
+    moveStartPoint: { x: number; y: number } | null;
     moveStartOrigin: { x: number; y: number } | null;
   }>({
     active: false,
@@ -270,7 +505,7 @@ export function App() {
     selectionMoved: false,
     clearSelectionOnMouseUp: false,
     lastDrawCell: null,
-    moveStartCell: null,
+    moveStartPoint: null,
     moveStartOrigin: null
   });
   // panStateRef: remembers scroll origin while Space + drag panning.
@@ -294,26 +529,215 @@ export function App() {
     pixels: Uint8ClampedArray;
     sourceX: number;
     sourceY: number;
+    markerToken?: string;
   } | null>(null);
   // Floating block used by paste/selection move until user confirms or cancels.
-  const floatingPasteRef = useRef<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    pixels: Uint8ClampedArray;
-    basePixels: Uint8ClampedArray;
-    restorePixels: Uint8ClampedArray;
-    restoreSelection: Selection;
-    restoreTool: Tool;
-  } | null>(null);
+  const floatingPasteRef = useRef<FloatingPasteState | null>(null);
+  const floatingResizeRef = useRef<FloatingResizeSession | null>(null);
   const undoStackRef = useRef<UndoSnapshot[]>([]);
 
   const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
+  const isFloatingPasteActive = floatingPasteRef.current !== null;
+  const floatingStagePaddingCells = useMemo(() => Math.max(1, Math.ceil(FLOATING_STAGE_PADDING_PX / zoom)), [zoom]);
   const paletteUsage = useMemo<PaletteUsageAnalysis>(
     () => collectPaletteUsageFromPixels(pixels, canvasSize),
     [canvasSize, pixels]
   );
+
+  const syncPaletteAfterPaste = useCallback(
+    (nextPixels: Uint8ClampedArray) => {
+      const { palette: nextPalette } = syncPaletteEntriesFromPixels(palette, nextPixels, canvasSize, {
+        removeUnusedColors: false,
+        addUsedColors: true
+      });
+      if (!hasSamePaletteEntries(palette, nextPalette)) {
+        setPalette(nextPalette);
+        setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
+      }
+    },
+    [canvasSize, palette, selectedColor]
+  );
+
+  const resolveCanvasPointFromClient = useCallback(
+    (clientX: number, clientY: number): { x: number; y: number } | null => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return null;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) {
+        return null;
+      }
+      const x = ((clientX - rect.left) / rect.width) * canvas.width / zoom;
+      const y = ((clientY - rect.top) / rect.height) * canvas.height / zoom;
+      return { x, y };
+    },
+    [zoom]
+  );
+
+  const resolveCanvasCellFromClient = useCallback(
+    (clientX: number, clientY: number) => {
+      const point = resolveCanvasPointFromClient(clientX, clientY);
+      if (!point) {
+        return null;
+      }
+
+      const x = Math.floor(point.x);
+      const y = Math.floor(point.y);
+      if (x < 0 || y < 0 || x >= canvasSize || y >= canvasSize) {
+        return null;
+      }
+      return { x, y };
+    },
+    [canvasSize, resolveCanvasPointFromClient]
+  );
+
+  const resolveDefaultPasteOrigin = useCallback(
+    (clip: ClipboardPixelBlock, mode: 'internal' | 'external') => {
+      if (selection) {
+        return { x: selection.x, y: selection.y };
+      }
+      if (mode === 'internal') {
+        return {
+          x: Math.min(clip.sourceX + 1, canvasSize - 1),
+          y: Math.min(clip.sourceY + 1, canvasSize - 1)
+        };
+      }
+
+      const stage = canvasStageRef.current;
+      const canvas = canvasRef.current;
+      if (!stage || !canvas) {
+        return { x: 0, y: 0 };
+      }
+
+      const centerX = (stage.scrollLeft + stage.clientWidth / 2 - canvas.offsetLeft) / zoom;
+      const centerY = (stage.scrollTop + stage.clientHeight / 2 - canvas.offsetTop) / zoom;
+      return {
+        x: Math.round(centerX - clip.width / 2),
+        y: Math.round(centerY - clip.height / 2)
+      };
+    },
+    [canvasSize, selection, zoom]
+  );
+
+  const resolveFloatingResizeHandleFromClientPoint = useCallback(
+    (clientX: number, clientY: number): FloatingResizeHandle | null => {
+      if (!selection || !floatingPasteRef.current) {
+        return null;
+      }
+
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return null;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const localX = ((clientX - rect.left) / rect.width) * canvas.width;
+      const localY = ((clientY - rect.top) / rect.height) * canvas.height;
+
+      let nearest: { handle: FloatingResizeHandle; distance: number } | null = null;
+      for (const point of getFloatingHandlePoints(selection, zoom)) {
+        const distance = Math.hypot(localX - point.x, localY - point.y);
+        if (distance > FLOATING_HANDLE_RADIUS) {
+          continue;
+        }
+        if (!nearest || distance < nearest.distance) {
+          nearest = { handle: point.handle, distance };
+        }
+      }
+
+      return nearest?.handle ?? null;
+    },
+    [selection, zoom]
+  );
+
+  const applyFloatingPasteBlock = useCallback(
+    (floating: FloatingPasteState, nextX: number, nextY: number, nextWidth: number, nextHeight: number) => {
+      const nextPixels = resizePixelBlockNearest(
+        floating.sourcePixels,
+        floating.sourceWidth,
+        floating.sourceHeight,
+        nextWidth,
+        nextHeight
+      );
+      const composited = blitBlockOnCanvas(
+        floating.basePixels,
+        canvasSize,
+        nextPixels,
+        nextWidth,
+        nextHeight,
+        nextX,
+        nextY
+      );
+
+      floating.x = nextX;
+      floating.y = nextY;
+      floating.width = nextWidth;
+      floating.height = nextHeight;
+      floating.pixels = nextPixels;
+      setPixels(composited);
+      setSelection({ x: nextX, y: nextY, w: nextWidth, h: nextHeight });
+    },
+    [canvasSize]
+  );
+
+  const loadPixelBlockFromDataUrl = useCallback(async (dataUrl: string): Promise<ClipboardPixelBlock | null> => {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('クリップボード画像の読み込みに失敗しました'));
+      img.src = dataUrl;
+    });
+
+    const width = Math.max(1, Math.trunc(img.width));
+    const height = Math.max(1, Math.trunc(img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, width, height);
+    return {
+      width,
+      height,
+      pixels: new Uint8ClampedArray(imageData.data),
+      sourceX: 0,
+      sourceY: 0
+    };
+  }, []);
+
+  const readPasteSourceFromClipboard = useCallback(async (): Promise<{
+    block: ClipboardPixelBlock | null;
+    mode: 'internal' | 'external' | null;
+  }> => {
+    const internalClip = selectionClipboardRef.current;
+    const clipboardResult = await window.pixelApi.readClipboardImageDataUrl().catch(() => ({
+      ok: false,
+      hasImage: false,
+      dataUrl: undefined,
+      markerToken: undefined
+    }));
+
+    if (clipboardResult.hasImage && clipboardResult.markerToken && internalClip?.markerToken === clipboardResult.markerToken) {
+      return { block: internalClip, mode: 'internal' };
+    }
+    if (clipboardResult.hasImage && clipboardResult.dataUrl) {
+      const externalBlock = await loadPixelBlockFromDataUrl(clipboardResult.dataUrl);
+      return { block: externalBlock, mode: externalBlock ? 'external' : null };
+    }
+    if (internalClip) {
+      return { block: internalClip, mode: 'internal' };
+    }
+
+    return { block: null, mode: null };
+  }, [loadPixelBlockFromDataUrl]);
   const previewDataUrl = useMemo(() => {
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = canvasSize;
@@ -326,19 +750,23 @@ export function App() {
     return previewCanvas.toDataURL('image/png');
   }, [canvasSize, pixels]);
   const tilePreviewSelection = useMemo(
-    () => clampSelectionToCanvas(selection ?? lastTilePreviewSelection, canvasSize),
-    [canvasSize, lastTilePreviewSelection, selection]
+    () =>
+      clampSelectionToCanvas(
+        (isFloatingPasteActive ? lastTilePreviewSelection : selection) ?? lastTilePreviewSelection,
+        canvasSize
+      ),
+    [canvasSize, isFloatingPasteActive, lastTilePreviewSelection, selection]
   );
 
   useEffect(() => {
-    if (!selection) {
+    if (!selection || isFloatingPasteActive) {
       return;
     }
     setLastTilePreviewSelection(selection);
-  }, [selection]);
+  }, [isFloatingPasteActive, selection]);
 
   const tilePreviewCandidateLayer = useMemo(() => {
-    if (!selection) {
+    if (!selection || isFloatingPasteActive) {
       return null;
     }
     const block = extractSelectionPixelBlock(pixels, canvasSize, selection);
@@ -347,7 +775,7 @@ export function App() {
       height: block.height,
       pixels: block.pixels
     };
-  }, [canvasSize, pixels, selection]);
+  }, [canvasSize, isFloatingPasteActive, pixels, selection]);
   const tilePreviewRenderLayers = useMemo(
     () =>
       tilePreviewLayers.map((layer) => {
@@ -374,6 +802,7 @@ export function App() {
     : null;
   const hasTilePreviewCandidate =
     selection !== null &&
+    !isFloatingPasteActive &&
     (tilePreviewLayers.length === 0 || selectionChangeSequence !== lastRegisteredTilePreviewSelectionSequence);
   const tilePreviewDataUrl = useMemo(() => {
     if (tilePreviewRenderLayers.length > 0) {
@@ -429,6 +858,61 @@ export function App() {
       undoStackRef.current.shift();
     }
   }, [canvasSize, palette, pixels, selectedColor, selection]);
+
+  const beginFloatingPaste = useCallback(
+    (clip: ClipboardPixelBlock, mode: 'internal' | 'external') => {
+      if (floatingPasteRef.current) {
+        setStatusText('貼り付け前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+        return false;
+      }
+
+      const origin = resolveDefaultPasteOrigin(clip, mode);
+      const nextRect = clampFloatingRectToVisibleCanvasBounds(
+        {
+          x: origin.x,
+          y: origin.y,
+          width: clip.width,
+          height: clip.height
+        },
+        canvasSize
+      );
+
+      pushUndo();
+      const basePixels = clonePixels(pixels);
+      const pastedPixels = clonePixels(clip.pixels);
+      const composited = blitBlockOnCanvas(
+        basePixels,
+        canvasSize,
+        pastedPixels,
+        clip.width,
+        clip.height,
+        nextRect.x,
+        nextRect.y
+      );
+
+      setPixels(composited);
+      floatingPasteRef.current = {
+        x: nextRect.x,
+        y: nextRect.y,
+        width: clip.width,
+        height: clip.height,
+        pixels: pastedPixels,
+        sourceWidth: clip.width,
+        sourceHeight: clip.height,
+        sourcePixels: clonePixels(pastedPixels),
+        basePixels,
+        restorePixels: clonePixels(pixels),
+        restoreSelection: cloneSelection(selection),
+        restoreTool: tool
+      };
+      floatingResizeRef.current = null;
+      setTool('select');
+      setSelection({ x: nextRect.x, y: nextRect.y, w: clip.width, h: clip.height });
+      setStatusText(`画像を貼り付けました (${clip.width}x${clip.height}) - Enterで確定 / Escでキャンセル`, 'success');
+      return true;
+    },
+    [canvasSize, pixels, pushUndo, resolveDefaultPasteOrigin, selection, setStatusText, tool]
+  );
 
   const resetTilePreviewLayers = useCallback(() => {
     setTilePreviewLayers([]);
@@ -506,7 +990,9 @@ export function App() {
         return;
       }
 
-      tctx.putImageData(new ImageData(sourcePixels.slice(), canvasSize, canvasSize), 0, 0);
+      const floating = floatingPasteRef.current;
+      const renderPixels = isFloatingPasteActive && floating ? floating.basePixels : sourcePixels;
+      tctx.putImageData(new ImageData(renderPixels.slice(), canvasSize, canvasSize), 0, 0);
 
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -530,26 +1016,31 @@ export function App() {
         }
       }
 
-      if (maybeSelection) {
-        // Active selection border (red dashed rectangle).
-        ctx.strokeStyle = 'rgba(255, 0, 0, 0.95)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 3]);
-        ctx.strokeRect(
-          maybeSelection.x * zoom,
-          maybeSelection.y * zoom,
-          maybeSelection.w * zoom,
-          maybeSelection.h * zoom
-        );
-        ctx.setLineDash([]);
-      }
     },
-    [canvasSize, gridSpacing, zoom]
+    [canvasSize, gridSpacing, isFloatingPasteActive, zoom]
   );
 
   useEffect(() => {
     drawCanvas(pixels, selection);
   }, [pixels, selection, drawCanvas]);
+
+  useLayoutEffect(() => {
+    const previewCanvas = floatingPreviewCanvasRef.current;
+    const floating = floatingPasteRef.current;
+    if (!previewCanvas || !floating || !selection) {
+      return;
+    }
+
+    previewCanvas.width = floating.width;
+    previewCanvas.height = floating.height;
+    const ctx = previewCanvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+
+    ctx.clearRect(0, 0, floating.width, floating.height);
+    ctx.putImageData(new ImageData(floating.pixels.slice(), floating.width, floating.height), 0, 0);
+  }, [pixels, selection]);
 
   const endPan = useCallback(() => {
     if (!panStateRef.current.active) {
@@ -809,16 +1300,8 @@ export function App() {
   );
 
   const getCellFromEvent = useCallback(
-    (event: ReactMouseEvent<HTMLCanvasElement>) => {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const x = Math.floor(((event.clientX - rect.left) / rect.width) * canvasSize);
-      const y = Math.floor(((event.clientY - rect.top) / rect.height) * canvasSize);
-      if (x < 0 || y < 0 || x >= canvasSize || y >= canvasSize) {
-        return null;
-      }
-      return { x, y };
-    },
-    [canvasSize]
+    (event: ReactMouseEvent<HTMLCanvasElement>) => resolveCanvasCellFromClient(event.clientX, event.clientY),
+    [resolveCanvasCellFromClient]
   );
 
   const normalizeSelection = useCallback((sx: number, sy: number, ex: number, ey: number): Selection => {
@@ -843,7 +1326,8 @@ export function App() {
 
   const clearFloatingPaste = useCallback(() => {
     floatingPasteRef.current = null;
-    drawStateRef.current.moveStartCell = null;
+    floatingResizeRef.current = null;
+    drawStateRef.current.moveStartPoint = null;
     drawStateRef.current.moveStartOrigin = null;
   }, []);
 
@@ -1099,18 +1583,40 @@ export function App() {
     drawStateRef.current.selectionMoved = false;
     drawStateRef.current.clearSelectionOnMouseUp = false;
     drawStateRef.current.lastDrawCell = null;
-    drawStateRef.current.moveStartCell = null;
+    drawStateRef.current.moveStartPoint = null;
     drawStateRef.current.moveStartOrigin = null;
+    floatingResizeRef.current = null;
   }, []);
 
-  const beginFloatingMove = useCallback((cell: { x: number; y: number }, origin: { x: number; y: number }) => {
+  const beginFloatingMove = useCallback((point: { x: number; y: number }, origin: { x: number; y: number }) => {
     drawStateRef.current.active = true;
     drawStateRef.current.selectionStart = null;
     drawStateRef.current.selectionMoved = false;
     drawStateRef.current.clearSelectionOnMouseUp = false;
     drawStateRef.current.lastDrawCell = null;
-    drawStateRef.current.moveStartCell = cell;
+    drawStateRef.current.moveStartPoint = point;
     drawStateRef.current.moveStartOrigin = origin;
+    floatingResizeRef.current = null;
+  }, []);
+
+  const beginFloatingResize = useCallback((handle: FloatingResizeHandle, selectionRect: SelectionRect) => {
+    drawStateRef.current.active = true;
+    drawStateRef.current.selectionStart = null;
+    drawStateRef.current.selectionMoved = false;
+    drawStateRef.current.clearSelectionOnMouseUp = false;
+    drawStateRef.current.lastDrawCell = null;
+    drawStateRef.current.moveStartPoint = null;
+    drawStateRef.current.moveStartOrigin = null;
+    floatingResizeRef.current = {
+      handle,
+      anchor: getResizeAnchorForHandle(handle, selectionRect),
+      startRect: {
+        x: selectionRect.x,
+        y: selectionRect.y,
+        width: selectionRect.w,
+        height: selectionRect.h
+      }
+    };
   }, []);
 
   const updateHoveredPixelInfo = useCallback(
@@ -1408,13 +1914,26 @@ export function App() {
   );
 
   const finalizeFloatingPaste = useCallback(() => {
-    if (!floatingPasteRef.current) {
+    const floating = floatingPasteRef.current;
+    if (!floating) {
       return;
     }
+    setSelection(
+      clampSelectionToCanvas(
+        {
+          x: floating.x,
+          y: floating.y,
+          w: floating.width,
+          h: floating.height
+        },
+        canvasSize
+      )
+    );
+    syncPaletteAfterPaste(pixels);
     clearFloatingPaste();
     setHasUnsavedChanges(true);
     setStatusText('貼り付け移動を確定しました', 'success');
-  }, [clearFloatingPaste]);
+  }, [canvasSize, clearFloatingPaste, pixels, syncPaletteAfterPaste]);
 
   const cancelFloatingPaste = useCallback(() => {
     const floating = floatingPasteRef.current;
@@ -1428,6 +1947,92 @@ export function App() {
     setStatusText('貼り付け移動をキャンセルしました', 'warning');
   }, [clearFloatingPaste]);
 
+  const updateFloatingInteractionFromClient = useCallback(
+    (clientX: number, clientY: number): boolean => {
+      if (floatingResizeRef.current && floatingPasteRef.current) {
+        const pointer = resolveCanvasPointFromClient(clientX, clientY);
+        if (!pointer) {
+          return false;
+        }
+
+        const floating = floatingPasteRef.current;
+        const nextRect = createResizedRectFromHandle(
+          floatingResizeRef.current.handle,
+          floatingResizeRef.current.anchor,
+          pointer.x,
+          pointer.y,
+          floating,
+          floatingResizeRef.current.startRect,
+          canvasSize,
+          floatingStagePaddingCells
+        );
+        if (
+          nextRect.x !== floating.x ||
+          nextRect.y !== floating.y ||
+          nextRect.width !== floating.width ||
+          nextRect.height !== floating.height
+        ) {
+          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, nextRect.width, nextRect.height);
+        }
+        return true;
+      }
+
+      if (drawStateRef.current.moveStartPoint && drawStateRef.current.moveStartOrigin && floatingPasteRef.current) {
+        const pointer = resolveCanvasPointFromClient(clientX, clientY);
+        if (!pointer) {
+          return false;
+        }
+
+        const floating = floatingPasteRef.current;
+        const dx = pointer.x - drawStateRef.current.moveStartPoint.x;
+        const dy = pointer.y - drawStateRef.current.moveStartPoint.y;
+        const nextRect = clampFloatingRectToVisibleCanvasBounds(
+          {
+            x: Math.round(drawStateRef.current.moveStartOrigin.x + dx),
+            y: Math.round(drawStateRef.current.moveStartOrigin.y + dy),
+            width: floating.width,
+            height: floating.height
+          },
+          canvasSize
+        );
+
+        if (nextRect.x !== floating.x || nextRect.y !== floating.y) {
+          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, floating.width, floating.height);
+        }
+        return true;
+      }
+
+      return false;
+    },
+    [applyFloatingPasteBlock, canvasSize, floatingStagePaddingCells, resolveCanvasPointFromClient]
+  );
+
+  const nudgeFloatingPaste = useCallback(
+    (dx: number, dy: number): boolean => {
+      const floating = floatingPasteRef.current;
+      if (!floating) {
+        return false;
+      }
+
+      const nextRect = clampFloatingRectToVisibleCanvasBounds(
+        {
+          x: floating.x + dx,
+          y: floating.y + dy,
+          width: floating.width,
+          height: floating.height
+        },
+        canvasSize
+      );
+      if (nextRect.x === floating.x && nextRect.y === floating.y) {
+        return false;
+      }
+
+      applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, floating.width, floating.height);
+      return true;
+    },
+    [applyFloatingPasteBlock, canvasSize]
+  );
+
   const onMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLCanvasElement>) => {
       if (isSpacePressed) {
@@ -1435,14 +2040,25 @@ export function App() {
         return;
       }
 
+      const floatingHandle =
+        tool === 'select' && floatingPasteRef.current && selection
+          ? resolveFloatingResizeHandleFromClientPoint(event.clientX, event.clientY)
+          : null;
+      if (floatingHandle && selection) {
+        beginFloatingResize(floatingHandle, selection);
+        setStatusText('選択範囲のサイズを変更中', 'info');
+        return;
+      }
+
       const cell = getCellFromEvent(event);
       if (!cell) {
         return;
       }
+      const pointer = resolveCanvasPointFromClient(event.clientX, event.clientY) ?? cell;
 
       if (tool === 'select' && floatingPasteRef.current && pointInSelection(cell, selection)) {
         // Continue dragging an already-floating block.
-        beginFloatingMove(cell, { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y });
+        beginFloatingMove(pointer, { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y });
         setStatusText('選択範囲を移動中', 'info');
         return;
       }
@@ -1484,12 +2100,15 @@ export function App() {
           width: selection.w,
           height: selection.h,
           pixels: selectedPixels,
+          sourceWidth: selection.w,
+          sourceHeight: selection.h,
+          sourcePixels: clonePixels(selectedPixels),
           basePixels,
           restorePixels: clonePixels(pixels),
           restoreSelection: cloneSelection(selection),
           restoreTool: tool
         };
-        beginFloatingMove(cell, { x: selection.x, y: selection.y });
+        beginFloatingMove(pointer, { x: selection.x, y: selection.y });
         setStatusText('選択範囲を移動中', 'info');
         return;
       }
@@ -1520,7 +2139,7 @@ export function App() {
         drawStateRef.current.selectionMoved = false;
         drawStateRef.current.clearSelectionOnMouseUp = shouldClearOnClick;
         drawStateRef.current.lastDrawCell = null;
-        drawStateRef.current.moveStartCell = null;
+        drawStateRef.current.moveStartPoint = null;
         drawStateRef.current.moveStartOrigin = null;
         if (!shouldClearOnClick && gridSpacing > 0) {
           setSelection({ x: cell.x, y: cell.y, w: 1, h: 1 });
@@ -1531,13 +2150,14 @@ export function App() {
         drawStateRef.current.selectionMoved = false;
         drawStateRef.current.clearSelectionOnMouseUp = false;
         drawStateRef.current.lastDrawCell = cell;
-        drawStateRef.current.moveStartCell = null;
+        drawStateRef.current.moveStartPoint = null;
         drawStateRef.current.moveStartOrigin = null;
       }
     },
     [
       applyStrokeSegment,
       beginFloatingMove,
+      beginFloatingResize,
       beginPan,
       clearFloatingPaste,
       createFloodFillResult,
@@ -1546,8 +2166,11 @@ export function App() {
       isSpacePressed,
       pixels,
       pushUndo,
+      resolveCanvasPointFromClient,
+      resolveFloatingResizeHandleFromClientPoint,
       resetDrawState,
       selection,
+      setStatusText,
       tool
     ]
   );
@@ -1555,7 +2178,7 @@ export function App() {
   const onMouseMove = useCallback(
     (event: ReactMouseEvent<HTMLCanvasElement>) => {
       canvasPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
-      const hoveredCell = getCellFromEvent(event);
+      const hoveredCell = resolveCanvasCellFromClient(event.clientX, event.clientY);
       updateHoveredPixelInfo(hoveredCell);
 
       if (panStateRef.current.active) {
@@ -1567,35 +2190,12 @@ export function App() {
         return;
       }
 
-      const cell = hoveredCell;
-      if (!cell) {
+      if (updateFloatingInteractionFromClient(event.clientX, event.clientY)) {
         return;
       }
 
-      if (drawStateRef.current.moveStartCell && drawStateRef.current.moveStartOrigin && floatingPasteRef.current) {
-        // Move floating block with clamped bounds inside canvas.
-        const dx = cell.x - drawStateRef.current.moveStartCell.x;
-        const dy = cell.y - drawStateRef.current.moveStartCell.y;
-        const maxX = Math.max(0, canvasSize - floatingPasteRef.current.width);
-        const maxY = Math.max(0, canvasSize - floatingPasteRef.current.height);
-        const nextX = Math.max(0, Math.min(drawStateRef.current.moveStartOrigin.x + dx, maxX));
-        const nextY = Math.max(0, Math.min(drawStateRef.current.moveStartOrigin.y + dy, maxY));
-
-        if (nextX !== floatingPasteRef.current.x || nextY !== floatingPasteRef.current.y) {
-          const composited = blitBlockOnCanvas(
-            floatingPasteRef.current.basePixels,
-            canvasSize,
-            floatingPasteRef.current.pixels,
-            floatingPasteRef.current.width,
-            floatingPasteRef.current.height,
-            nextX,
-            nextY
-          );
-          setPixels(composited);
-          setSelection({ x: nextX, y: nextY, w: floatingPasteRef.current.width, h: floatingPasteRef.current.height });
-          floatingPasteRef.current.x = nextX;
-          floatingPasteRef.current.y = nextY;
-        }
+      const cell = hoveredCell;
+      if (!cell) {
         return;
       }
 
@@ -1617,7 +2217,15 @@ export function App() {
       applyStrokeSegment(lastCell, cell, tool === 'eraser');
       drawStateRef.current.lastDrawCell = cell;
     },
-    [applyStrokeSegment, canvasSize, getCellFromEvent, normalizeSelection, tool, updateHoveredPixelInfo, updatePan]
+    [
+      applyStrokeSegment,
+      normalizeSelection,
+      resolveCanvasCellFromClient,
+      tool,
+      updateFloatingInteractionFromClient,
+      updateHoveredPixelInfo,
+      updatePan
+    ]
   );
 
   const onMouseUp = useCallback(() => {
@@ -1626,7 +2234,8 @@ export function App() {
       return;
     }
 
-    const wasMovingPaste = drawStateRef.current.moveStartCell !== null && floatingPasteRef.current !== null;
+    const wasMovingPaste = drawStateRef.current.moveStartPoint !== null && floatingPasteRef.current !== null;
+    const wasResizingPaste = floatingResizeRef.current !== null && floatingPasteRef.current !== null;
     const selectStart = drawStateRef.current.selectionStart;
     const shouldClearSelection =
       tool === 'select' &&
@@ -1637,7 +2246,8 @@ export function App() {
       tool === 'select' &&
       selectStart !== null &&
       !drawStateRef.current.selectionMoved &&
-      !drawStateRef.current.clearSelectionOnMouseUp;
+      !drawStateRef.current.clearSelectionOnMouseUp &&
+      !wasResizingPaste;
     // Single click in Select tool creates grid-aligned tile selection.
     if (shouldClearSelection) {
       setSelection(null);
@@ -1655,13 +2265,48 @@ export function App() {
     if (wasMovingPaste && !shouldSelectSingleTile) {
       setStatusText('選択範囲を配置しました', 'success');
     }
+    if (wasResizingPaste) {
+      setStatusText('選択範囲のサイズを変更しました', 'success');
+    }
   }, [endPan, gridSpacing, resetDrawState, resolveSingleTileSelection, tool]);
 
   const onMouseLeaveCanvas = useCallback(() => {
     canvasPointerRef.current = null;
-    onMouseUp();
+    const hasFloatingInteractionActive =
+      floatingPasteRef.current !== null &&
+      (drawStateRef.current.moveStartPoint !== null || floatingResizeRef.current !== null);
+    if (!hasFloatingInteractionActive && !panStateRef.current.active) {
+      onMouseUp();
+    }
     setHoveredPixelInfo(null);
   }, [onMouseUp]);
+
+  useEffect(() => {
+    const onWindowMouseMove = (event: MouseEvent) => {
+      if (!drawStateRef.current.active) {
+        return;
+      }
+      updateFloatingInteractionFromClient(event.clientX, event.clientY);
+    };
+
+    const onWindowMouseUp = () => {
+      const hasFloatingInteractionActive =
+        floatingPasteRef.current !== null &&
+        (drawStateRef.current.moveStartPoint !== null || floatingResizeRef.current !== null);
+      if (!hasFloatingInteractionActive) {
+        return;
+      }
+      onMouseUp();
+    };
+
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+    };
+  }, [onMouseUp, updateFloatingInteractionFromClient]);
 
   useEffect(() => {
     const stage = canvasStageRef.current;
@@ -1969,6 +2614,10 @@ export function App() {
   }, [canvasSize, clearFloatingPaste, resetAnimationFrames]);
 
   const addTilePreviewLayer = useCallback(() => {
+    if (floatingPasteRef.current) {
+      setStatusText('Tile Preview 追加の前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+      return;
+    }
     if (!selection) {
       setStatusText('Tile Preview 追加: 先に矩形選択してください', 'warning');
       return;
@@ -2047,6 +2696,10 @@ export function App() {
   );
 
   const addAnimationFrame = useCallback(() => {
+    if (floatingPasteRef.current) {
+      setStatusText('アニメーション追加の前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+      return;
+    }
     if (!selection) {
       setStatusText('アニメーション追加: 先に矩形選択してください', 'warning');
       return;
@@ -2168,6 +2821,10 @@ export function App() {
   }, []);
 
   const deleteSelection = useCallback(() => {
+    if (floatingPasteRef.current) {
+      setStatusText('削除の前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+      return;
+    }
     if (!selection) {
       return;
     }
@@ -2192,6 +2849,10 @@ export function App() {
   }, [canvasSize, clearFloatingPaste, pushUndo, selection]);
 
   const copySelection = useCallback(async () => {
+    if (floatingPasteRef.current) {
+      setStatusText('コピーの前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+      return;
+    }
     if (!selection) {
       setStatusText('選択範囲がありません', 'warning');
       return;
@@ -2217,68 +2878,61 @@ export function App() {
       }
     }
     ctx.putImageData(imageData, 0, 0);
+    const markerToken =
+      typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `dlapixy-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     selectionClipboardRef.current = {
       width: selection.w,
       height: selection.h,
       pixels: new Uint8ClampedArray(imageData.data),
       sourceX: selection.x,
-      sourceY: selection.y
+      sourceY: selection.y,
+      markerToken
     };
 
-    await window.pixelApi.copyImageDataUrl(canvas.toDataURL('image/png'));
+    await window.pixelApi.copyImageDataUrl({ dataUrl: canvas.toDataURL('image/png'), markerToken });
     setStatusText('選択範囲をクリップボードにコピーしました', 'success');
-  }, [canvasSize, pixels, selection]);
+  }, [canvasSize, pixels, selection, setStatusText]);
+
+  const onFloatingOverlayMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (tool !== 'select' || !selection || !floatingPasteRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const handle = (event.target as HTMLElement | null)?.dataset.handle as FloatingResizeHandle | undefined;
+      if (handle) {
+        beginFloatingResize(handle, selection);
+        setStatusText('選択範囲のサイズを変更中', 'info');
+        return;
+      }
+
+      const pointer = resolveCanvasPointFromClient(event.clientX, event.clientY);
+      if (!pointer) {
+        return;
+      }
+
+      beginFloatingMove(pointer, { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y });
+      setStatusText('選択範囲を移動中', 'info');
+    },
+    [beginFloatingMove, beginFloatingResize, resolveCanvasPointFromClient, selection, setStatusText, tool]
+  );
 
   const pasteSelection = useCallback(() => {
-    const clip = selectionClipboardRef.current;
-    if (!clip) {
-      setStatusText('貼り付けできる選択コピーがありません', 'warning');
-      return;
-    }
-
-    const baseX = selection ? selection.x : Math.min(clip.sourceX + 1, canvasSize - 1);
-    const baseY = selection ? selection.y : Math.min(clip.sourceY + 1, canvasSize - 1);
-    const pasteX = Math.max(0, Math.min(baseX, canvasSize - 1));
-    const pasteY = Math.max(0, Math.min(baseY, canvasSize - 1));
-    const pasteWidth = Math.max(0, Math.min(clip.width, canvasSize - pasteX));
-    const pasteHeight = Math.max(0, Math.min(clip.height, canvasSize - pasteY));
-
-    if (pasteWidth === 0 || pasteHeight === 0) {
-      setStatusText('貼り付け先がキャンバス外です', 'warning');
-      return;
-    }
-
-    pushUndo();
-    const basePixels = clonePixels(pixels);
-    const pastedPixels = new Uint8ClampedArray(pasteWidth * pasteHeight * 4);
-    for (let y = 0; y < pasteHeight; y += 1) {
-      for (let x = 0; x < pasteWidth; x += 1) {
-        const srcIdx = (y * clip.width + x) * 4;
-        const dstIdx = (y * pasteWidth + x) * 4;
-        pastedPixels[dstIdx] = clip.pixels[srcIdx];
-        pastedPixels[dstIdx + 1] = clip.pixels[srcIdx + 1];
-        pastedPixels[dstIdx + 2] = clip.pixels[srcIdx + 2];
-        pastedPixels[dstIdx + 3] = clip.pixels[srcIdx + 3];
+    void (async () => {
+      const { block, mode } = await readPasteSourceFromClipboard();
+      if (!block || !mode) {
+        setStatusText('貼り付けできる画像がクリップボードにありません', 'warning');
+        return;
       }
-    }
-
-    const composited = blitBlockOnCanvas(basePixels, canvasSize, pastedPixels, pasteWidth, pasteHeight, pasteX, pasteY);
-    setPixels(composited);
-    floatingPasteRef.current = {
-      x: pasteX,
-      y: pasteY,
-      width: pasteWidth,
-      height: pasteHeight,
-      pixels: pastedPixels,
-      basePixels,
-      restorePixels: clonePixels(pixels),
-      restoreSelection: cloneSelection(selection),
-      restoreTool: tool
-    };
-    setTool('select');
-    setSelection({ x: pasteX, y: pasteY, w: pasteWidth, h: pasteHeight });
-    setStatusText(`選択範囲を貼り付けました (${pasteWidth}x${pasteHeight}) - Enterで確定 / Escでキャンセル`, 'success');
-  }, [canvasSize, pixels, pushUndo, selection, tool]);
+      beginFloatingPaste(block, mode);
+    })();
+  }, [beginFloatingPaste, readPasteSourceFromClipboard, setStatusText]);
 
   const selectEntireCanvas = useCallback(() => {
     if (floatingPasteRef.current) {
@@ -2425,6 +3079,34 @@ export function App() {
             setStatusText('選択を解除しました', 'success');
           }
           break;
+        case 'ArrowUp':
+          if (!floatingPasteRef.current) {
+            break;
+          }
+          event.preventDefault();
+          nudgeFloatingPaste(0, -1);
+          break;
+        case 'ArrowDown':
+          if (!floatingPasteRef.current) {
+            break;
+          }
+          event.preventDefault();
+          nudgeFloatingPaste(0, 1);
+          break;
+        case 'ArrowLeft':
+          if (!floatingPasteRef.current) {
+            break;
+          }
+          event.preventDefault();
+          nudgeFloatingPaste(-1, 0);
+          break;
+        case 'ArrowRight':
+          if (!floatingPasteRef.current) {
+            break;
+          }
+          event.preventDefault();
+          nudgeFloatingPaste(1, 0);
+          break;
         case 'KeyQ':
           event.preventDefault();
           setTool('select');
@@ -2499,6 +3181,7 @@ export function App() {
     finalizeFloatingPaste,
     focusHoveredPixel,
     freezeHoveredPixelInfo,
+    nudgeFloatingPaste,
     pasteSelection,
     deleteSelection,
     openSelectionRotateModal,
@@ -3098,6 +3781,33 @@ export function App() {
     savePng
   ]);
 
+  const hasCommittedSelection = selection !== null && !isFloatingPasteActive;
+  const selectionOverlaySelection = selection;
+  const selectionOverlayLeftPx = selectionOverlaySelection ? selectionOverlaySelection.x * zoom : 0;
+  const selectionOverlayTopPx = selectionOverlaySelection ? selectionOverlaySelection.y * zoom : 0;
+  const selectionOverlayWidthPx = selectionOverlaySelection ? selectionOverlaySelection.w * zoom : 0;
+  const selectionOverlayHeightPx = selectionOverlaySelection ? selectionOverlaySelection.h * zoom : 0;
+  const selectionOverlayBaseStyle = selectionOverlaySelection
+    ? ({
+        left: `${CANVAS_FRAME_PX + selectionOverlayLeftPx}px`,
+        top: `${CANVAS_FRAME_PX + selectionOverlayTopPx}px`,
+        width: `${selectionOverlayWidthPx}px`,
+        height: `${selectionOverlayHeightPx}px`
+      } as CSSProperties)
+    : undefined;
+  const selectionOverlayVisualStyle = selectionOverlaySelection
+    ? ({
+        ...selectionOverlayBaseStyle,
+        clipPath: `inset(${Math.max(0, -selectionOverlayTopPx)}px ${Math.max(
+          0,
+          selectionOverlayLeftPx + selectionOverlayWidthPx - displaySize
+        )}px ${Math.max(0, selectionOverlayTopPx + selectionOverlayHeightPx - displaySize)}px ${Math.max(
+          0,
+          -selectionOverlayLeftPx
+        )}px)`
+      } as CSSProperties)
+    : undefined;
+
   return (
     <div className="app-layout">
       <div className="container-fluid pt-3 pb-0 mb-0 app-shell">
@@ -3148,18 +3858,65 @@ export function App() {
               <div
                 ref={canvasStageRef}
                 className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''}`}
+                style={{ '--floating-stage-padding': `${FLOATING_STAGE_PADDING_PX}px` } as CSSProperties}
                 onMouseDown={onCanvasStageMouseDown}
               >
-                <canvas
-                  ref={canvasRef}
-                  width={displaySize}
-                  height={displaySize}
-                  className={`pixel-canvas ${transparentBackgroundClassName} ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
-                  onMouseDown={onMouseDown}
-                  onMouseMove={onMouseMove}
-                  onMouseUp={onMouseUp}
-                  onMouseLeave={onMouseLeaveCanvas}
-                />
+                <div className="canvas-surface">
+                  <canvas
+                    ref={canvasRef}
+                    width={displaySize}
+                    height={displaySize}
+                    className={`pixel-canvas ${transparentBackgroundClassName} ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
+                    onMouseDown={onMouseDown}
+                    onMouseMove={onMouseMove}
+                    onMouseUp={onMouseUp}
+                    onMouseLeave={onMouseLeaveCanvas}
+                  />
+                  {selectionOverlaySelection ? (
+                    <>
+                      {isFloatingPasteActive ? (
+                        <div className="canvas-floating-visual" style={selectionOverlayVisualStyle}>
+                          <canvas
+                            ref={floatingPreviewCanvasRef}
+                            width={selectionOverlaySelection.w}
+                            height={selectionOverlaySelection.h}
+                            className={`canvas-floating-preview ${transparentBackgroundClassName}`}
+                            style={{
+                              width: `${selectionOverlaySelection.w * zoom}px`,
+                              height: `${selectionOverlaySelection.h * zoom}px`
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                      <div
+                        className={`canvas-selection-overlay ${isFloatingPasteActive ? 'is-floating' : 'is-static'}`}
+                        style={selectionOverlayBaseStyle}
+                        onMouseDown={isFloatingPasteActive ? onFloatingOverlayMouseDown : undefined}
+                      >
+                        {isFloatingPasteActive
+                          ? FLOATING_HANDLE_ORDER.map((handle) => (
+                              <button
+                                key={handle}
+                                type="button"
+                                className="canvas-floating-handle"
+                                data-handle={handle}
+                                aria-label={`resize-${handle}`}
+                                style={getFloatingHandleStyle(handle)}
+                                tabIndex={-1}
+                              />
+                            ))
+                          : null}
+                        <span className="canvas-selection-size-label corner">
+                          {selectionOverlaySelection.x},{selectionOverlaySelection.y}
+                        </span>
+                        <span className="canvas-selection-size-label top">{selectionOverlaySelection.w}</span>
+                        <span className="canvas-selection-size-label bottom">{selectionOverlaySelection.w}</span>
+                        <span className="canvas-selection-size-label left">{selectionOverlaySelection.h}</span>
+                        <span className="canvas-selection-size-label right">{selectionOverlaySelection.h}</span>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
               </div>
               <div className="canvas-hover-info px-3 py-2 border-top">
                 {hoveredPixelInfo ? (
@@ -3331,10 +4088,10 @@ export function App() {
               <EditorToolbar
                 tool={tool}
                 setTool={setTool}
-                canAddAnimationFrame={selection !== null}
-                canDeleteSelection={selection !== null}
+                canAddAnimationFrame={hasCommittedSelection}
+                canDeleteSelection={hasCommittedSelection}
                 addAnimationFrame={addAnimationFrame}
-                canRotateSelection={selection !== null}
+                canRotateSelection={hasCommittedSelection}
                 openSelectionRotateModal={openSelectionRotateModal}
                 zoom={zoom}
                 zoomIn={zoomIn}

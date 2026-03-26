@@ -92,7 +92,7 @@ npm run dist
 - Selection operations:
   - Copy selection
   - Delete selection
-  - Paste selection
+  - Paste DlaPixy internal copied selection or OS clipboard image
   - `Y` or the right toolbar button opens a selection rotation modal for the active selection
   - Inside the rotation modal, arrow keys rotate-scroll the preview by `1px` with wraparound
   - The rotation modal also has `90° left / 90° right` buttons, enabled only for square selections
@@ -103,7 +103,17 @@ npm run dist
   - Selection is cleared only when clicking outside the selected area with Select tool; other tool operations keep selection
   - When selection is active, Pencil/Eraser/Fill are constrained to selected pixels only
   - After paste: pasted block is draggable immediately (with Select tool)
+  - Floating paste shows 8 resize handles (`TL / TC / TR / ML / MR / BL / BC / BR`)
+  - Floating paste resize uses nearest-neighbor scaling and keeps aspect ratio fixed
   - Floating paste/move controls: `Enter` to finalize, `Esc` to cancel and restore pre-paste state
+  - Floating paste can also be nudged by keyboard with arrow keys (`1px` per press)
+  - Floating paste can be moved slightly outside the canvas while previewing, but at least `1px` remains visible
+  - Out-of-canvas floating preview is visually clipped; only the in-canvas portion is shown
+  - Finalize clips pasted pixels to the canvas bounds; only the visible in-canvas area is applied
+  - Selection overlay shows compact numeric labels outside the rectangle (`w` on top/bottom, `h` on left/right, `x,y` at top-left)
+  - Selection overlay UI (frame / handles / labels) can overflow into the stage padding and is not clipped by the canvas surface
+  - Selection frame uses a lightweight animated marching-ants style
+  - Finalizing floating paste adds missing palette swatches for pasted colors and does not remove existing swatches
   - Selected pixels are draggable directly (same behavior as pasted floating block)
 - Undo
 - Save/Load PNG
@@ -124,7 +134,7 @@ npm run dist
   - `Cmd/Ctrl + G` also opens the grid spacing modal
   - `Canvas -> 透過バックグラウンド` switches the transparent preview background mode
   - Modes: `White Check`, `Black Check`, `White`, `Black`, `Magenta`
-  - The chosen mode is saved as an app-wide preference and shared by the editor canvas, left sidebar previews, and renderer modal previews
+  - The chosen mode is mirrored to the native menu from renderer state and is also stored in sidecar editor metadata
   - Sidebar no longer shows persistent canvas size / grid spacing inputs
 - Footer status row
   - `Canvas`, `Grid`, `Zoom`, and `Current File` status are shown in the bottom footer instead of the sidebar
@@ -348,6 +358,9 @@ Current metadata shape:
 - The last cell in the palette grid is a `+` action that opens the same modal in create mode and adds a new unique palette color.
 - Renderer modals are split into per-modal component files under `src/components/modals/**`.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
+- Floating paste preview is rendered on a stage overlay:
+  - The overlay can extend slightly outside the canvas for interaction, but the visible preview is clipped by the canvas surface
+  - The committed pixel write still goes through clipped `blitBlockOnCanvas` compositing
 - Selection drag-move also reuses `floatingPasteRef` flow:
   - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.
 - Floating pasted state is cleared on destructive/reset flows:

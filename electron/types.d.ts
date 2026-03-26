@@ -41,7 +41,13 @@ declare global {
         message?: string;
       }>;
       setTransparentBackgroundMode: (mode: TransparentBackgroundMode) => Promise<{ ok: boolean }>;
-      copyImageDataUrl: (dataUrl: string) => Promise<{ ok: boolean }>;
+      copyImageDataUrl: (args: { dataUrl: string; markerToken?: string }) => Promise<{ ok: boolean }>;
+      readClipboardImageDataUrl: () => Promise<{
+        ok: boolean;
+        hasImage: boolean;
+        dataUrl?: string;
+        markerToken?: string;
+      }>;
       confirmOpenWithUnsaved: () => Promise<{ action: 'save-open' | 'discard-open' | 'cancel' }>;
       onMenuAction: (handler: (action: MenuAction) => void) => () => void;
     };

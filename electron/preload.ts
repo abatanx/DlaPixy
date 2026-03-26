@@ -20,7 +20,15 @@ contextBridge.exposeInMainWorld('pixelApi', {
     ipcRenderer.invoke('palette:export-gpl', args),
   setTransparentBackgroundMode: (mode: TransparentBackgroundMode) =>
     ipcRenderer.invoke('editor:set-transparent-background-mode', mode) as Promise<{ ok: boolean }>,
-  copyImageDataUrl: (dataUrl: string) => ipcRenderer.invoke('clipboard:writeImageDataUrl', dataUrl),
+  copyImageDataUrl: (args: { dataUrl: string; markerToken?: string }) =>
+    ipcRenderer.invoke('clipboard:writeImageDataUrl', args),
+  readClipboardImageDataUrl: () =>
+    ipcRenderer.invoke('clipboard:readImageDataUrl') as Promise<{
+      ok: boolean;
+      hasImage: boolean;
+      dataUrl?: string;
+      markerToken?: string;
+    }>,
   confirmOpenWithUnsaved: () => ipcRenderer.invoke('dialog:confirmOpenWithUnsaved'),
   onMenuAction: (handler: (action: MenuAction) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, action: MenuAction) => {

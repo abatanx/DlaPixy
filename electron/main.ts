@@ -24,6 +24,7 @@ type PngChunk = ReturnType<typeof extractChunks>[number];
 const RECENT_MAX = 10;
 const PREFERENCES_FILE = 'preferences.json';
 const SIDECAR_SUFFIX = '.dla-pixy.json';
+const CLIPBOARD_MARKER_FORMAT = 'application/x-dlapixy-selection-token';
 
 let mainWindow: BrowserWindow | null = null;
 let preferences: AppPreferences = {
@@ -600,9 +601,25 @@ ipcMain.handle('dialog:confirmOpenWithUnsaved', async () => {
   return { action: 'cancel' as const };
 });
 
-ipcMain.handle('clipboard:writeImageDataUrl', async (_, dataUrl: string) => {
+ipcMain.handle('clipboard:writeImageDataUrl', async (_, args: { dataUrl: string; markerToken?: string }) => {
   // OS clipboard write must run in Electron main process.
-  const image = nativeImage.createFromDataURL(dataUrl);
+  const image = nativeImage.createFromDataURL(args.dataUrl);
   clipboard.writeImage(image);
+  clipboard.writeBuffer(CLIPBOARD_MARKER_FORMAT, Buffer.from(args.markerToken ?? '', 'utf8'));
   return { ok: true };
+});
+
+ipcMain.handle('clipboard:readImageDataUrl', async () => {
+  const image = clipboard.readImage();
+  const markerToken = clipboard.readBuffer(CLIPBOARD_MARKER_FORMAT).toString('utf8') || undefined;
+  if (image.isEmpty()) {
+    return { ok: true, hasImage: false, markerToken };
+  }
+
+  return {
+    ok: true,
+    hasImage: true,
+    dataUrl: image.toDataURL(),
+    markerToken
+  };
 });
