@@ -254,6 +254,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/usePixelReferences.ts`
   - ホバー中ピクセル、参照ライン、パレット hover からの `F` 固定、drag/copy 操作をまとめる hook
   - キャンバスの参照/インスペクタ挙動を 1 か所に寄せて、`App.tsx` から callback 群を減らす
+- `src/hooks/useFloatingPaste.ts`
+  - copy/paste/finalize/cancel/nudge を含む、クリップボード起点の floating paste ライフサイクルをまとめる hook
+  - drag/resize の状態機械を後続差分へ残しつつ、副作用の塊を `App.tsx` から切り離す
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - 1xプレビュー / タイルプレビュー / アニメーションプレビューを担当するプレビューセクション
   - 3つのプレビューは Bootstrap 風のタブ切り替えで表示する
@@ -263,6 +266,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - Tile Preview の重ねを 1 枚目サイズへ正規化して合成し、その結果を `3x3` 反復表示する
 - `src/editor/app-utils.ts`
   - `App.tsx` から切り出した小さな共通 helper。ファイル名処理や selectedColor 解決を担当する
+- `src/editor/floating-paste.ts`
+  - `App.tsx` と floating paste hook で共有する、内部クリップボード / floating paste の型定義
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - 色セレクタ起点とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
   - パレット一覧はコンパクト表示 + 独立スクロールにして、大量色でも使いやすくしている
