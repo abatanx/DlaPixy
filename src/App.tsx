@@ -26,6 +26,7 @@ import { useSelectionOperations } from './hooks/useSelectionOperations';
 import { useEditorShortcuts } from './hooks/useEditorShortcuts';
 import { useFloatingPaste } from './hooks/useFloatingPaste';
 import { usePixelReferences } from './hooks/usePixelReferences';
+import { useUndoHistory } from './hooks/useUndoHistory';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
   type TransparentBackgroundMode
@@ -36,7 +37,6 @@ import {
   DEFAULT_PALETTE,
   DEFAULT_ZOOM,
   MAX_CANVAS_SIZE,
-  MAX_UNDO,
   MIN_CANVAS_SIZE
 } from './editor/constants';
 import type {
@@ -62,7 +62,6 @@ import { getTransparentBackgroundSurfaceClassName } from './editor/transparent-b
 import {
   clonePaletteEntries,
   clonePixels,
-  cloneSelection,
   createEmptyPixels,
   hexToRgba,
   normalizePaletteEntries,
@@ -71,14 +70,6 @@ import {
 } from './editor/utils';
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
-
-type UndoSnapshot = {
-  canvasSize: number;
-  pixels: Uint8ClampedArray;
-  selection: Selection;
-  palette: PaletteEntry[];
-  selectedColor: string;
-};
 
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
@@ -141,7 +132,6 @@ export function App() {
   // Floating block used by paste/selection move until user confirms or cancels.
   const floatingPasteRef = useRef<FloatingPasteState | null>(null);
   const floatingResizeRef = useRef<FloatingResizeSession | null>(null);
-  const undoStackRef = useRef<UndoSnapshot[]>([]);
 
   const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
   const {
@@ -221,42 +211,6 @@ export function App() {
     },
     [canvasSize, resolveCanvasPointFromClient]
   );
-
-  const pushUndo = useCallback(() => {
-    // Keep immutable snapshots; cap history size to avoid unbounded memory growth.
-    undoStackRef.current.push({
-      canvasSize,
-      pixels: clonePixels(pixels),
-      selection: cloneSelection(selection),
-      palette: clonePaletteEntries(palette),
-      selectedColor
-    });
-    if (undoStackRef.current.length > MAX_UNDO) {
-      undoStackRef.current.shift();
-    }
-  }, [canvasSize, palette, pixels, selectedColor, selection]);
-  const {
-    paletteRemovalRequest,
-    addPaletteColor,
-    removeSelectedColorFromPalette,
-    applySelectedColorChange,
-    importGplPalette,
-    exportGplPalette,
-    confirmPaletteRemoval,
-    closePaletteRemovalModal
-  } = usePaletteManagement({
-    currentFilePath,
-    palette,
-    selectedColor,
-    pixels,
-    paletteUsageByColor: paletteUsage.byColor,
-    pushUndo,
-    setPalette,
-    setSelectedColor,
-    setPixels,
-    setHasUnsavedChanges,
-    setStatusText
-  });
 
   const {
     previewDataUrl,
@@ -514,6 +468,45 @@ export function App() {
     drawStateRef.current.moveStartPoint = null;
     drawStateRef.current.moveStartOrigin = null;
   }, []);
+  const { undoStackRef, pushUndo, doUndo } = useUndoHistory({
+    canvasSize,
+    pixels,
+    selection,
+    palette,
+    selectedColor,
+    clearFloatingPaste,
+    resetAnimationFrames,
+    setCanvasSize,
+    setPixels,
+    setSelection,
+    setLastTilePreviewSelection,
+    setPalette,
+    setSelectedColor,
+    setHasUnsavedChanges,
+    setStatusText
+  });
+  const {
+    paletteRemovalRequest,
+    addPaletteColor,
+    removeSelectedColorFromPalette,
+    applySelectedColorChange,
+    importGplPalette,
+    exportGplPalette,
+    confirmPaletteRemoval,
+    closePaletteRemovalModal
+  } = usePaletteManagement({
+    currentFilePath,
+    palette,
+    selectedColor,
+    pixels,
+    paletteUsageByColor: paletteUsage.byColor,
+    pushUndo,
+    setPalette,
+    setSelectedColor,
+    setPixels,
+    setHasUnsavedChanges,
+    setStatusText
+  });
 
   const {
     applyFloatingPasteBlock,
@@ -700,26 +693,6 @@ export function App() {
     setHasUnsavedChanges,
     setStatusText
   });
-
-  const doUndo = useCallback(() => {
-    const previous = undoStackRef.current.pop();
-    if (!previous) {
-      setStatusText('Undo履歴がありません', 'warning');
-      return;
-    }
-    setCanvasSize(previous.canvasSize);
-    setPixels(previous.pixels);
-    setSelection(previous.selection);
-    setLastTilePreviewSelection(previous.selection);
-    setPalette(clonePaletteEntries(previous.palette));
-    setSelectedColor(previous.selectedColor);
-    if (previous.canvasSize !== canvasSize) {
-      resetAnimationFrames();
-    }
-    clearFloatingPaste();
-    setHasUnsavedChanges(true);
-    setStatusText('1手戻しました', 'success');
-  }, [canvasSize, clearFloatingPaste, resetAnimationFrames]);
 
   const { savePng, saveAsPng, loadPng } = useDocumentFileActions({
     canvasSize,

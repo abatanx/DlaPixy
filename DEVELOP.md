@@ -264,6 +264,9 @@ Current metadata shape:
 - `src/hooks/useCanvasSettings.ts`
   - Canvas size/grid/zoom modal open-close and canvas/grid apply actions
   - Owns canvas-setting side effects so `App.tsx` no longer carries that settings callback cluster
+- `src/hooks/useUndoHistory.ts`
+  - Undo stack snapshots and undo-apply flow
+  - Owns undo history mutation so `App.tsx` no longer carries push/pop snapshot logic directly
 - `src/hooks/useCanvasPointerInteractions.ts`
   - Pointer event hook for draw/select/fill interactions on the canvas and stage
   - Owns `onMouseDown` / `onMouseMove` / `onMouseUp` orchestration while delegating floating move/resize to dedicated hook
