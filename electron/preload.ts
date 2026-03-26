@@ -2,19 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { MenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
+import type { EditorSidecar } from '../shared/sidecar';
 import type { TransparentBackgroundMode } from '../shared/transparent-background';
-
-type EditorMeta = {
-  version: number;
-  canvasSize?: number;
-  gridSpacing?: number;
-  palette: PaletteEntry[];
-  lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
-};
 
 contextBridge.exposeInMainWorld('pixelApi', {
   // Narrow bridge: expose only required IPC APIs to renderer.
-  savePng: (args: { base64Png: string; metadata: EditorMeta; filePath?: string; saveAs?: boolean }) =>
+  savePng: (args: { base64Png: string; metadata: EditorSidecar; filePath?: string; saveAs?: boolean }) =>
     ipcRenderer.invoke('png:save', args),
   openPng: (args?: { filePath?: string }) => ipcRenderer.invoke('png:open', args),
   importGplPalette: (args?: { mode?: 'replace' | 'append' }) => ipcRenderer.invoke('palette:import-gpl', args),
@@ -25,7 +18,8 @@ contextBridge.exposeInMainWorld('pixelApi', {
     paletteName?: string;
   }) =>
     ipcRenderer.invoke('palette:export-gpl', args),
-  getPreferences: () => ipcRenderer.invoke('preferences:get') as Promise<{ transparentBackgroundMode: TransparentBackgroundMode }>,
+  setTransparentBackgroundMode: (mode: TransparentBackgroundMode) =>
+    ipcRenderer.invoke('editor:set-transparent-background-mode', mode) as Promise<{ ok: boolean }>,
   copyImageDataUrl: (dataUrl: string) => ipcRenderer.invoke('clipboard:writeImageDataUrl', dataUrl),
   confirmOpenWithUnsaved: () => ipcRenderer.invoke('dialog:confirmOpenWithUnsaved'),
   onMenuAction: (handler: (action: MenuAction) => void) => {

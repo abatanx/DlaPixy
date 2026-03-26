@@ -9,6 +9,7 @@ import encodeChunks from 'png-chunks-encode';
 import type { MenuAction } from '../shared/ipc';
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
+import { SIDECAR_SCHEMA_VERSION, type EditorSidecar } from '../shared/sidecar';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
   isTransparentBackgroundMode,
@@ -16,13 +17,7 @@ import {
 } from '../shared/transparent-background';
 import { buildApplicationMenu, type AppPreferences } from './menu';
 
-type EditorMeta = {
-  version: number;
-  canvasSize?: number;
-  gridSpacing?: number;
-  palette: PaletteEntry[];
-  lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
-};
+type EditorMeta = EditorSidecar;
 
 type PngChunk = ReturnType<typeof extractChunks>[number];
 
@@ -33,9 +28,9 @@ const SIDECAR_SUFFIX = '.dla-pixy.json';
 let mainWindow: BrowserWindow | null = null;
 let preferences: AppPreferences = {
   recentFiles: [],
-  lastDirectory: null,
-  transparentBackgroundMode: DEFAULT_TRANSPARENT_BACKGROUND_MODE
+  lastDirectory: null
 };
+let currentTransparentBackgroundMode: TransparentBackgroundMode = DEFAULT_TRANSPARENT_BACKGROUND_MODE;
 
 function getPreferencesPath(): string {
   return path.join(app.getPath('userData'), PREFERENCES_FILE);
@@ -76,26 +71,21 @@ async function loadPreferences(): Promise<void> {
     const parsed: unknown = JSON.parse(raw);
     const parsedPreferences =
       parsed && typeof parsed === 'object'
-        ? (parsed as { recentFiles?: unknown; lastDirectory?: unknown; transparentBackgroundMode?: unknown })
+        ? (parsed as { recentFiles?: unknown; lastDirectory?: unknown })
         : {};
     const recentFiles = Array.isArray(parsedPreferences.recentFiles)
       ? parsedPreferences.recentFiles.filter((item): item is string => typeof item === 'string')
       : [];
     const lastDirectory =
       typeof parsedPreferences.lastDirectory === 'string' ? parsedPreferences.lastDirectory : null;
-    const transparentBackgroundMode = isTransparentBackgroundMode(parsedPreferences.transparentBackgroundMode)
-      ? parsedPreferences.transparentBackgroundMode
-      : DEFAULT_TRANSPARENT_BACKGROUND_MODE;
     preferences = {
       recentFiles: recentFiles.slice(0, RECENT_MAX),
-      lastDirectory,
-      transparentBackgroundMode
+      lastDirectory
     };
   } catch {
     preferences = {
       recentFiles: [],
-      lastDirectory: null,
-      transparentBackgroundMode: DEFAULT_TRANSPARENT_BACKGROUND_MODE
+      lastDirectory: null
     };
   }
 }
@@ -132,21 +122,23 @@ function rememberLastDirectory(targetPath: string): void {
 function rebuildApplicationMenu(): void {
   buildApplicationMenu({
     preferences,
+    transparentBackgroundMode: currentTransparentBackgroundMode,
     createWindow,
     sendMenuAction,
     setTransparentBackgroundMode
   });
 }
 
-function setTransparentBackgroundMode(mode: TransparentBackgroundMode): void {
-  if (preferences.transparentBackgroundMode === mode) {
+function setTransparentBackgroundMode(mode: TransparentBackgroundMode, notifyRenderer = true): void {
+  if (currentTransparentBackgroundMode === mode) {
     return;
   }
 
-  preferences.transparentBackgroundMode = mode;
-  void savePreferences();
+  currentTransparentBackgroundMode = mode;
   rebuildApplicationMenu();
-  sendMenuAction({ type: 'transparent-background', mode });
+  if (notifyRenderer) {
+    sendMenuAction({ type: 'transparent-background', mode });
+  }
 }
 
 function createWindow(): void {
@@ -189,7 +181,15 @@ function isPaletteEntry(value: unknown): value is PaletteEntry {
   );
 }
 
-function isTool(value: unknown): value is EditorMeta['lastTool'] {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isTool(value: unknown): value is EditorMeta['dlaPixy']['editor']['lastTool'] {
   return value === 'pencil' || value === 'eraser' || value === 'fill' || value === 'select';
 }
 
@@ -201,43 +201,64 @@ function parseEditorMeta(rawText: string): EditorMeta | null {
     return null;
   }
 
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     return null;
   }
 
-  const candidate = parsed as {
-    version?: unknown;
-    canvasSize?: unknown;
-    gridSpacing?: unknown;
-    palette?: unknown;
-    lastTool?: unknown;
-  };
-
-  if (typeof candidate.version !== 'number' || !Number.isFinite(candidate.version)) {
+  if (!isRecord(parsed.dlaPixy)) {
     return null;
   }
-  if (candidate.canvasSize !== undefined && (typeof candidate.canvasSize !== 'number' || !Number.isFinite(candidate.canvasSize))) {
+
+  const candidate = parsed.dlaPixy;
+  if (candidate.schemaVersion !== SIDECAR_SCHEMA_VERSION) {
+    return null;
+  }
+  if (!isRecord(candidate.document) || !isRecord(candidate.editor)) {
+    return null;
+  }
+
+  const candidateDocument = candidate.document;
+  const candidateEditor = candidate.editor;
+  if (!isRecord(candidateDocument.palette) || !Array.isArray(candidateDocument.palette.entries)) {
+    return null;
+  }
+  if (!candidateDocument.palette.entries.every(isPaletteEntry)) {
     return null;
   }
   if (
-    candidate.gridSpacing !== undefined &&
-    (typeof candidate.gridSpacing !== 'number' || !Number.isFinite(candidate.gridSpacing))
+    !isFiniteNumber(candidateEditor.gridSpacing) ||
+    !isTransparentBackgroundMode(candidateEditor.transparentBackgroundMode) ||
+    !isFiniteNumber(candidateEditor.zoom) ||
+    !isTool(candidateEditor.lastTool)
   ) {
     return null;
   }
-  if (!Array.isArray(candidate.palette) || !candidate.palette.every(isPaletteEntry)) {
+  if (!isRecord(candidateEditor.viewport)) {
     return null;
   }
-  if (!isTool(candidate.lastTool)) {
+  if (!isFiniteNumber(candidateEditor.viewport.scrollLeft) || !isFiniteNumber(candidateEditor.viewport.scrollTop)) {
     return null;
   }
 
   return {
-    version: candidate.version,
-    canvasSize: candidate.canvasSize,
-    gridSpacing: candidate.gridSpacing,
-    palette: candidate.palette,
-    lastTool: candidate.lastTool
+    dlaPixy: {
+      schemaVersion: SIDECAR_SCHEMA_VERSION,
+      document: {
+        palette: {
+          entries: candidateDocument.palette.entries
+        }
+      },
+      editor: {
+        gridSpacing: candidateEditor.gridSpacing,
+        transparentBackgroundMode: candidateEditor.transparentBackgroundMode,
+        zoom: candidateEditor.zoom,
+        viewport: {
+          scrollLeft: candidateEditor.viewport.scrollLeft,
+          scrollTop: candidateEditor.viewport.scrollTop
+        },
+        lastTool: candidateEditor.lastTool
+      }
+    }
   };
 }
 
@@ -456,9 +477,14 @@ ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
   };
 });
 
-ipcMain.handle('preferences:get', async () => ({
-  transparentBackgroundMode: preferences.transparentBackgroundMode
-}));
+ipcMain.handle('editor:set-transparent-background-mode', async (_, mode: unknown) => {
+  if (!isTransparentBackgroundMode(mode)) {
+    return { ok: false };
+  }
+
+  setTransparentBackgroundMode(mode, false);
+  return { ok: true };
+});
 
 ipcMain.handle('palette:import-gpl', async (_, args?: { mode?: 'replace' | 'append' }) => {
   const initialDir = await resolveInitialDirectory();

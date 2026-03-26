@@ -1,6 +1,7 @@
 import type { PaletteEntry as SharedPaletteEntry } from '../../shared/palette';
+import type { EditorSidecar, EditorTool } from '../../shared/sidecar';
 
-export type Tool = 'pencil' | 'eraser' | 'fill' | 'select';
+export type Tool = EditorTool;
 
 export type PaletteEntry = SharedPaletteEntry;
 
@@ -32,10 +33,4 @@ export type HoveredPixelInfo = {
   paletteCaption: string | null;
 } | null;
 
-export type EditorMeta = {
-  version: number;
-  canvasSize?: number;
-  gridSpacing?: number;
-  palette: PaletteEntry[];
-  lastTool: Tool;
-};
+export type EditorMeta = EditorSidecar;

@@ -11,11 +11,11 @@ import {
 export type AppPreferences = {
   recentFiles: string[];
   lastDirectory: string | null;
-  transparentBackgroundMode: TransparentBackgroundMode;
 };
 
 type BuildApplicationMenuArgs = {
   preferences: AppPreferences;
+  transparentBackgroundMode: TransparentBackgroundMode;
   createWindow: () => void;
   sendMenuAction: (action: MenuAction) => void;
   setTransparentBackgroundMode: (mode: TransparentBackgroundMode) => void;
@@ -73,7 +73,7 @@ function buildFileMenuTemplate({
 }
 
 function buildCanvasMenuTemplate({
-  preferences,
+  transparentBackgroundMode,
   sendMenuAction,
   setTransparentBackgroundMode
 }: BuildApplicationMenuArgs): MenuItemConstructorOptions {
@@ -94,7 +94,7 @@ function buildCanvasMenuTemplate({
         submenu: TRANSPARENT_BACKGROUND_MODES.map((mode) => ({
           label: TRANSPARENT_BACKGROUND_LABELS[mode],
           type: 'radio',
-          checked: preferences.transparentBackgroundMode === mode,
+          checked: transparentBackgroundMode === mode,
           click: () => setTransparentBackgroundMode(mode)
         }))
       }

@@ -114,6 +114,7 @@ npm run dist
   - `foo.png` を開くと同階層の `foo.dla-pixy.json` を自動読込し、なければ PNG 単体として開く
   - sidecar JSON が壊れている場合は警告ダイアログを表示し、その後 PNG 単体として開く
   - PNG 内メタ情報（`dla-pixy-meta` を含む）は読込時には使わない
+  - sidecar JSON にはパレット情報に加えて、編集UI状態（`gridSpacing`、`transparentBackgroundMode`、`zoom`、表示位置、`lastTool`）も保存する
   - 保存時は sidecar JSON を新規作成または更新しつつ、既存の PNG メタ情報チャンクは壊さず維持する
 - ネイティブ Canvas メニュー
   - `Canvas -> キャンバスサイズ変更...` でモーダルを開く
@@ -205,15 +206,29 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 
 ```ts
 {
-  version: number, // sidecar schema version
-  canvasSize?: number,
-  gridSpacing?: number,
-  palette: Array<{ color: string, caption: string, locked: boolean }>,
-  lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
+  dlaPixy: {
+    schemaVersion: number,
+    document: {
+      palette: {
+        entries: Array<{ color: string, caption: string, locked: boolean }>
+      }
+    },
+    editor: {
+      gridSpacing: number,
+      transparentBackgroundMode: 'white-check' | 'black-check' | 'white' | 'black' | 'magenta',
+      zoom: number,
+      viewport: {
+        scrollLeft: number,
+        scrollTop: number
+      },
+      lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
+    }
+  }
 }
 ```
 
 - `foo.png` に対する sidecar は `foo.dla-pixy.json`
+- 読み込むのは新しい `dlaPixy` 構造のみで、旧 sidecar 形式は不正データとして扱う
 - sidecar が無ければ PNG 単体画像として扱う
 - sidecar が壊れていれば警告ダイアログ後に PNG 単体読込へフォールバックする
 - 既存の PNG メタ情報チャンクは保存時に維持するが、DlaPixy の編集状態復元には使わない

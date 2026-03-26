@@ -114,6 +114,7 @@ npm run dist
   - Opening `foo.png` auto-loads `foo.dla-pixy.json` if present; if missing, the PNG is opened standalone
   - If the sidecar JSON exists but is invalid, a warning dialog is shown and the PNG is opened standalone
   - PNG-embedded metadata (including `dla-pixy-meta`) is ignored on load
+  - Sidecar JSON keeps palette data plus editor UI state (`gridSpacing`, `transparentBackgroundMode`, `zoom`, viewport scroll, `lastTool`)
   - Saving writes/updates the sidecar JSON and keeps existing PNG metadata chunks intact
 - Native Canvas menu
   - `Canvas -> Change Canvas Size...` opens modal dialog in renderer
@@ -205,15 +206,29 @@ Stored next to the PNG as `<filename>.dla-pixy.json`.
 Current metadata shape:
 ```ts
 {
-  version: number, // sidecar schema version
-  canvasSize?: number,
-  gridSpacing?: number,
-  palette: Array<{ color: string, caption: string, locked: boolean }>,
-  lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
+  dlaPixy: {
+    schemaVersion: number,
+    document: {
+      palette: {
+        entries: Array<{ color: string, caption: string, locked: boolean }>
+      }
+    },
+    editor: {
+      gridSpacing: number,
+      transparentBackgroundMode: 'white-check' | 'black-check' | 'white' | 'black' | 'magenta',
+      zoom: number,
+      viewport: {
+        scrollLeft: number,
+        scrollTop: number
+      },
+      lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
+    }
+  }
 }
 ```
 
 - `foo.png` pairs with `foo.dla-pixy.json`
+- Only the new `dlaPixy` structure is read; older sidecar formats are treated as invalid
 - If the sidecar is missing, the PNG is treated as a plain standalone image
 - If the sidecar is invalid, DlaPixy shows a warning dialog and falls back to plain PNG load
 - Existing PNG metadata chunks are preserved on save, but are not used as DlaPixy editor state
