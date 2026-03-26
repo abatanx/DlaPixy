@@ -267,6 +267,9 @@ Current metadata shape:
 - `src/hooks/useUndoHistory.ts`
   - Undo stack snapshots and undo-apply flow
   - Owns undo history mutation so `App.tsx` no longer carries push/pop snapshot logic directly
+- `src/hooks/useCanvasEditingCore.ts`
+  - Canvas render sync, floating preview sync, coordinate resolution, stroke, and flood fill primitives
+  - Owns low-level canvas editing logic so `App.tsx` no longer carries that render/draw callback cluster
 - `src/hooks/useCanvasPointerInteractions.ts`
   - Pointer event hook for draw/select/fill interactions on the canvas and stage
   - Owns `onMouseDown` / `onMouseMove` / `onMouseUp` orchestration while delegating floating move/resize to dedicated hook

@@ -260,6 +260,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/useUndoHistory.ts`
   - Undo スタックの snapshot 管理と undo 適用フローをまとめる hook
   - 履歴 push/pop と復元処理を 1 か所に寄せて、`App.tsx` から undo ロジックを減らす
+- `src/hooks/useCanvasEditingCore.ts`
+  - キャンバス描画同期、floating preview 同期、座標解決、stroke、flood fill の低レベル処理をまとめる hook
+  - 描画系の編集コアを 1 か所に寄せて、`App.tsx` から render/draw callback 群を減らす
 - `src/hooks/useCanvasPointerInteractions.ts`
   - draw/select/fill の pointer event をまとめるキャンバス用 hook
   - `onMouseDown` / `onMouseMove` / `onMouseUp` の制御を持ちつつ、floating move/resize は専用 hook へ委譲する
