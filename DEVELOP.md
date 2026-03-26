@@ -264,6 +264,9 @@ Current metadata shape:
 - `src/hooks/useCanvasPointerInteractions.ts`
   - Pointer event hook for draw/select/fill interactions on the canvas and stage
   - Owns `onMouseDown` / `onMouseMove` / `onMouseUp` orchestration while delegating floating move/resize to dedicated hook
+- `src/hooks/useEditorPreviews.ts`
+  - Sidebar preview state hook for 1x preview, tile preview, and animation preview
+  - Owns preview-derived Data URLs, tile/animation collections, and sidebar preview callbacks outside `App.tsx`
 - `src/hooks/usePixelReferences.ts`
   - Hovered pixel state, reference-line state, palette-hover freeze (`F`), and related drag/copy actions
   - Keeps canvas inspector/reference behavior together so `App.tsx` no longer owns that callback cluster

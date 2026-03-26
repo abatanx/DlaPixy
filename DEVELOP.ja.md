@@ -257,6 +257,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/useCanvasPointerInteractions.ts`
   - draw/select/fill の pointer event をまとめるキャンバス用 hook
   - `onMouseDown` / `onMouseMove` / `onMouseUp` の制御を持ちつつ、floating move/resize は専用 hook へ委譲する
+- `src/hooks/useEditorPreviews.ts`
+  - 1x preview / tile preview / animation preview をまとめるサイドバー向け hook
+  - プレビュー用 Data URL、tile/animation の state、サイドバー callback を `App.tsx` から切り離す
 - `src/hooks/usePixelReferences.ts`
   - ホバー中ピクセル、参照ライン、パレット hover からの `F` 固定、drag/copy 操作をまとめる hook
   - キャンバスの参照/インスペクタ挙動を 1 か所に寄せて、`App.tsx` から callback 群を減らす
