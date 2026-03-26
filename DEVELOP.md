@@ -270,6 +270,9 @@ Current metadata shape:
 - `src/hooks/usePaletteManagement.ts`
   - Palette edit/remove flow plus GPL import/export handling
   - Owns palette CRUD side effects and removal-confirmation state so `App.tsx` no longer carries that callback cluster
+- `src/hooks/useSelectionOperations.ts`
+  - Selection delete/select-all/clear plus K-Means and rotation modal request handling
+  - Owns selection-oriented editing side effects so `App.tsx` no longer carries that modal/request callback cluster
 - `src/hooks/usePixelReferences.ts`
   - Hovered pixel state, reference-line state, palette-hover freeze (`F`), and related drag/copy actions
   - Keeps canvas inspector/reference behavior together so `App.tsx` no longer owns that callback cluster

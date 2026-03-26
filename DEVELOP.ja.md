@@ -263,6 +263,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/usePaletteManagement.ts`
   - パレット編集/削除フローと GPL import/export をまとめる hook
   - パレット CRUD の副作用と削除確認 state を 1 か所に寄せて、`App.tsx` から callback 群を減らす
+- `src/hooks/useSelectionOperations.ts`
+  - 選択削除/全選択/選択解除と、K-Means / rotation modal request をまとめる hook
+  - 選択まわりの編集副作用と modal request 管理を 1 か所に寄せて、`App.tsx` から callback 群を減らす
 - `src/hooks/usePixelReferences.ts`
   - ホバー中ピクセル、参照ライン、パレット hover からの `F` 固定、drag/copy 操作をまとめる hook
   - キャンバスの参照/インスペクタ挙動を 1 か所に寄せて、`App.tsx` から callback 群を減らす
