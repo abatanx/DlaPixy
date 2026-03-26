@@ -254,6 +254,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/useCanvasViewport.ts`
   - Space キー中の pan、wheel zoom、zoom anchor 復元、viewport 復元をまとめる hook
   - ドキュメント読込/保存やキャンバス操作が viewport 副作用を `App.tsx` で直接持たないようにする
+- `src/hooks/useCanvasSettings.ts`
+  - キャンバスサイズ / グリッド線 / 表示倍率モーダルの open-close と、canvas/grid 適用処理をまとめる hook
+  - キャンバス設定系の副作用を 1 か所に寄せて、`App.tsx` から callback 群を減らす
 - `src/hooks/useCanvasPointerInteractions.ts`
   - draw/select/fill の pointer event をまとめるキャンバス用 hook
   - `onMouseDown` / `onMouseMove` / `onMouseUp` の制御を持ちつつ、floating move/resize は専用 hook へ委譲する

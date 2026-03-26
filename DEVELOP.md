@@ -261,6 +261,9 @@ Current metadata shape:
 - `src/hooks/useCanvasViewport.ts`
   - Space-key pan, wheel zoom, zoom-anchor restore, and viewport restore hook for the canvas stage
   - Owns viewport-side effects so document load/save and canvas interactions no longer wire them directly in `App.tsx`
+- `src/hooks/useCanvasSettings.ts`
+  - Canvas size/grid/zoom modal open-close and canvas/grid apply actions
+  - Owns canvas-setting side effects so `App.tsx` no longer carries that settings callback cluster
 - `src/hooks/useCanvasPointerInteractions.ts`
   - Pointer event hook for draw/select/fill interactions on the canvas and stage
   - Owns `onMouseDown` / `onMouseMove` / `onMouseUp` orchestration while delegating floating move/resize to dedicated hook

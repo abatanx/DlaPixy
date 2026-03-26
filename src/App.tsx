@@ -16,6 +16,7 @@ import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
 import { SelectionRotateModal } from './components/modals/SelectionRotateModal';
 import { ZoomModal } from './components/modals/ZoomModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
+import { useCanvasSettings } from './hooks/useCanvasSettings';
 import { useCanvasViewport } from './hooks/useCanvasViewport';
 import { useCanvasPointerInteractions } from './hooks/useCanvasPointerInteractions';
 import { useDocumentFileActions } from './hooks/useDocumentFileActions';
@@ -66,8 +67,7 @@ import {
   hexToRgba,
   normalizePaletteEntries,
   pointInSelection,
-  rasterLinePoints,
-  resizeCanvasPixels
+  rasterLinePoints
 } from './editor/utils';
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';
@@ -105,9 +105,6 @@ export function App() {
   const [paletteColorModalRequest, setPaletteColorModalRequest] = useState<PaletteColorModalRequest>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
-  const [isCanvasSizeModalOpen, setIsCanvasSizeModalOpen] = useState<boolean>(false);
-  const [isGridSpacingModalOpen, setIsGridSpacingModalOpen] = useState<boolean>(false);
-  const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
 
   const setStatusText = useCallback((text: string, type: ToastType) => {
     setStatusTextRaw(text);
@@ -677,56 +674,32 @@ export function App() {
     setHasUnsavedChanges,
     setStatusText
   });
-
-  const applyCanvasSize = useCallback((normalized: number) => {
-    if (normalized === canvasSize) {
-      setIsCanvasSizeModalOpen(false);
-      return;
-    }
-
-    pushUndo();
-    setCanvasSize(normalized);
-    setPixels((prev) => resizeCanvasPixels(prev, canvasSize, normalized));
-    setSelection(null);
-    setLastTilePreviewSelection(null);
-    resetTilePreviewLayers();
-    resetAnimationFrames();
-    clearFloatingPaste();
-    setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
-    setHasUnsavedChanges(true);
-    setIsCanvasSizeModalOpen(false);
-  }, [canvasSize, clearFloatingPaste, pushUndo, resetAnimationFrames, resetTilePreviewLayers, setStatusText]);
-
-  const openCanvasSizeModal = useCallback(() => {
-    setIsCanvasSizeModalOpen(true);
-  }, []);
-
-  const closeCanvasSizeModal = useCallback(() => {
-    setIsCanvasSizeModalOpen(false);
-  }, []);
-
-  const applyGridSpacing = useCallback((value: number) => {
-    setGridSpacing(value);
-    setHasUnsavedChanges(true);
-    setIsGridSpacingModalOpen(false);
-    setStatusText(value === 0 ? '補助グリッドを非表示にしました' : `補助グリッドを ${value}px 間隔に変更しました`, 'success');
-  }, []);
-
-  const openGridSpacingModal = useCallback(() => {
-    setIsGridSpacingModalOpen(true);
-  }, []);
-
-  const closeGridSpacingModal = useCallback(() => {
-    setIsGridSpacingModalOpen(false);
-  }, []);
-
-  const openZoomModal = useCallback(() => {
-    setIsZoomModalOpen(true);
-  }, []);
-
-  const closeZoomModal = useCallback(() => {
-    setIsZoomModalOpen(false);
-  }, []);
+  const {
+    isCanvasSizeModalOpen,
+    isGridSpacingModalOpen,
+    isZoomModalOpen,
+    applyCanvasSize,
+    openCanvasSizeModal,
+    closeCanvasSizeModal,
+    applyGridSpacing,
+    openGridSpacingModal,
+    closeGridSpacingModal,
+    openZoomModal,
+    closeZoomModal
+  } = useCanvasSettings({
+    canvasSize,
+    pushUndo,
+    clearFloatingPaste,
+    resetTilePreviewLayers,
+    resetAnimationFrames,
+    setCanvasSize,
+    setPixels,
+    setSelection,
+    setLastTilePreviewSelection,
+    setGridSpacing,
+    setHasUnsavedChanges,
+    setStatusText
+  });
 
   const doUndo = useCallback(() => {
     const previous = undoStackRef.current.pop();
