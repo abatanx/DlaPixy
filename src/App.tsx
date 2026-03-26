@@ -19,9 +19,9 @@ import { ZoomModal } from './components/modals/ZoomModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
 import type { MenuAction as FileMenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
+import { SIDECAR_SCHEMA_VERSION } from '../shared/sidecar';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
-  isTransparentBackgroundMode,
   type TransparentBackgroundMode
 } from '../shared/transparent-background';
 import {
@@ -209,6 +209,7 @@ export function App() {
   const [toastType, setToastType] = useState<ToastType>('info');
   const [isToastVisible, setIsToastVisible] = useState<boolean>(false);
   const [toastSequence, setToastSequence] = useState<number>(0);
+  const [viewportRestoreSequence, setViewportRestoreSequence] = useState<number>(0);
   const [hoveredPixelInfo, setHoveredPixelInfo] = useState<HoveredPixelInfo>(null);
   const [hoveredPaletteColor, setHoveredPaletteColor] = useState<{ hex: string; index: number } | null>(null);
   const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
@@ -236,6 +237,7 @@ export function App() {
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const canvasPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const pendingZoomAnchorRef = useRef<ZoomAnchor | null>(null);
+  const pendingViewportRestoreRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
   const spaceWheelZoomAccumRef = useRef<number>(0);
   const spaceWheelZoomResetTimerRef = useRef<number | null>(null);
   const tilePreviewLayerIdRef = useRef<number>(1);
@@ -247,19 +249,8 @@ export function App() {
   }, [hasUnsavedChanges]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    void window.pixelApi.getPreferences().then((nextPreferences) => {
-      if (cancelled || !isTransparentBackgroundMode(nextPreferences.transparentBackgroundMode)) {
-        return;
-      }
-      setTransparentBackgroundMode(nextPreferences.transparentBackgroundMode);
-    }).catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void window.pixelApi.setTransparentBackgroundMode(transparentBackgroundMode).catch(() => undefined);
+  }, [transparentBackgroundMode]);
 
   useEffect(() => {
     setSelectionChangeSequence((prev) => prev + 1);
@@ -979,6 +970,18 @@ export function App() {
     [zoom]
   );
 
+  const restoreCanvasViewport = useCallback((viewport: { scrollLeft: number; scrollTop: number }) => {
+    const stage = canvasStageRef.current;
+    if (!stage) {
+      return;
+    }
+
+    const maxScrollLeft = Math.max(0, stage.scrollWidth - stage.clientWidth);
+    const maxScrollTop = Math.max(0, stage.scrollHeight - stage.clientHeight);
+    stage.scrollLeft = Math.max(0, Math.min(viewport.scrollLeft, maxScrollLeft));
+    stage.scrollTop = Math.max(0, Math.min(viewport.scrollTop, maxScrollTop));
+  }, []);
+
   useLayoutEffect(() => {
     if (!pendingZoomAnchorRef.current) {
       return;
@@ -987,6 +990,15 @@ export function App() {
     restoreZoomAnchor(pendingZoomAnchorRef.current);
     pendingZoomAnchorRef.current = null;
   }, [restoreZoomAnchor, zoom]);
+
+  useLayoutEffect(() => {
+    if (!pendingViewportRestoreRef.current) {
+      return;
+    }
+
+    restoreCanvasViewport(pendingViewportRestoreRef.current);
+    pendingViewportRestoreRef.current = null;
+  }, [canvasSize, restoreCanvasViewport, viewportRestoreSequence, zoom]);
 
   const setZoomWithAnchor = useCallback(
     (nextZoom: number, clientPoint?: { clientX: number; clientY: number } | null) => {
@@ -2761,6 +2773,7 @@ export function App() {
 
   const createSavePayload = useCallback(() => {
     const canvas = document.createElement('canvas');
+    const stage = canvasStageRef.current;
     canvas.width = canvasSize;
     canvas.height = canvasSize;
     const ctx = canvas.getContext('2d');
@@ -2773,15 +2786,28 @@ export function App() {
     const base64Png = dataUrl.replace(/^data:image\/png;base64,/, '');
 
     const metadata: EditorMeta = {
-      version: 3,
-      canvasSize,
-      gridSpacing,
-      palette: clonePaletteEntries(palette),
-      lastTool: tool
+      dlaPixy: {
+        schemaVersion: SIDECAR_SCHEMA_VERSION,
+        document: {
+          palette: {
+            entries: clonePaletteEntries(palette)
+          }
+        },
+        editor: {
+          gridSpacing,
+          transparentBackgroundMode,
+          zoom,
+          viewport: {
+            scrollLeft: stage?.scrollLeft ?? 0,
+            scrollTop: stage?.scrollTop ?? 0
+          },
+          lastTool: tool
+        }
+      }
     };
 
     return { base64Png, metadata };
-  }, [canvasSize, gridSpacing, palette, pixels, tool]);
+  }, [canvasSize, gridSpacing, palette, pixels, tool, transparentBackgroundMode, zoom]);
 
   const performSave = useCallback(
     async (options: { saveAs: boolean; suppressCancelToast?: boolean }): Promise<'saved' | 'canceled' | 'failed'> => {
@@ -2880,11 +2906,8 @@ export function App() {
       });
 
       const fallbackSize = img.width === img.height ? img.width : DEFAULT_CANVAS_SIZE;
-      const targetCanvasSize = clampCanvasSize(
-        result.metadata?.canvasSize ?? fallbackSize,
-        MIN_CANVAS_SIZE,
-        MAX_CANVAS_SIZE
-      );
+      const targetCanvasSize = clampCanvasSize(fallbackSize, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+      const editorState = result.metadata?.dlaPixy.editor;
 
       const canvas = document.createElement('canvas');
       canvas.width = targetCanvasSize;
@@ -2912,10 +2935,11 @@ export function App() {
       resetAnimationFrames();
       clearFloatingPaste();
       undoStackRef.current = [];
+      pendingZoomAnchorRef.current = null;
       setCurrentFilePath(result.filePath);
 
-      const metadataPalette = result.metadata?.palette?.length
-        ? normalizePaletteEntries(result.metadata.palette)
+      const metadataPalette = result.metadata?.dlaPixy.document.palette.entries.length
+        ? normalizePaletteEntries(result.metadata.dlaPixy.document.palette.entries)
         : [];
       const nextPalette = syncPaletteEntriesWithUsage(metadataPalette, usageFromLoadedPixels, {
         removeUnusedColors: false,
@@ -2924,11 +2948,9 @@ export function App() {
       setPalette(nextPalette);
       setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
 
-      if (result.metadata?.lastTool) {
-        setTool(result.metadata.lastTool);
-      }
+      setTool(editorState?.lastTool ?? 'select');
 
-      const loadedGridSpacing = result.metadata?.gridSpacing;
+      const loadedGridSpacing = editorState?.gridSpacing;
       if (typeof loadedGridSpacing === 'number' && Number.isFinite(loadedGridSpacing)) {
         if (loadedGridSpacing <= 0) {
           setGridSpacing(DEFAULT_GRID_SPACING);
@@ -2938,6 +2960,21 @@ export function App() {
       } else {
         setGridSpacing(DEFAULT_GRID_SPACING);
       }
+
+      const loadedZoom = editorState?.zoom;
+      if (typeof loadedZoom === 'number' && Number.isFinite(loadedZoom)) {
+        setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.trunc(loadedZoom))));
+      } else {
+        setZoom(DEFAULT_ZOOM);
+      }
+
+      setTransparentBackgroundMode(editorState?.transparentBackgroundMode ?? DEFAULT_TRANSPARENT_BACKGROUND_MODE);
+
+      pendingViewportRestoreRef.current = {
+        scrollLeft: Math.max(0, editorState?.viewport.scrollLeft ?? 0),
+        scrollTop: Math.max(0, editorState?.viewport.scrollTop ?? 0)
+      };
+      setViewportRestoreSequence((prev) => prev + 1);
 
       setHasUnsavedChanges(false);
 

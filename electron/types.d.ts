@@ -1,6 +1,7 @@
 import type { MenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
+import type { EditorSidecar } from '../shared/sidecar';
 import type { TransparentBackgroundMode } from '../shared/transparent-background';
 export {};
 
@@ -9,13 +10,7 @@ declare global {
     pixelApi: {
       savePng: (args: {
         base64Png: string;
-        metadata: {
-          version: number;
-          canvasSize?: number;
-          gridSpacing?: number;
-          palette: PaletteEntry[];
-          lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
-        };
+        metadata: EditorSidecar;
         filePath?: string;
         saveAs?: boolean;
       }) => Promise<{ canceled: boolean; filePath?: string }>;
@@ -24,13 +19,7 @@ declare global {
         filePath?: string;
         base64Png?: string;
         error?: 'not-found' | 'read-failed';
-        metadata?: {
-          version: number;
-          canvasSize?: number;
-          gridSpacing?: number;
-          palette: PaletteEntry[];
-          lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
-        } | null;
+        metadata?: EditorSidecar | null;
       }>;
       importGplPalette: (args?: { mode?: 'replace' | 'append' }) => Promise<{
         canceled: boolean;
@@ -51,9 +40,7 @@ declare global {
         error?: 'serialize-failed' | 'write-failed';
         message?: string;
       }>;
-      getPreferences: () => Promise<{
-        transparentBackgroundMode: TransparentBackgroundMode;
-      }>;
+      setTransparentBackgroundMode: (mode: TransparentBackgroundMode) => Promise<{ ok: boolean }>;
       copyImageDataUrl: (dataUrl: string) => Promise<{ ok: boolean }>;
       confirmOpenWithUnsaved: () => Promise<{ action: 'save-open' | 'discard-open' | 'cancel' }>;
       onMenuAction: (handler: (action: MenuAction) => void) => () => void;

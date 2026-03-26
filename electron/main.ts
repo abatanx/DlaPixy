@@ -6,10 +6,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
-import * as pngText from 'png-chunk-text';
 import type { MenuAction } from '../shared/ipc';
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
+import { SIDECAR_SCHEMA_VERSION, type EditorSidecar } from '../shared/sidecar';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
   isTransparentBackgroundMode,
@@ -17,27 +17,28 @@ import {
 } from '../shared/transparent-background';
 import { buildApplicationMenu, type AppPreferences } from './menu';
 
-type EditorMeta = {
-  version: number;
-  canvasSize?: number;
-  gridSpacing?: number;
-  palette: PaletteEntry[];
-  lastTool: 'pencil' | 'eraser' | 'fill' | 'select';
-};
+type EditorMeta = EditorSidecar;
 
-const META_KEYWORD = 'dla-pixy-meta';
+type PngChunk = ReturnType<typeof extractChunks>[number];
+
 const RECENT_MAX = 10;
 const PREFERENCES_FILE = 'preferences.json';
+const SIDECAR_SUFFIX = '.dla-pixy.json';
 
 let mainWindow: BrowserWindow | null = null;
 let preferences: AppPreferences = {
   recentFiles: [],
-  lastDirectory: null,
-  transparentBackgroundMode: DEFAULT_TRANSPARENT_BACKGROUND_MODE
+  lastDirectory: null
 };
+let currentTransparentBackgroundMode: TransparentBackgroundMode = DEFAULT_TRANSPARENT_BACKGROUND_MODE;
 
 function getPreferencesPath(): string {
   return path.join(app.getPath('userData'), PREFERENCES_FILE);
+}
+
+function getSidecarPath(pngFilePath: string): string {
+  const parsed = path.parse(pngFilePath);
+  return path.join(parsed.dir, `${parsed.name}${SIDECAR_SUFFIX}`);
 }
 
 async function pathExists(targetPath: string): Promise<boolean> {
@@ -70,26 +71,21 @@ async function loadPreferences(): Promise<void> {
     const parsed: unknown = JSON.parse(raw);
     const parsedPreferences =
       parsed && typeof parsed === 'object'
-        ? (parsed as { recentFiles?: unknown; lastDirectory?: unknown; transparentBackgroundMode?: unknown })
+        ? (parsed as { recentFiles?: unknown; lastDirectory?: unknown })
         : {};
     const recentFiles = Array.isArray(parsedPreferences.recentFiles)
       ? parsedPreferences.recentFiles.filter((item): item is string => typeof item === 'string')
       : [];
     const lastDirectory =
       typeof parsedPreferences.lastDirectory === 'string' ? parsedPreferences.lastDirectory : null;
-    const transparentBackgroundMode = isTransparentBackgroundMode(parsedPreferences.transparentBackgroundMode)
-      ? parsedPreferences.transparentBackgroundMode
-      : DEFAULT_TRANSPARENT_BACKGROUND_MODE;
     preferences = {
       recentFiles: recentFiles.slice(0, RECENT_MAX),
-      lastDirectory,
-      transparentBackgroundMode
+      lastDirectory
     };
   } catch {
     preferences = {
       recentFiles: [],
-      lastDirectory: null,
-      transparentBackgroundMode: DEFAULT_TRANSPARENT_BACKGROUND_MODE
+      lastDirectory: null
     };
   }
 }
@@ -126,21 +122,23 @@ function rememberLastDirectory(targetPath: string): void {
 function rebuildApplicationMenu(): void {
   buildApplicationMenu({
     preferences,
+    transparentBackgroundMode: currentTransparentBackgroundMode,
     createWindow,
     sendMenuAction,
     setTransparentBackgroundMode
   });
 }
 
-function setTransparentBackgroundMode(mode: TransparentBackgroundMode): void {
-  if (preferences.transparentBackgroundMode === mode) {
+function setTransparentBackgroundMode(mode: TransparentBackgroundMode, notifyRenderer = true): void {
+  if (currentTransparentBackgroundMode === mode) {
     return;
   }
 
-  preferences.transparentBackgroundMode = mode;
-  void savePreferences();
+  currentTransparentBackgroundMode = mode;
   rebuildApplicationMenu();
-  sendMenuAction({ type: 'transparent-background', mode });
+  if (notifyRenderer) {
+    sendMenuAction({ type: 'transparent-background', mode });
+  }
 }
 
 function createWindow(): void {
@@ -170,50 +168,221 @@ function createWindow(): void {
   });
 }
 
-function attachMetadataToPng(buffer: Buffer, metadata: EditorMeta): Buffer {
-  // Replace existing editor metadata chunk to avoid duplicates on re-save.
-  const chunks = extractChunks(new Uint8Array(buffer));
-  const filtered = chunks.filter((chunk) => {
-    if (chunk.name !== 'tEXt') {
-      return true;
-    }
-    try {
-      const decoded = pngText.decode(chunk.data);
-      return decoded.keyword !== META_KEYWORD;
-    } catch {
-      return true;
-    }
-  });
-
-  const iendIndex = filtered.findIndex((chunk) => chunk.name === 'IEND');
-  const metaChunk = pngText.encode(META_KEYWORD, JSON.stringify(metadata));
-
-  if (iendIndex === -1) {
-    filtered.push(metaChunk);
-  } else {
-    filtered.splice(iendIndex, 0, metaChunk);
+function isPaletteEntry(value: unknown): value is PaletteEntry {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
   }
 
-  return Buffer.from(encodeChunks(filtered));
+  const candidate = value as { color?: unknown; caption?: unknown; locked?: unknown };
+  return (
+    typeof candidate.color === 'string' &&
+    typeof candidate.caption === 'string' &&
+    typeof candidate.locked === 'boolean'
+  );
 }
 
-function parseMetadataFromPng(buffer: Buffer): EditorMeta | null {
-  // Read first matching tEXt chunk and parse editor metadata.
-  const chunks = extractChunks(new Uint8Array(buffer));
-  for (const chunk of chunks) {
-    if (chunk.name !== 'tEXt') {
-      continue;
-    }
-    try {
-      const decoded = pngText.decode(chunk.data);
-      if (decoded.keyword === META_KEYWORD) {
-        return JSON.parse(decoded.text) as EditorMeta;
-      }
-    } catch {
-      // ignore invalid chunk
-    }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isTool(value: unknown): value is EditorMeta['dlaPixy']['editor']['lastTool'] {
+  return value === 'pencil' || value === 'eraser' || value === 'fill' || value === 'select';
+}
+
+function parseEditorMeta(rawText: string): EditorMeta | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    return null;
   }
-  return null;
+
+  if (!isRecord(parsed)) {
+    return null;
+  }
+
+  if (!isRecord(parsed.dlaPixy)) {
+    return null;
+  }
+
+  const candidate = parsed.dlaPixy;
+  if (candidate.schemaVersion !== SIDECAR_SCHEMA_VERSION) {
+    return null;
+  }
+  if (!isRecord(candidate.document) || !isRecord(candidate.editor)) {
+    return null;
+  }
+
+  const candidateDocument = candidate.document;
+  const candidateEditor = candidate.editor;
+  if (!isRecord(candidateDocument.palette) || !Array.isArray(candidateDocument.palette.entries)) {
+    return null;
+  }
+  if (!candidateDocument.palette.entries.every(isPaletteEntry)) {
+    return null;
+  }
+  if (
+    !isFiniteNumber(candidateEditor.gridSpacing) ||
+    !isTransparentBackgroundMode(candidateEditor.transparentBackgroundMode) ||
+    !isFiniteNumber(candidateEditor.zoom) ||
+    !isTool(candidateEditor.lastTool)
+  ) {
+    return null;
+  }
+  if (!isRecord(candidateEditor.viewport)) {
+    return null;
+  }
+  if (!isFiniteNumber(candidateEditor.viewport.scrollLeft) || !isFiniteNumber(candidateEditor.viewport.scrollTop)) {
+    return null;
+  }
+
+  return {
+    dlaPixy: {
+      schemaVersion: SIDECAR_SCHEMA_VERSION,
+      document: {
+        palette: {
+          entries: candidateDocument.palette.entries
+        }
+      },
+      editor: {
+        gridSpacing: candidateEditor.gridSpacing,
+        transparentBackgroundMode: candidateEditor.transparentBackgroundMode,
+        zoom: candidateEditor.zoom,
+        viewport: {
+          scrollLeft: candidateEditor.viewport.scrollLeft,
+          scrollTop: candidateEditor.viewport.scrollTop
+        },
+        lastTool: candidateEditor.lastTool
+      }
+    }
+  };
+}
+
+async function showInvalidSidecarAlert(sidecarPath: string): Promise<void> {
+  const focusedWindow = BrowserWindow.getFocusedWindow() ?? mainWindow ?? undefined;
+  const options: MessageBoxOptions = {
+    type: 'warning',
+    title: '編集メタ情報の読み込みに失敗しました',
+    message: `編集メタ情報の読み込みに失敗したため、PNG 単体として開きます。\n${sidecarPath}`,
+    buttons: ['OK'],
+    defaultId: 0,
+    noLink: true
+  };
+
+  if (focusedWindow && !focusedWindow.isDestroyed()) {
+    await dialog.showMessageBox(focusedWindow, options);
+    return;
+  }
+
+  await dialog.showMessageBox(options);
+}
+
+async function loadSidecarMetadata(
+  pngFilePath: string
+): Promise<{ metadata: EditorMeta | null }> {
+  const sidecarPath = getSidecarPath(pngFilePath);
+
+  let rawText: string;
+  try {
+    rawText = await fs.readFile(sidecarPath, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { metadata: null };
+    }
+    await showInvalidSidecarAlert(sidecarPath);
+    return { metadata: null };
+  }
+
+  const metadata = parseEditorMeta(rawText);
+  if (metadata) {
+    return { metadata };
+  }
+
+  await showInvalidSidecarAlert(sidecarPath);
+  return { metadata: null };
+}
+
+async function writeSidecarMetadata(pngFilePath: string, metadata: EditorMeta): Promise<void> {
+  const sidecarPath = getSidecarPath(pngFilePath);
+  await fs.writeFile(sidecarPath, JSON.stringify(metadata, null, 2), 'utf8');
+}
+
+function mergeRenderedPngWithExistingMetadata(renderedBuffer: Buffer, sourceBuffer?: Buffer): Buffer {
+  if (!sourceBuffer) {
+    return renderedBuffer;
+  }
+
+  try {
+    const renderedChunks = extractChunks(new Uint8Array(renderedBuffer));
+    const sourceChunks = extractChunks(new Uint8Array(sourceBuffer));
+
+    const renderedIhdr = renderedChunks.find((chunk) => chunk.name === 'IHDR');
+    const renderedIdats = renderedChunks.filter((chunk) => chunk.name === 'IDAT');
+    const renderedIend = renderedChunks.find((chunk) => chunk.name === 'IEND');
+
+    if (!renderedIhdr || renderedIdats.length === 0 || !renderedIend) {
+      return renderedBuffer;
+    }
+
+    const mergedChunks: PngChunk[] = [];
+    let insertedIhdr = false;
+    let insertedIdats = false;
+    let insertedIend = false;
+
+    for (const chunk of sourceChunks) {
+      if (chunk.name === 'IHDR') {
+        if (!insertedIhdr) {
+          mergedChunks.push(renderedIhdr);
+          insertedIhdr = true;
+        }
+        continue;
+      }
+
+      if (chunk.name === 'IDAT') {
+        if (!insertedIdats) {
+          mergedChunks.push(...renderedIdats);
+          insertedIdats = true;
+        }
+        continue;
+      }
+
+      if (chunk.name === 'IEND') {
+        if (!insertedIdats) {
+          mergedChunks.push(...renderedIdats);
+          insertedIdats = true;
+        }
+        mergedChunks.push(renderedIend);
+        insertedIend = true;
+        continue;
+      }
+
+      // These chunks depend on source transparency/palette encoding and can become invalid
+      // when the pixel data is regenerated through the canvas save path.
+      if (chunk.name === 'tRNS' || chunk.name === 'hIST') {
+        continue;
+      }
+
+      mergedChunks.push(chunk);
+    }
+
+    if (!insertedIhdr) {
+      mergedChunks.unshift(renderedIhdr);
+    }
+    if (!insertedIdats) {
+      mergedChunks.push(...renderedIdats);
+    }
+    if (!insertedIend) {
+      mergedChunks.push(renderedIend);
+    }
+
+    return Buffer.from(encodeChunks(mergedChunks));
+  } catch {
+    return renderedBuffer;
+  }
 }
 
 app.whenReady().then(async () => {
@@ -238,9 +407,8 @@ app.on('window-all-closed', () => {
 ipcMain.handle(
   'png:save',
   async (_, args: { base64Png: string; metadata: EditorMeta; filePath?: string; saveAs?: boolean }) => {
-  // Renderer sends raw PNG bytes + metadata; main process writes file.
+  // Renderer sends regenerated PNG bytes + sidecar metadata; main process writes both.
   const rawBuffer = Buffer.from(args.base64Png, 'base64');
-  const bufferWithMetadata = attachMetadataToPng(rawBuffer, args.metadata);
 
   let outputPath = args.filePath;
   if (!outputPath || args.saveAs) {
@@ -255,13 +423,24 @@ ipcMain.handle(
     outputPath = result.filePath;
   }
 
-  await fs.writeFile(outputPath, bufferWithMetadata);
+  let sourceBuffer: Buffer | undefined;
+  if (args.filePath) {
+    try {
+      sourceBuffer = await fs.readFile(args.filePath);
+    } catch {
+      sourceBuffer = undefined;
+    }
+  }
+
+  const outputBuffer = mergeRenderedPngWithExistingMetadata(rawBuffer, sourceBuffer);
+  await fs.writeFile(outputPath, outputBuffer);
+  await writeSidecarMetadata(outputPath, args.metadata);
   addRecentFile(outputPath);
   return { canceled: false, filePath: outputPath };
 });
 
 ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
-  // Main process returns PNG bytes + embedded metadata to renderer.
+  // Main process returns PNG bytes and optional sidecar metadata to renderer.
   let filePath = args?.filePath;
   if (!filePath) {
     const initialDir = await resolveInitialDirectory();
@@ -287,7 +466,7 @@ ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
     }
     return { canceled: false, error: 'read-failed' as const, filePath };
   }
-  const metadata = parseMetadataFromPng(fileBuffer);
+  const { metadata } = await loadSidecarMetadata(filePath);
   addRecentFile(filePath);
 
   return {
@@ -298,9 +477,14 @@ ipcMain.handle('png:open', async (_, args?: { filePath?: string }) => {
   };
 });
 
-ipcMain.handle('preferences:get', async () => ({
-  transparentBackgroundMode: preferences.transparentBackgroundMode
-}));
+ipcMain.handle('editor:set-transparent-background-mode', async (_, mode: unknown) => {
+  if (!isTransparentBackgroundMode(mode)) {
+    return { ok: false };
+  }
+
+  setTransparentBackgroundMode(mode, false);
+  return { ok: true };
+});
 
 ipcMain.handle('palette:import-gpl', async (_, args?: { mode?: 'replace' | 'append' }) => {
   const initialDir = await resolveInitialDirectory();

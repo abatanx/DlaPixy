@@ -2,7 +2,7 @@
 
 ## 1. プロジェクト概要
 - プロジェクト: `DlaPixy`（Electronデスクトップアプリ）
-- 目的: macOS/Windows向けのPNGピクセルエディター（パレット、グリッド、選択、Undo、保存/読込、メタ情報埋め込み）
+- 目的: macOS/Windows向けのPNGピクセルエディター（パレット、グリッド、選択、Undo、保存/読込、sidecar ベースの編集メタ情報）
 - 現在の状態: コア機能は実装済みで実行可能
 
 ## 2. 技術スタック
@@ -110,6 +110,12 @@ npm run dist
   - ファイル操作はOS標準の File メニュー中心（新規/開く/保存/別名保存/最近使ったファイル）
   - ダイアログ初期ディレクトリは最終利用ディレクトリを永続利用（無効時はホーム）
   - Recent Files は上限管理・重複排除・存在しないパスの自動除外に対応
+  - 編集メタ情報は PNG の隣に sidecar JSON（`<filename>.dla-pixy.json`）として保存する
+  - `foo.png` を開くと同階層の `foo.dla-pixy.json` を自動読込し、なければ PNG 単体として開く
+  - sidecar JSON が壊れている場合は警告ダイアログを表示し、その後 PNG 単体として開く
+  - PNG 内メタ情報（`dla-pixy-meta` を含む）は読込時には使わない
+  - sidecar JSON にはパレット情報に加えて、編集UI状態（`gridSpacing`、`transparentBackgroundMode`、`zoom`、表示位置、`lastTool`）も保存する
+  - 保存時は sidecar JSON を新規作成または更新しつつ、既存の PNG メタ情報チャンクは壊さず維持する
 - ネイティブ Canvas メニュー
   - `Canvas -> キャンバスサイズ変更...` でモーダルを開く
   - `Cmd/Ctrl + I` でもキャンバスサイズ変更モーダルを開ける
@@ -195,18 +201,37 @@ npm run dist
   - `Enter`: 浮動貼り付け/移動を確定
   - `Esc`: 浮動貼り付け/移動中はキャンセル、それ以外は選択範囲を解除
 
-## 6. PNGメタ情報仕様
-PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
+## 6. Sidecar JSON 仕様
+PNG の隣に `<filename>.dla-pixy.json` として保存。
 
 ```ts
 {
-  version: number,
-  canvasSize?: number,
-  gridSpacing?: number,
-  palette: Array<{ color: string, caption: string, locked: boolean }>,
-  lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
+  dlaPixy: {
+    schemaVersion: number,
+    document: {
+      palette: {
+        entries: Array<{ color: string, caption: string, locked: boolean }>
+      }
+    },
+    editor: {
+      gridSpacing: number,
+      transparentBackgroundMode: 'white-check' | 'black-check' | 'white' | 'black' | 'magenta',
+      zoom: number,
+      viewport: {
+        scrollLeft: number,
+        scrollTop: number
+      },
+      lastTool: 'pencil' | 'eraser' | 'fill' | 'select'
+    }
+  }
 }
 ```
+
+- `foo.png` に対する sidecar は `foo.dla-pixy.json`
+- 読み込むのは新しい `dlaPixy` 構造のみで、旧 sidecar 形式は不正データとして扱う
+- sidecar が無ければ PNG 単体画像として扱う
+- sidecar が壊れていれば警告ダイアログ後に PNG 単体読込へフォールバックする
+- 既存の PNG メタ情報チャンクは保存時に維持するが、DlaPixy の編集状態復元には使わない
 
 ## 7. 主要ファイル
 - `src/App.tsx`
@@ -271,7 +296,8 @@ PNGの `tEXt` チャンクに、キーワード `dla-pixy-meta` で保存。
 - `src/main.tsx`
   - Bootstrap / FontAwesomeのCSS読込
 - `electron/main.ts`
-  - Electronウィンドウ、IPC、PNG保存/読込、メタ埋め込み
+  - Electronウィンドウ、IPC、PNG保存/読込、sidecar JSON の読込/保存
+  - PNG 既存メタ情報チャンクを保持しつつ、DlaPixy の編集状態は sidecar に逃がす
   - GPL パレット import/export の native dialog とファイルI/O
 - `electron/menu.ts`
   - ネイティブ File/Canvas/Palette メニュー構築とメニューアクション配線
