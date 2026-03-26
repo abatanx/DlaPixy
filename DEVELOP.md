@@ -261,6 +261,9 @@ Current metadata shape:
 - `src/hooks/useCanvasViewport.ts`
   - Space-key pan, wheel zoom, zoom-anchor restore, and viewport restore hook for the canvas stage
   - Owns viewport-side effects so document load/save and canvas interactions no longer wire them directly in `App.tsx`
+- `src/hooks/useCanvasPointerInteractions.ts`
+  - Pointer event hook for draw/select/fill interactions on the canvas and stage
+  - Owns `onMouseDown` / `onMouseMove` / `onMouseUp` orchestration while delegating floating move/resize to dedicated hook
 - `src/hooks/usePixelReferences.ts`
   - Hovered pixel state, reference-line state, palette-hover freeze (`F`), and related drag/copy actions
   - Keeps canvas inspector/reference behavior together so `App.tsx` no longer owns that callback cluster
@@ -279,6 +282,8 @@ Current metadata shape:
   - Normalizes Tile Preview layers to the first registered size, composites them, then repeats the result in `3x3`
 - `src/editor/app-utils.ts`
   - Small shared helpers extracted from `App.tsx` for file-name handling and selected-color resolution
+- `src/editor/canvas-pointer.ts`
+  - Shared pointer-interaction state type used by canvas pointer hooks and root orchestration
 - `src/editor/floating-paste.ts`
   - Shared floating-paste and internal clipboard types used by `App.tsx` and floating-paste hook
 - `src/editor/floating-interaction.ts`

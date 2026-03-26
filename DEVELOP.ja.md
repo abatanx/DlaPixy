@@ -254,6 +254,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/useCanvasViewport.ts`
   - Space キー中の pan、wheel zoom、zoom anchor 復元、viewport 復元をまとめる hook
   - ドキュメント読込/保存やキャンバス操作が viewport 副作用を `App.tsx` で直接持たないようにする
+- `src/hooks/useCanvasPointerInteractions.ts`
+  - draw/select/fill の pointer event をまとめるキャンバス用 hook
+  - `onMouseDown` / `onMouseMove` / `onMouseUp` の制御を持ちつつ、floating move/resize は専用 hook へ委譲する
 - `src/hooks/usePixelReferences.ts`
   - ホバー中ピクセル、参照ライン、パレット hover からの `F` 固定、drag/copy 操作をまとめる hook
   - キャンバスの参照/インスペクタ挙動を 1 か所に寄せて、`App.tsx` から callback 群を減らす
@@ -272,6 +275,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - Tile Preview の重ねを 1 枚目サイズへ正規化して合成し、その結果を `3x3` 反復表示する
 - `src/editor/app-utils.ts`
   - `App.tsx` から切り出した小さな共通 helper。ファイル名処理や selectedColor 解決を担当する
+- `src/editor/canvas-pointer.ts`
+  - canvas pointer interaction 用の共有 state 型
 - `src/editor/floating-paste.ts`
   - `App.tsx` と floating paste hook で共有する、内部クリップボード / floating paste の型定義
 - `src/editor/floating-interaction.ts`
