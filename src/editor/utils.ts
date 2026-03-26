@@ -284,9 +284,17 @@ export function blitBlockOnCanvas(
 ): Uint8ClampedArray {
   const next = clonePixels(basePixels);
   for (let y = 0; y < blockHeight; y += 1) {
+    const targetY = destY + y;
+    if (targetY < 0 || targetY >= canvasSize) {
+      continue;
+    }
     for (let x = 0; x < blockWidth; x += 1) {
+      const targetX = destX + x;
+      if (targetX < 0 || targetX >= canvasSize) {
+        continue;
+      }
       const srcIdx = (y * blockWidth + x) * 4;
-      const dstIdx = ((destY + y) * canvasSize + (destX + x)) * 4;
+      const dstIdx = (targetY * canvasSize + targetX) * 4;
       next[dstIdx] = blockPixels[srcIdx];
       next[dstIdx + 1] = blockPixels[srcIdx + 1];
       next[dstIdx + 2] = blockPixels[srcIdx + 2];
