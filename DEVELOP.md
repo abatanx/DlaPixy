@@ -267,6 +267,9 @@ Current metadata shape:
 - `src/hooks/useEditorPreviews.ts`
   - Sidebar preview state hook for 1x preview, tile preview, and animation preview
   - Owns preview-derived Data URLs, tile/animation collections, and sidebar preview callbacks outside `App.tsx`
+- `src/hooks/usePaletteManagement.ts`
+  - Palette edit/remove flow plus GPL import/export handling
+  - Owns palette CRUD side effects and removal-confirmation state so `App.tsx` no longer carries that callback cluster
 - `src/hooks/usePixelReferences.ts`
   - Hovered pixel state, reference-line state, palette-hover freeze (`F`), and related drag/copy actions
   - Keeps canvas inspector/reference behavior together so `App.tsx` no longer owns that callback cluster

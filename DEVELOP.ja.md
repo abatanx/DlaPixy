@@ -260,6 +260,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/useEditorPreviews.ts`
   - 1x preview / tile preview / animation preview をまとめるサイドバー向け hook
   - プレビュー用 Data URL、tile/animation の state、サイドバー callback を `App.tsx` から切り離す
+- `src/hooks/usePaletteManagement.ts`
+  - パレット編集/削除フローと GPL import/export をまとめる hook
+  - パレット CRUD の副作用と削除確認 state を 1 か所に寄せて、`App.tsx` から callback 群を減らす
 - `src/hooks/usePixelReferences.ts`
   - ホバー中ピクセル、参照ライン、パレット hover からの `F` 固定、drag/copy 操作をまとめる hook
   - キャンバスの参照/インスペクタ挙動を 1 か所に寄せて、`App.tsx` から callback 群を減らす
