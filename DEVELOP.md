@@ -258,6 +258,9 @@ Current metadata shape:
 - `src/hooks/useEditorShortcuts.ts`
   - Global keyboard shortcuts and native menu action wiring
   - Keeps shortcut side effects out of the root JSX/orchestration file
+- `src/hooks/usePixelReferences.ts`
+  - Hovered pixel state, reference-line state, palette-hover freeze (`F`), and related drag/copy actions
+  - Keeps canvas inspector/reference behavior together so `App.tsx` no longer owns that callback cluster
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - Preview section for 1x preview, tiling preview, and animation preview
   - These three preview blocks are switched by Bootstrap-style tabs

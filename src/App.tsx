@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent
 } from 'react';
 import { EditorCanvasWorkspace } from './components/EditorCanvasWorkspace';
@@ -20,6 +19,7 @@ import { ZoomModal } from './components/modals/ZoomModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
 import { useDocumentFileActions } from './hooks/useDocumentFileActions';
 import { useEditorShortcuts } from './hooks/useEditorShortcuts';
+import { usePixelReferences } from './hooks/usePixelReferences';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
@@ -38,7 +38,6 @@ import {
 } from './editor/constants';
 import type {
   AnimationFrame,
-  HoveredPixelInfo,
   PaletteEntry,
   Selection,
   TilePreviewLayer,
@@ -80,8 +79,6 @@ import {
   normalizePaletteEntries,
   pointInSelection,
   rasterLinePoints,
-  rgbaToHex8,
-  rgbaToHsva,
   resizeCanvasPixels,
   resizePixelBlockNearest
 } from './editor/utils';
@@ -374,25 +371,6 @@ function createResizedRectFromHandle(
   return clampFloatingRectToVisibleCanvasBounds({ x, y, width, height }, canvasSize);
 }
 
-function hasHoveredPixelInfoSameContent(
-  left: NonNullable<HoveredPixelInfo>,
-  right: NonNullable<HoveredPixelInfo>
-): boolean {
-  return (
-    left.rgba.r === right.rgba.r &&
-    left.rgba.g === right.rgba.g &&
-    left.rgba.b === right.rgba.b &&
-    left.rgba.a === right.rgba.a &&
-    left.hex8 === right.hex8 &&
-    left.hsva.h === right.hsva.h &&
-    left.hsva.s === right.hsva.s &&
-    left.hsva.v === right.hsva.v &&
-    left.hsva.a === right.hsva.a &&
-    left.paletteIndex === right.paletteIndex &&
-    left.paletteCaption === right.paletteCaption
-  );
-}
-
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
   // ---- UI / editor state ----
@@ -422,10 +400,6 @@ export function App() {
   const [isToastVisible, setIsToastVisible] = useState<boolean>(false);
   const [toastSequence, setToastSequence] = useState<number>(0);
   const [viewportRestoreSequence, setViewportRestoreSequence] = useState<number>(0);
-  const [hoveredPixelInfo, setHoveredPixelInfo] = useState<HoveredPixelInfo>(null);
-  const [hoveredPaletteColor, setHoveredPaletteColor] = useState<{ hex: string; index: number } | null>(null);
-  const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
-  const [draggingReferenceKey, setDraggingReferenceKey] = useState<string | null>(null);
   const [paletteColorModalRequest, setPaletteColorModalRequest] = useState<PaletteColorModalRequest>(null);
   const [paletteRemovalRequest, setPaletteRemovalRequest] = useState<PaletteRemovalRequest | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
@@ -1483,78 +1457,6 @@ export function App() {
     [setZoomWithAnchor, zoom]
   );
 
-  const resolvePaletteMatch = useCallback(
-    (hex8: string): { paletteIndex: number | null; paletteCaption: string | null } => {
-      const paletteIndex = palette.findIndex((entry) => entry.color === hex8.toLowerCase());
-      if (paletteIndex < 0) {
-        return { paletteIndex: null, paletteCaption: null };
-      }
-      return {
-        paletteIndex,
-        paletteCaption: palette[paletteIndex]?.caption || null
-      };
-    },
-    [palette]
-  );
-
-  const syncHoveredPixelInfoWithPalette = useCallback(
-    (info: NonNullable<HoveredPixelInfo>): NonNullable<HoveredPixelInfo> => {
-      const { paletteIndex, paletteCaption } = resolvePaletteMatch(info.hex8);
-      return {
-        ...info,
-        y: info.x < 0 && paletteIndex !== null ? paletteIndex : info.y,
-        paletteIndex,
-        paletteCaption
-      };
-    },
-    [resolvePaletteMatch]
-  );
-
-  const syncReferencePixelInfo = useCallback(
-    (info: NonNullable<HoveredPixelInfo>): NonNullable<HoveredPixelInfo> => {
-      if (info.x >= 0 && info.y >= 0 && info.x < canvasSize && info.y < canvasSize) {
-        const idx = (info.y * canvasSize + info.x) * 4;
-        const r = pixels[idx];
-        const g = pixels[idx + 1];
-        const b = pixels[idx + 2];
-        const a = pixels[idx + 3];
-        const hex8 = rgbaToHex8(r, g, b, a).toUpperCase();
-        const { paletteIndex, paletteCaption } = resolvePaletteMatch(hex8);
-        return {
-          x: info.x,
-          y: info.y,
-          rgba: { r, g, b, a },
-          hex8,
-          hsva: rgbaToHsva(r, g, b, a),
-          paletteIndex,
-          paletteCaption
-        };
-      }
-
-      const paletteSourceIndex = info.paletteIndex ?? info.y;
-      const paletteEntry = paletteSourceIndex >= 0 ? palette[paletteSourceIndex] ?? null : null;
-      if (!paletteEntry) {
-        return {
-          ...info,
-          paletteIndex: null,
-          paletteCaption: null
-        };
-      }
-
-      const { r, g, b, a } = hexToRgba(paletteEntry.color);
-      return {
-        x: info.x,
-        y: paletteSourceIndex,
-        rgba: { r, g, b, a },
-        hex8: rgbaToHex8(r, g, b, a).toUpperCase(),
-        hsva: rgbaToHsva(r, g, b, a),
-        paletteIndex: paletteSourceIndex,
-        paletteCaption: paletteEntry.caption || null
-      };
-    },
-    [canvasSize, palette, pixels, resolvePaletteMatch]
-  );
-
   const resetDrawState = useCallback(() => {
     drawStateRef.current.active = false;
     drawStateRef.current.selectionStart = null;
@@ -1597,299 +1499,41 @@ export function App() {
     };
   }, []);
 
-  const updateHoveredPixelInfo = useCallback(
-    (cell: { x: number; y: number } | null) => {
-      if (!cell) {
-        setHoveredPixelInfo(null);
-        return;
-      }
-
-      const idx = (cell.y * canvasSize + cell.x) * 4;
-      const r = pixels[idx];
-      const g = pixels[idx + 1];
-      const b = pixels[idx + 2];
-      const a = pixels[idx + 3];
-      const hsva = rgbaToHsva(r, g, b, a);
-      const hex8 = rgbaToHex8(r, g, b, a).toUpperCase();
-      const { paletteIndex, paletteCaption } = resolvePaletteMatch(hex8);
-
-      setHoveredPixelInfo({
-        x: cell.x,
-        y: cell.y,
-        rgba: { r, g, b, a },
-        hex8,
-        hsva,
-        paletteIndex,
-        paletteCaption
-      });
-    },
-    [canvasSize, pixels, resolvePaletteMatch]
-  );
-
-  const jumpToPaletteUsage = useCallback(
-    (color: string): boolean => {
-      if (floatingPasteRef.current) {
-        setStatusText('貼り付け移動を確定またはキャンセルしてから使用位置へ移動してください', 'warning');
-        return false;
-      }
-
-      const usageEntry = paletteUsage.byColor[color.toLowerCase()];
-      if (!usageEntry) {
-        setStatusText(`使用位置がありません: ${color.toUpperCase()}`, 'warning');
-        return false;
-      }
-
-      const nextSelection = {
-        x: usageEntry.firstX,
-        y: usageEntry.firstY,
-        w: 1,
-        h: 1
-      } satisfies SelectionRect;
-
-      setSelection(nextSelection);
-      setLastTilePreviewSelection(nextSelection);
-      updateHoveredPixelInfo({ x: usageEntry.firstX, y: usageEntry.firstY });
-      scrollCanvasStageToCell({ x: usageEntry.firstX, y: usageEntry.firstY });
-      setStatusText(`使用位置へ移動しました: (${usageEntry.firstX}, ${usageEntry.firstY})`, 'success');
-      return true;
-    },
-    [paletteUsage.byColor, scrollCanvasStageToCell, setStatusText, updateHoveredPixelInfo]
-  );
-
-  const focusHoveredPixel = useCallback((): boolean => {
-    if (!hoveredPixelInfo) {
-      setStatusText('中心移動: キャンバス上にカーソルを置いてから S を押してください', 'warning');
-      return false;
-    }
-
-    scrollCanvasStageToCell({ x: hoveredPixelInfo.x, y: hoveredPixelInfo.y });
-    setStatusText(`カーソル位置を中央へ移動しました: (${hoveredPixelInfo.x}, ${hoveredPixelInfo.y})`, 'success');
-    return true;
-  }, [hoveredPixelInfo, scrollCanvasStageToCell, setStatusText]);
-
-  const getPixelInfoFields = useCallback((info: NonNullable<HoveredPixelInfo>) => {
-    const syncedInfo = syncReferencePixelInfo(info);
-    return {
-      rgba: `${syncedInfo.rgba.r}, ${syncedInfo.rgba.g}, ${syncedInfo.rgba.b}, ${syncedInfo.rgba.a}`,
-      hex8: syncedInfo.hex8,
-      hsva: `${syncedInfo.hsva.h.toFixed(1)}, ${syncedInfo.hsva.s.toFixed(1)}%, ${syncedInfo.hsva.v.toFixed(1)}%, ${syncedInfo.hsva.a.toFixed(3)}`,
-      paletteIndex: String(syncedInfo.paletteIndex ?? '-'),
-      paletteCaption: syncedInfo.paletteCaption || '-'
-    };
-  }, [syncReferencePixelInfo]);
-
-  const copyTextToClipboard = useCallback(async (text: string): Promise<boolean> => {
-    if (!navigator.clipboard?.writeText) {
-      return false;
-    }
-
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  const copyPixelField = useCallback(
-    async (label: string, value: string) => {
-      const copied = await copyTextToClipboard(value);
-      setStatusText(copied ? `${label}をコピーしました` : `${label}のコピーに失敗しました`, copied ? 'success' : 'error');
-    },
-    [copyTextToClipboard]
-  );
-
-  const formatReferenceSourceLabel = useCallback((info: NonNullable<HoveredPixelInfo>): string => {
-    return info.x >= 0 ? `(${info.x}, ${info.y})` : `パレット[${info.paletteIndex ?? '-'}]`;
-  }, []);
-
-  const selectReferenceByNumber = useCallback(
-    (number: number): boolean => {
-      // Shortcut target is only 1-9. Lines after 9 are explicitly not selectable.
-      if (number < 1 || number > 9) {
-        return false;
-      }
-      const info = referencePixelInfos[number - 1];
-      if (!info) {
-        return false;
-      }
-      const syncedInfo = syncReferencePixelInfo(info);
-      setSelectedColor(rgbaToHex8(syncedInfo.rgba.r, syncedInfo.rgba.g, syncedInfo.rgba.b, syncedInfo.rgba.a));
-      setStatusText(`参照 ${number} の色を選択しました`, 'success');
-      return true;
-    },
-    [referencePixelInfos, syncReferencePixelInfo]
-  );
-
-  const freezeHoveredPixelInfo = useCallback(() => {
-    const infoFromPalette = (() => {
-      if (!hoveredPaletteColor) {
-        return null;
-      }
-      const { r, g, b, a } = hexToRgba(hoveredPaletteColor.hex);
-      return {
-        x: -1,
-        y: hoveredPaletteColor.index,
-        rgba: { r, g, b, a },
-        hex8: rgbaToHex8(r, g, b, a).toUpperCase(),
-        hsva: rgbaToHsva(r, g, b, a),
-        paletteIndex: hoveredPaletteColor.index,
-        paletteCaption: null
-      } satisfies NonNullable<HoveredPixelInfo>;
-    })();
-
-    const activeInfo = hoveredPixelInfo ?? infoFromPalette;
-    if (!activeInfo) {
-      setStatusText('参照追加: キャンバスまたはパレット上にマウスを置いてから F を押してください', 'warning');
-      return;
-    }
-    const syncedActiveInfo = syncReferencePixelInfo(activeInfo);
-
-    const matchingPaletteColor =
-      syncedActiveInfo.paletteIndex !== null ? palette[syncedActiveInfo.paletteIndex]?.color ?? null : null;
-    if (matchingPaletteColor) {
-      setSelectedColor(matchingPaletteColor);
-    }
-
-    const hasSameInfoIgnoringCoordinate = referencePixelInfos.some(
-      (info) =>
-        hasHoveredPixelInfoSameContent(info, syncedActiveInfo) &&
-        !(info.x === syncedActiveInfo.x && info.y === syncedActiveInfo.y)
-    );
-    if (hasSameInfoIgnoringCoordinate) {
-      setStatusText('参照追加: 同じ色情報がすでに登録済みです', 'warning');
-      return;
-    }
-
-    const existingIndex = referencePixelInfos.findIndex(
-      (info) => info.x === syncedActiveInfo.x && info.y === syncedActiveInfo.y
-    );
-    if (existingIndex < 0) {
-      setReferencePixelInfos((prev) => [...prev, syncedActiveInfo]);
-      setStatusText(`参照追加: ${formatReferenceSourceLabel(syncedActiveInfo)} ${syncedActiveInfo.hex8}`, 'success');
-      return;
-    }
-
-    if (hasHoveredPixelInfoSameContent(referencePixelInfos[existingIndex], syncedActiveInfo)) {
-      setStatusText(`参照維持: ${formatReferenceSourceLabel(syncedActiveInfo)} は同じ色です`, 'warning');
-      return;
-    }
-
-    setReferencePixelInfos((prev) => {
-      const next = [...prev];
-      next[existingIndex] = syncedActiveInfo;
-      return next;
-    });
-    setStatusText(`参照更新: ${formatReferenceSourceLabel(syncedActiveInfo)} -> ${syncedActiveInfo.hex8}`, 'success');
-  }, [formatReferenceSourceLabel, hoveredPaletteColor, hoveredPixelInfo, palette, referencePixelInfos, syncReferencePixelInfo]);
-
-  useEffect(() => {
-    setReferencePixelInfos((prev) => {
-      let changed = false;
-      const next = prev.map((info) => {
-        const syncedInfo = syncReferencePixelInfo(info);
-        if (syncedInfo.x === info.x && syncedInfo.y === info.y && hasHoveredPixelInfoSameContent(syncedInfo, info)) {
-          return info;
-        }
-        changed = true;
-        return syncedInfo;
-      });
-      return changed ? next : prev;
-    });
-  }, [syncReferencePixelInfo]);
-
-  const clearReferencePixelInfos = useCallback(() => {
-    if (referencePixelInfos.length === 0) {
-      setStatusText('参照はすでに空です', 'warning');
-      return;
-    }
-    setReferencePixelInfos([]);
-    setStatusText('参照ラインをクリアしました', 'success');
-  }, [referencePixelInfos.length]);
-
-  const removeReferencePixelInfo = useCallback((x: number, y: number) => {
-    let removed = false;
-    setReferencePixelInfos((prev) => {
-      const next = prev.filter((info) => {
-        const isTarget = info.x === x && info.y === y;
-        if (isTarget) {
-          removed = true;
-        }
-        return !isTarget;
-      });
-      return next.length === prev.length ? prev : next;
-    });
-    if (removed) {
-      setStatusText(`参照を削除しました: (${x}, ${y})`, 'success');
-    }
-  }, []);
-
-  const openReferencePaletteColorModal = useCallback(
-    (info: NonNullable<HoveredPixelInfo>) => {
-      const syncedInfo = syncReferencePixelInfo(info);
-      const matchedEntry =
-        syncedInfo.paletteIndex !== null ? palette[syncedInfo.paletteIndex] ?? null : null;
-      const modalEntry: PaletteEntry = matchedEntry ?? {
-        color: syncedInfo.hex8.toLowerCase(),
-        caption: syncedInfo.paletteCaption ?? '',
-        locked: false
-      };
-
-      setSelectedColor(modalEntry.color);
-      setPaletteColorModalRequest({
-        mode: matchedEntry ? 'edit' : 'create',
-        entry: modalEntry
-      });
-    },
-    [palette, syncReferencePixelInfo]
-  );
-
-  const getReferenceKey = useCallback((info: NonNullable<HoveredPixelInfo>): string => `${info.x}:${info.y}`, []);
-
-  const onReferenceDragStart = useCallback((event: ReactDragEvent<HTMLDivElement>, sourceKey: string) => {
-    setDraggingReferenceKey(sourceKey);
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', sourceKey);
-  }, []);
-
-  const onReferenceDragEnd = useCallback(() => {
-    setDraggingReferenceKey(null);
-  }, []);
-
-  const onReferenceDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const onReferenceDrop = useCallback(
-    (event: ReactDragEvent<HTMLDivElement>, targetKey: string) => {
-      event.preventDefault();
-      const sourceKey = draggingReferenceKey ?? event.dataTransfer.getData('text/plain');
-      setDraggingReferenceKey(null);
-      if (!sourceKey || sourceKey === targetKey) {
-        return;
-      }
-
-      let moved = false;
-      setReferencePixelInfos((prev) => {
-        const sourceIndex = prev.findIndex((info) => getReferenceKey(info) === sourceKey);
-        const targetIndex = prev.findIndex((info) => getReferenceKey(info) === targetKey);
-        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
-          return prev;
-        }
-
-        const next = [...prev];
-        const [movedItem] = next.splice(sourceIndex, 1);
-        next.splice(targetIndex, 0, movedItem);
-        moved = true;
-        return next;
-      });
-      if (moved) {
-        setStatusText('参照ラインの順序を変更しました', 'success');
-      }
-    },
-    [draggingReferenceKey, getReferenceKey]
-  );
+  const {
+    hoveredPixelInfo,
+    setHoveredPaletteColor,
+    referencePixelInfos,
+    draggingReferenceKey,
+    updateHoveredPixelInfo,
+    clearHoveredPixelInfo,
+    jumpToPaletteUsage,
+    focusHoveredPixel,
+    getPixelInfoFields,
+    copyPixelField,
+    selectReferenceByNumber,
+    freezeHoveredPixelInfo,
+    clearReferencePixelInfos,
+    removeReferencePixelInfo,
+    openReferencePaletteColorModal,
+    getReferenceKey,
+    onReferenceDragStart,
+    onReferenceDragEnd,
+    onReferenceDragOver,
+    onReferenceDrop,
+    syncReferencePixelInfo
+  } = usePixelReferences({
+    canvasSize,
+    pixels,
+    palette,
+    paletteUsageByColor: paletteUsage.byColor,
+    floatingPasteRef,
+    scrollCanvasStageToCell,
+    setSelection,
+    setLastTilePreviewSelection,
+    setSelectedColor,
+    setPaletteColorModalRequest,
+    setStatusText
+  });
 
   const finalizeFloatingPaste = useCallback(() => {
     const floating = floatingPasteRef.current;
@@ -2256,8 +1900,8 @@ export function App() {
     if (!hasFloatingInteractionActive && !panStateRef.current.active) {
       onMouseUp();
     }
-    setHoveredPixelInfo(null);
-  }, [onMouseUp]);
+    clearHoveredPixelInfo();
+  }, [clearHoveredPixelInfo, onMouseUp]);
 
   useEffect(() => {
     const onWindowMouseMove = (event: MouseEvent) => {

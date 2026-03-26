@@ -251,6 +251,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/useEditorShortcuts.ts`
   - グローバルショートカットとネイティブメニュー action の配線をまとめる hook
   - shortcut 系の副作用を root JSX から切り離す
+- `src/hooks/usePixelReferences.ts`
+  - ホバー中ピクセル、参照ライン、パレット hover からの `F` 固定、drag/copy 操作をまとめる hook
+  - キャンバスの参照/インスペクタ挙動を 1 か所に寄せて、`App.tsx` から callback 群を減らす
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - 1xプレビュー / タイルプレビュー / アニメーションプレビューを担当するプレビューセクション
   - 3つのプレビューは Bootstrap 風のタブ切り替えで表示する
