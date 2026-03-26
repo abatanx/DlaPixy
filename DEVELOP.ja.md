@@ -239,12 +239,18 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 ## 7. 主要ファイル
 - `src/App.tsx`
   - エディター本体の状態管理と高レベルなオーケストレーション
-  - サイドバー、中央ワークスペース、モーダル状態、各種編集 callback を束ねる
+  - サイドバー、中央ワークスペース、shell chrome component、各種編集 callback を束ねる
 - `src/components/EditorCanvasWorkspace.tsx`
   - 中央のキャンバスカード UI。キャンバス面、選択オーバーレイ、ホバー情報、参照ライン、右ツールバーを担当する
   - 編集ロジックは `App.tsx` に残しつつ、中央レイアウトの見通しをよくする
 - `src/components/EditorSidebar.tsx`
   - 左サイドバーのコンテナ。プレビュー部とパレット部を組み立てる
+- `src/components/EditorModalLayer.tsx`
+  - toast と、canvas/grid/zoom、K-Means、rotation、パレット削除確認の renderer modal 群をまとめる
+  - shell レベルの modal JSX を `App.tsx` から外しつつ、既存の配線はそのまま保つ
+- `src/components/EditorStatusFooter.tsx`
+  - canvas/grid/zoom/file status を表示する footer ステータスバー
+  - footer の JSX と表示文言を `App.tsx` から外す
 - `src/hooks/useDocumentFileActions.ts`
   - PNG + sidecar metadata の保存 / 名前を付けて保存 / 読込フローをまとめる hook
   - 未保存確認ダイアログと、renderer 側での PNG decode / state 反映を担当する

@@ -246,12 +246,18 @@ Current metadata shape:
 ## 7. Key File Map
 - `src/App.tsx`
   - Main editor state and high-level orchestration
-  - Wires sidebar, canvas workspace, modal state, and editor domain callbacks
+  - Wires sidebar, canvas workspace, shell chrome components, and editor domain callbacks
 - `src/components/EditorCanvasWorkspace.tsx`
   - Main canvas card UI including canvas surface, selection overlay, hover info, reference lines, and right toolbar
   - Keeps the central editor layout readable without moving core editing logic out of `App.tsx`
 - `src/components/EditorSidebar.tsx`
   - Left sidebar container that composes preview and palette sections
+- `src/components/EditorModalLayer.tsx`
+  - Toast plus renderer modal cluster for canvas/grid/zoom, K-Means, rotation, and palette-removal confirmation
+  - Keeps shell-level modal JSX out of `App.tsx` while preserving existing modal wiring
+- `src/components/EditorStatusFooter.tsx`
+  - Footer status bar for canvas/grid/zoom/file status actions
+  - Keeps footer JSX and footer-specific labels out of `App.tsx`
 - `src/hooks/useDocumentFileActions.ts`
   - Save / Save As / Open document flow for PNG + sidecar metadata
   - Owns unsaved-confirmation handling and renderer-side PNG decode/apply steps

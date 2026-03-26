@@ -1,12 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { EditorCanvasWorkspace } from './components/EditorCanvasWorkspace';
+import { EditorModalLayer } from './components/EditorModalLayer';
 import { EditorSidebar } from './components/EditorSidebar';
-import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
-import { ConfirmModal } from './components/modals/ConfirmModal';
-import { GridSpacingModal } from './components/modals/GridSpacingModal';
-import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
-import { SelectionRotateModal } from './components/modals/SelectionRotateModal';
-import { ZoomModal } from './components/modals/ZoomModal';
+import { EditorStatusFooter } from './components/EditorStatusFooter';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
 import { useCanvasSettings } from './hooks/useCanvasSettings';
 import { useCanvasViewport } from './hooks/useCanvasViewport';
@@ -472,6 +468,10 @@ export function App() {
     exportGplPalette,
   });
 
+  const showValidationWarning = (message: string) => {
+    setStatusText(message, 'warning');
+  };
+
   return (
     <div className="app-layout">
       <div className="container-fluid pt-3 pb-0 mb-0 app-shell">
@@ -566,103 +566,48 @@ export function App() {
             deleteSelection={deleteSelection}
           />
         </div>
-        <div className={`status-toast ${isToastVisible ? 'show' : ''} ${toastType}`} role="status" aria-live="polite">
-          {statusText}
-        </div>
-        <CanvasSizeModal
-          isOpen={isCanvasSizeModalOpen}
+        <EditorModalLayer
+          statusText={statusText}
+          toastType={toastType}
+          isToastVisible={isToastVisible}
+          isCanvasSizeModalOpen={isCanvasSizeModalOpen}
           canvasSize={canvasSize}
-          onApply={applyCanvasSize}
-          onClose={closeCanvasSizeModal}
-          onValidationError={(message) => setStatusText(message, 'warning')}
-        />
-        <GridSpacingModal
-          isOpen={isGridSpacingModalOpen}
+          onApplyCanvasSize={applyCanvasSize}
+          onCloseCanvasSize={closeCanvasSizeModal}
+          isGridSpacingModalOpen={isGridSpacingModalOpen}
           gridSpacing={gridSpacing}
-          canvasSize={canvasSize}
-          onApply={applyGridSpacing}
-          onClose={closeGridSpacingModal}
-          onValidationError={(message) => setStatusText(message, 'warning')}
-        />
-        <ZoomModal
-          isOpen={isZoomModalOpen}
+          onApplyGridSpacing={applyGridSpacing}
+          onCloseGridSpacing={closeGridSpacingModal}
+          isZoomModalOpen={isZoomModalOpen}
           zoom={zoom}
-          onApply={applyZoom}
-          onClose={closeZoomModal}
-          onValidationError={(message) => setStatusText(message, 'warning')}
-        />
-        <KMeansQuantizeModal
-          isOpen={kMeansQuantizeRequest !== null}
+          onApplyZoom={applyZoom}
+          onCloseZoom={closeZoomModal}
           transparentBackgroundMode={transparentBackgroundMode}
-          selection={kMeansQuantizeRequest?.selection ?? null}
-          source={kMeansQuantizeRequest?.source ?? null}
-          initialColorCount={kMeansQuantizeRequest?.initialColorCount ?? 1}
-          onApply={applyKMeansQuantize}
-          onClose={closeKMeansQuantizeModal}
-          onValidationError={(message) => setStatusText(message, 'warning')}
+          kMeansQuantizeSelection={kMeansQuantizeRequest?.selection ?? null}
+          kMeansQuantizeSource={kMeansQuantizeRequest?.source ?? null}
+          kMeansInitialColorCount={kMeansQuantizeRequest?.initialColorCount ?? 1}
+          onApplyKMeansQuantize={applyKMeansQuantize}
+          onCloseKMeansQuantize={closeKMeansQuantizeModal}
+          selectionRotateSelection={selectionRotateRequest?.selection ?? null}
+          selectionRotateSource={selectionRotateRequest?.source ?? null}
+          onApplySelectionRotate={applySelectionRotate}
+          onCloseSelectionRotate={closeSelectionRotateModal}
+          paletteRemovalRequest={paletteRemovalRequest}
+          onConfirmPaletteRemoval={confirmPaletteRemoval}
+          onClosePaletteRemoval={closePaletteRemovalModal}
+          showValidationWarning={showValidationWarning}
         />
-        <SelectionRotateModal
-          isOpen={selectionRotateRequest !== null}
-          transparentBackgroundMode={transparentBackgroundMode}
-          selection={selectionRotateRequest?.selection ?? null}
-          source={selectionRotateRequest?.source ?? null}
-          onApply={applySelectionRotate}
-          onClose={closeSelectionRotateModal}
-          onValidationError={(message) => setStatusText(message, 'warning')}
-        />
-        <ConfirmModal
-          isOpen={paletteRemovalRequest !== null}
-          title="使用中の色を削除しますか？"
-          confirmLabel="クリアして削除"
-          onConfirm={confirmPaletteRemoval}
-          onClose={closePaletteRemovalModal}
-        >
-          <p className="mb-2">
-            <span className="font-monospace">{paletteRemovalRequest?.color.toUpperCase() ?? '-'}</span>
-            {' '}はキャンバス上で{' '}
-            <strong>{paletteRemovalRequest?.usedPixelCount.toLocaleString() ?? '0'} px</strong>
-            {' '}使用されています。
-          </p>
-          <p className="mb-0 text-body-secondary">
-            この色を削除すると、該当するピクセルはすべて透明になります。続けてよければ削除してください。
-          </p>
-        </ConfirmModal>
       </div>
-      <footer className="container-fluid app-footer font-monospace small border-top">
-        <div className="app-footer-status">
-          <button
-            type="button"
-            className="app-footer-action"
-            onClick={openCanvasSizeModal}
-            aria-label="キャンバスサイズ変更を開く (⌘I)"
-            title="キャンバスサイズ変更を開く (⌘I)"
-          >
-            キャンバス(⌘I):{canvasSize}x{canvasSize}
-          </button>
-          <button
-            type="button"
-            className="app-footer-action"
-            onClick={openGridSpacingModal}
-            aria-label="グリッド線間隔変更を開く (⌘G)"
-            title="グリッド線間隔変更を開く (⌘G)"
-          >
-            グリッド線(⌘G):{gridSpacing === 0 ? 'なし' : `${gridSpacing}px 間隔`}
-          </button>
-          <button
-            type="button"
-            className="app-footer-action"
-            onClick={openZoomModal}
-            aria-label="表示倍率変更を開く (⌘R)"
-            title="表示倍率変更を開く (⌘R)"
-          >
-            倍率(⌘R):{zoom}x
-          </button>
-          <span>
-            ファイル:{currentFilePath ?? '未保存'}
-            {hasUnsavedChanges ? ' *' : ''}
-          </span>
-        </div>
-      </footer>
+      <EditorStatusFooter
+        canvasSize={canvasSize}
+        gridSpacing={gridSpacing}
+        zoom={zoom}
+        currentFilePath={currentFilePath}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onOpenCanvasSizeModal={openCanvasSizeModal}
+        onOpenGridSpacingModal={openGridSpacingModal}
+        onOpenZoomModal={openZoomModal}
+      />
     </div>
   );
 }
