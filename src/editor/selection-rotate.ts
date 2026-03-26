@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 export type SelectionPixelBlock = {
   pixels: Uint8ClampedArray;
   width: number;

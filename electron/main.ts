@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 /// <reference path="./png-modules.d.ts" />
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage } from 'electron';
 import type { MessageBoxOptions } from 'electron';

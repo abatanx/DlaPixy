@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { PALETTE_CAPTION_MAX_LENGTH as SHARED_PALETTE_CAPTION_MAX_LENGTH, type PaletteEntry } from '../../shared/palette';
 
 export const PALETTE_CAPTION_MAX_LENGTH = SHARED_PALETTE_CAPTION_MAX_LENGTH;

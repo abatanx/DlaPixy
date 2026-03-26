@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { MenuAction } from '../../shared/ipc';
 import type { GplExportFormat } from '../../shared/palette-gpl';

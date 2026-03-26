@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { normalizePaletteEntries, type PaletteEntry } from '../../shared/palette';
 import { rgbaToHex8 } from './utils';
 

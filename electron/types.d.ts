@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import type { MenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';

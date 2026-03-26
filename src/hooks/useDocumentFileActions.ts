@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { SIDECAR_SCHEMA_VERSION } from '../../shared/sidecar';
 import {

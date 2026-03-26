@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useCallback, useEffect, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
 import type { DrawState } from '../editor/canvas-pointer';
 import type { FloatingPasteState } from '../editor/floating-paste';

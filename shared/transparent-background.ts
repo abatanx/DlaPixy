@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 export const TRANSPARENT_BACKGROUND_MODES = [
   'white-check',
   'black-check',

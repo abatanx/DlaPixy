@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { hasSamePaletteEntries, resolveNextSelectedColor } from '../editor/app-utils';
 import type { FloatingPasteState } from '../editor/floating-paste';

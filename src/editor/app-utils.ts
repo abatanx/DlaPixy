@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import type { PaletteEntry } from './types';
 
 export function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boolean {

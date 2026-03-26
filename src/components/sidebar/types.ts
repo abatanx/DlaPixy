@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import type { AnimationFrame, PaletteEntry, Selection, TilePreviewLayer } from '../../editor/types';
 import type { PaletteUsageEntry } from '../../editor/palette-sync';
 import type { TransparentBackgroundMode } from '../../../shared/transparent-background';

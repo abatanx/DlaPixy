@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useCallback, type MutableRefObject } from 'react';
 import type { ClipboardPixelBlock, FloatingPasteState } from '../editor/floating-paste';
 import type { Selection, Tool } from '../editor/types';

@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import type { GplExportFormat } from '../../shared/palette-gpl';
 import { getFileNameFromPath, hasSamePaletteEntries, replaceFileExtension, resolveNextSelectedColor } from '../editor/app-utils';

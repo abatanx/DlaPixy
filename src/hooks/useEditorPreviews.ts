@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createRegionPreviewDataUrl, createTilePreviewLayerDataUrl, createTilePreviewLayerThumbnailDataUrl } from '../editor/preview';
 import { extractSelectionPixelBlock } from '../editor/selection-rotate';

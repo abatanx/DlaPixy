@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { Menu } from 'electron';
 import type { MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';

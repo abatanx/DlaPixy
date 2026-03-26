@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import type { PaletteEntry as SharedPaletteEntry } from '../../shared/palette';
 import type { EditorSidecar, EditorTool } from '../../shared/sidecar';
 

@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import type { CSSProperties } from 'react';
 import type { FloatingPasteState } from './floating-paste';
 import type { Selection } from './types';

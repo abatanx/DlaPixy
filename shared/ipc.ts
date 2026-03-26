@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import type { GplExportFormat } from './palette-gpl';
 import type { TransparentBackgroundMode } from './transparent-background';
 

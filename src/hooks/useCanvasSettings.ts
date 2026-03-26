@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Selection } from '../editor/types';
 import { resizeCanvasPixels } from '../editor/utils';

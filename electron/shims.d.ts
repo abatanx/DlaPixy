@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 declare module 'png-chunks-extract' {
   type Chunk = { name: string; data: Uint8Array };
   export default function extractChunks(data: Uint8Array): Chunk[];

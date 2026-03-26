@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 import { useMemo, type CSSProperties } from 'react';
 import type { Selection } from '../editor/types';
 

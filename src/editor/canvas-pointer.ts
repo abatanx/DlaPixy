@@ -1,3 +1,8 @@
+/**
+ * DlaPixy / Pixel Editor for MapChip
+ * @copyright (C) 2026 DEKITASHICO-LAB
+ **/
+
 export type DrawState = {
   active: boolean;
   selectionStart: { x: number; y: number } | null;
