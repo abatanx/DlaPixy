@@ -238,11 +238,19 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 
 ## 7. 主要ファイル
 - `src/App.tsx`
-  - エディター本体の状態管理と処理オーケストレーション
-  - キャンバス操作ハンドラとキーボードショートカット
-  - ネイティブ `Palette` メニューの action を受けて GPL パレット import/export を適用する
+  - エディター本体の状態管理と高レベルなオーケストレーション
+  - サイドバー、中央ワークスペース、モーダル状態、各種編集 callback を束ねる
+- `src/components/EditorCanvasWorkspace.tsx`
+  - 中央のキャンバスカード UI。キャンバス面、選択オーバーレイ、ホバー情報、参照ライン、右ツールバーを担当する
+  - 編集ロジックは `App.tsx` に残しつつ、中央レイアウトの見通しをよくする
 - `src/components/EditorSidebar.tsx`
   - 左サイドバーのコンテナ。プレビュー部とパレット部を組み立てる
+- `src/hooks/useDocumentFileActions.ts`
+  - PNG + sidecar metadata の保存 / 名前を付けて保存 / 読込フローをまとめる hook
+  - 未保存確認ダイアログと、renderer 側での PNG decode / state 反映を担当する
+- `src/hooks/useEditorShortcuts.ts`
+  - グローバルショートカットとネイティブメニュー action の配線をまとめる hook
+  - shortcut 系の副作用を root JSX から切り離す
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - 1xプレビュー / タイルプレビュー / アニメーションプレビューを担当するプレビューセクション
   - 3つのプレビューは Bootstrap 風のタブ切り替えで表示する
@@ -250,6 +258,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/editor/preview.ts`
   - 1x / Tile Preview 用の Data URL 生成を担当する
   - Tile Preview の重ねを 1 枚目サイズへ正規化して合成し、その結果を `3x3` 反復表示する
+- `src/editor/app-utils.ts`
+  - `App.tsx` から切り出した小さな共通 helper。ファイル名処理や selectedColor 解決を担当する
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - 色セレクタ起点とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
   - パレット一覧はコンパクト表示 + 独立スクロールにして、大量色でも使いやすくしている

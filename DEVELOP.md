@@ -245,11 +245,19 @@ Current metadata shape:
 
 ## 7. Key File Map
 - `src/App.tsx`
-  - Main editor state and behavior orchestration
-  - Canvas interaction handlers and keyboard shortcuts
-  - Handles native `Palette` menu actions and applies GPL palette import/export results
+  - Main editor state and high-level orchestration
+  - Wires sidebar, canvas workspace, modal state, and editor domain callbacks
+- `src/components/EditorCanvasWorkspace.tsx`
+  - Main canvas card UI including canvas surface, selection overlay, hover info, reference lines, and right toolbar
+  - Keeps the central editor layout readable without moving core editing logic out of `App.tsx`
 - `src/components/EditorSidebar.tsx`
   - Left sidebar container that composes preview and palette sections
+- `src/hooks/useDocumentFileActions.ts`
+  - Save / Save As / Open document flow for PNG + sidecar metadata
+  - Owns unsaved-confirmation handling and renderer-side PNG decode/apply steps
+- `src/hooks/useEditorShortcuts.ts`
+  - Global keyboard shortcuts and native menu action wiring
+  - Keeps shortcut side effects out of the root JSX/orchestration file
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - Preview section for 1x preview, tiling preview, and animation preview
   - These three preview blocks are switched by Bootstrap-style tabs
@@ -257,6 +265,8 @@ Current metadata shape:
 - `src/editor/preview.ts`
   - Generates the 1x / tile preview images
   - Normalizes Tile Preview layers to the first registered size, composites them, then repeats the result in `3x3`
+- `src/editor/app-utils.ts`
+  - Small shared helpers extracted from `App.tsx` for file-name handling and selected-color resolution
 - `src/editor/transparent-background.ts`
   - Maps transparent background mode to reusable renderer surface classes
 - `src/components/sidebar/SidebarPaletteSection.tsx`

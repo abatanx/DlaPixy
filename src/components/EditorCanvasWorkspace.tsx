@@ -1,0 +1,364 @@
+import {
+  type CSSProperties,
+  type DragEvent as ReactDragEvent,
+  type MutableRefObject,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
+import { EditorToolbar } from './EditorToolbar';
+import type { HoveredPixelInfo, Selection, Tool } from '../editor/types';
+
+type FloatingResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
+
+type PixelInfoFields = {
+  rgba: string;
+  hex8: string;
+  hsva: string;
+  paletteIndex: string;
+  paletteCaption: string;
+};
+
+type EditorCanvasWorkspaceProps = {
+  canvasStageRef: MutableRefObject<HTMLDivElement | null>;
+  canvasRef: MutableRefObject<HTMLCanvasElement | null>;
+  floatingPreviewCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
+  displaySize: number;
+  floatingStagePaddingPx: number;
+  transparentBackgroundClassName: string;
+  isPanning: boolean;
+  isSpacePressed: boolean;
+  onCanvasStageMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onMouseDown: (event: ReactMouseEvent<HTMLCanvasElement>) => void;
+  onMouseMove: (event: ReactMouseEvent<HTMLCanvasElement>) => void;
+  onMouseUp: () => void;
+  onMouseLeaveCanvas: () => void;
+  selectionOverlaySelection: Selection;
+  selectionOverlayBaseStyle?: CSSProperties;
+  selectionOverlayVisualStyle?: CSSProperties;
+  isFloatingPasteActive: boolean;
+  zoom: number;
+  floatingHandleOrder: FloatingResizeHandle[];
+  getFloatingHandleStyle: (handle: FloatingResizeHandle) => CSSProperties;
+  onFloatingOverlayMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  hoveredPixelInfo: HoveredPixelInfo;
+  getPixelInfoFields: (info: NonNullable<HoveredPixelInfo>) => PixelInfoFields;
+  referencePixelInfos: Array<NonNullable<HoveredPixelInfo>>;
+  clearReferencePixelInfos: () => void;
+  syncReferencePixelInfo: (info: NonNullable<HoveredPixelInfo>) => NonNullable<HoveredPixelInfo>;
+  getReferenceKey: (info: NonNullable<HoveredPixelInfo>) => string;
+  draggingReferenceKey: string | null;
+  onReferenceDragStart: (event: ReactDragEvent<HTMLDivElement>, sourceKey: string) => void;
+  onReferenceDragEnd: () => void;
+  onReferenceDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
+  onReferenceDrop: (event: ReactDragEvent<HTMLDivElement>, targetKey: string) => void;
+  openReferencePaletteColorModal: (info: NonNullable<HoveredPixelInfo>) => void;
+  copyPixelField: (label: string, value: string) => Promise<void>;
+  removeReferencePixelInfo: (x: number, y: number) => void;
+  tool: Tool;
+  setTool: (tool: Tool) => void;
+  hasCommittedSelection: boolean;
+  addAnimationFrame: () => void;
+  openSelectionRotateModal: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  doUndo: () => void;
+  copySelection: () => Promise<void>;
+  pasteSelection: () => void;
+  deleteSelection: () => void;
+};
+
+export function EditorCanvasWorkspace({
+  canvasStageRef,
+  canvasRef,
+  floatingPreviewCanvasRef,
+  displaySize,
+  floatingStagePaddingPx,
+  transparentBackgroundClassName,
+  isPanning,
+  isSpacePressed,
+  onCanvasStageMouseDown,
+  onMouseDown,
+  onMouseMove,
+  onMouseUp,
+  onMouseLeaveCanvas,
+  selectionOverlaySelection,
+  selectionOverlayBaseStyle,
+  selectionOverlayVisualStyle,
+  isFloatingPasteActive,
+  zoom,
+  floatingHandleOrder,
+  getFloatingHandleStyle,
+  onFloatingOverlayMouseDown,
+  hoveredPixelInfo,
+  getPixelInfoFields,
+  referencePixelInfos,
+  clearReferencePixelInfos,
+  syncReferencePixelInfo,
+  getReferenceKey,
+  draggingReferenceKey,
+  onReferenceDragStart,
+  onReferenceDragEnd,
+  onReferenceDragOver,
+  onReferenceDrop,
+  openReferencePaletteColorModal,
+  copyPixelField,
+  removeReferencePixelInfo,
+  tool,
+  setTool,
+  hasCommittedSelection,
+  addAnimationFrame,
+  openSelectionRotateModal,
+  zoomIn,
+  zoomOut,
+  doUndo,
+  copySelection,
+  pasteSelection,
+  deleteSelection
+}: EditorCanvasWorkspaceProps) {
+  return (
+    <main className="col-12 col-lg-8 col-xl-9 d-flex">
+      <div className="card shadow-sm editor-card flex-grow-1">
+        <div
+          ref={canvasStageRef}
+          className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''}`}
+          style={{ '--floating-stage-padding': `${floatingStagePaddingPx}px` } as CSSProperties}
+          onMouseDown={onCanvasStageMouseDown}
+        >
+          <div className="canvas-surface">
+            <canvas
+              ref={canvasRef}
+              width={displaySize}
+              height={displaySize}
+              className={`pixel-canvas ${transparentBackgroundClassName} ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseLeaveCanvas}
+            />
+            {selectionOverlaySelection ? (
+              <>
+                {isFloatingPasteActive ? (
+                  <div className="canvas-floating-visual" style={selectionOverlayVisualStyle}>
+                    <canvas
+                      ref={floatingPreviewCanvasRef}
+                      width={selectionOverlaySelection.w}
+                      height={selectionOverlaySelection.h}
+                      className={`canvas-floating-preview ${transparentBackgroundClassName}`}
+                      style={{
+                        width: `${selectionOverlaySelection.w * zoom}px`,
+                        height: `${selectionOverlaySelection.h * zoom}px`
+                      }}
+                    />
+                  </div>
+                ) : null}
+                <div
+                  className={`canvas-selection-overlay ${isFloatingPasteActive ? 'is-floating' : 'is-static'}`}
+                  style={selectionOverlayBaseStyle}
+                  onMouseDown={isFloatingPasteActive ? onFloatingOverlayMouseDown : undefined}
+                >
+                  {isFloatingPasteActive
+                    ? floatingHandleOrder.map((handle) => (
+                        <button
+                          key={handle}
+                          type="button"
+                          className="canvas-floating-handle"
+                          data-handle={handle}
+                          aria-label={`resize-${handle}`}
+                          style={getFloatingHandleStyle(handle)}
+                          tabIndex={-1}
+                        />
+                      ))
+                    : null}
+                  <span className="canvas-selection-size-label corner">
+                    {selectionOverlaySelection.x},{selectionOverlaySelection.y}
+                  </span>
+                  <span className="canvas-selection-size-label top">{selectionOverlaySelection.w}</span>
+                  <span className="canvas-selection-size-label bottom">{selectionOverlaySelection.w}</span>
+                  <span className="canvas-selection-size-label left">{selectionOverlaySelection.h}</span>
+                  <span className="canvas-selection-size-label right">{selectionOverlaySelection.h}</span>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="canvas-hover-info px-3 py-2 border-top">
+          {hoveredPixelInfo ? (
+            (() => {
+              const fields = getPixelInfoFields(hoveredPixelInfo);
+              return (
+                <span className="canvas-hover-row">
+                  <span className="canvas-hover-swatch" title={hoveredPixelInfo.hex8}>
+                    <span
+                      className="canvas-hover-swatch-color"
+                      style={{
+                        backgroundColor: `rgba(${hoveredPixelInfo.rgba.r}, ${hoveredPixelInfo.rgba.g}, ${hoveredPixelInfo.rgba.b}, ${hoveredPixelInfo.rgba.a / 255})`
+                      }}
+                    />
+                  </span>
+                  <span className="canvas-hover-text">x,y: {hoveredPixelInfo.x}, {hoveredPixelInfo.y}</span>
+                  <span className="canvas-data-field">RGBA: {fields.rgba}</span>
+                  <span className="canvas-data-field">HEX8: {fields.hex8}</span>
+                  <span className="canvas-data-field">HSVA: {fields.hsva}</span>
+                  <span className="canvas-data-field">PaletteIndex: {fields.paletteIndex}</span>
+                  <span className="canvas-data-field">Caption: {fields.paletteCaption}</span>
+                </span>
+              );
+            })()
+          ) : (
+            <span className="canvas-hover-row">
+              <span className="canvas-hover-swatch" aria-hidden="true" />
+              <span className="canvas-hover-text">x,y: -</span>
+              <span className="canvas-data-field">RGBA: -</span>
+              <span className="canvas-data-field">HEX8: -</span>
+              <span className="canvas-data-field">HSVA: -</span>
+              <span className="canvas-data-field">PaletteIndex: -</span>
+              <span className="canvas-data-field">Caption: -</span>
+            </span>
+          )}
+        </div>
+
+        <div className="canvas-reference-info px-3 py-2 border-top">
+          <div className="canvas-reference-header">
+            <span className="canvas-reference-label">参照 (F):</span>
+            <button
+              type="button"
+              className="canvas-copy-btn"
+              onClick={clearReferencePixelInfos}
+              title="参照をクリア"
+              aria-label="参照をクリア"
+            >
+              <i className="fa-solid fa-trash-can" aria-hidden="true" />
+            </button>
+          </div>
+
+          {referencePixelInfos.length > 0 ? (
+            <div className="canvas-reference-list">
+              {referencePixelInfos.map((info, index) => {
+                const syncedInfo = syncReferencePixelInfo(info);
+                const fields = getPixelInfoFields(syncedInfo);
+                const referenceKey = getReferenceKey(info);
+                const lineNumber = index < 9 ? String(index + 1) : '-';
+
+                return (
+                  <div
+                    key={referenceKey}
+                    className={`canvas-reference-line ${draggingReferenceKey === referenceKey ? 'is-dragging' : ''}`}
+                    title={syncedInfo.hex8}
+                    draggable
+                    onDragStart={(event) => onReferenceDragStart(event, referenceKey)}
+                    onDragEnd={onReferenceDragEnd}
+                    onDragOver={onReferenceDragOver}
+                    onDrop={(event) => onReferenceDrop(event, referenceKey)}
+                  >
+                    <span className="canvas-reference-number">{lineNumber}</span>
+                    <span
+                      className="canvas-reference-swatch"
+                      onDoubleClick={() => openReferencePaletteColorModal(info)}
+                      title="ダブルクリックで色モーダルを開く"
+                      aria-label="ダブルクリックで色モーダルを開く"
+                    >
+                      <span
+                        className="canvas-hover-swatch-color"
+                        style={{
+                          backgroundColor: `rgba(${syncedInfo.rgba.r}, ${syncedInfo.rgba.g}, ${syncedInfo.rgba.b}, ${syncedInfo.rgba.a / 255})`
+                        }}
+                      />
+                    </span>
+                    <span className="canvas-reference-text canvas-data-field">
+                      RGBA: {fields.rgba}
+                      <button
+                        type="button"
+                        className="canvas-copy-btn"
+                        onClick={() => void copyPixelField('RGBA', fields.rgba)}
+                        title="RGBAをコピー"
+                        aria-label="RGBAをコピー"
+                      >
+                        <i className="fa-regular fa-copy" aria-hidden="true" />
+                      </button>
+                    </span>
+                    <span className="canvas-reference-text canvas-data-field">
+                      HEX8: {fields.hex8}
+                      <button
+                        type="button"
+                        className="canvas-copy-btn"
+                        onClick={() => void copyPixelField('HEX8', fields.hex8)}
+                        title="HEX8をコピー"
+                        aria-label="HEX8をコピー"
+                      >
+                        <i className="fa-regular fa-copy" aria-hidden="true" />
+                      </button>
+                    </span>
+                    <span className="canvas-reference-text canvas-data-field">
+                      HSVA: {fields.hsva}
+                      <button
+                        type="button"
+                        className="canvas-copy-btn"
+                        onClick={() => void copyPixelField('HSVA', fields.hsva)}
+                        title="HSVAをコピー"
+                        aria-label="HSVAをコピー"
+                      >
+                        <i className="fa-regular fa-copy" aria-hidden="true" />
+                      </button>
+                    </span>
+                    <span className="canvas-reference-text canvas-data-field">
+                      PaletteIndex: {fields.paletteIndex}
+                      <button
+                        type="button"
+                        className="canvas-copy-btn"
+                        onClick={() => void copyPixelField('PaletteIndex', fields.paletteIndex)}
+                        title="PaletteIndexをコピー"
+                        aria-label="PaletteIndexをコピー"
+                      >
+                        <i className="fa-regular fa-copy" aria-hidden="true" />
+                      </button>
+                    </span>
+                    <span className="canvas-reference-text canvas-data-field">
+                      Caption: {fields.paletteCaption}
+                      <button
+                        type="button"
+                        className="canvas-copy-btn"
+                        onClick={() => void copyPixelField('Caption', fields.paletteCaption)}
+                        title="Captionをコピー"
+                        aria-label="Captionをコピー"
+                      >
+                        <i className="fa-regular fa-copy" aria-hidden="true" />
+                      </button>
+                    </span>
+                    <button
+                      type="button"
+                      className="canvas-copy-btn"
+                      onClick={() => removeReferencePixelInfo(info.x, info.y)}
+                      title="この参照を削除"
+                      aria-label="この参照を削除"
+                    >
+                      <i className="fa-solid fa-xmark" aria-hidden="true" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <span className="canvas-reference-empty">-</span>
+          )}
+        </div>
+
+        <EditorToolbar
+          tool={tool}
+          setTool={setTool}
+          canAddAnimationFrame={hasCommittedSelection}
+          canDeleteSelection={hasCommittedSelection}
+          addAnimationFrame={addAnimationFrame}
+          canRotateSelection={hasCommittedSelection}
+          openSelectionRotateModal={openSelectionRotateModal}
+          zoom={zoom}
+          zoomIn={zoomIn}
+          zoomOut={zoomOut}
+          doUndo={doUndo}
+          copySelection={copySelection}
+          pasteSelection={pasteSelection}
+          deleteSelection={deleteSelection}
+        />
+      </div>
+    </main>
+  );
+}

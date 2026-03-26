@@ -9,8 +9,8 @@ import {
   type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent
 } from 'react';
+import { EditorCanvasWorkspace } from './components/EditorCanvasWorkspace';
 import { EditorSidebar } from './components/EditorSidebar';
-import { EditorToolbar } from './components/EditorToolbar';
 import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
 import { ConfirmModal } from './components/modals/ConfirmModal';
 import { GridSpacingModal } from './components/modals/GridSpacingModal';
@@ -18,9 +18,9 @@ import { KMeansQuantizeModal } from './components/modals/KMeansQuantizeModal';
 import { SelectionRotateModal } from './components/modals/SelectionRotateModal';
 import { ZoomModal } from './components/modals/ZoomModal';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
-import type { MenuAction as FileMenuAction } from '../shared/ipc';
+import { useDocumentFileActions } from './hooks/useDocumentFileActions';
+import { useEditorShortcuts } from './hooks/useEditorShortcuts';
 import type { GplExportFormat } from '../shared/palette-gpl';
-import { SIDECAR_SCHEMA_VERSION } from '../shared/sidecar';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
   type TransparentBackgroundMode
@@ -38,13 +38,13 @@ import {
 } from './editor/constants';
 import type {
   AnimationFrame,
-  EditorMeta,
   HoveredPixelInfo,
   PaletteEntry,
   Selection,
   TilePreviewLayer,
   Tool
 } from './editor/types';
+import { getFileNameFromPath, replaceFileExtension, resolveNextSelectedColor } from './editor/app-utils';
 import {
   extractSelectionPixels,
   quantizeSelectionWithKMeans,
@@ -55,7 +55,6 @@ import {
 import {
   collectPaletteUsageFromPixels,
   syncPaletteEntriesFromPixels,
-  syncPaletteEntriesWithUsage,
   type PaletteUsageAnalysis
 } from './editor/palette-sync';
 import {
@@ -72,7 +71,6 @@ import {
 } from './editor/selection-rotate';
 import {
   blitBlockOnCanvas,
-  clampCanvasSize,
   clampSelectionToCanvas,
   clonePaletteEntries,
   clonePixels,
@@ -188,26 +186,6 @@ function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[]): boo
       entry.caption === right[index]?.caption &&
       entry.locked === right[index]?.locked
   );
-}
-
-function resolveNextSelectedColor(nextPalette: PaletteEntry[], currentSelectedColor: string): string {
-  return nextPalette.some((entry) => entry.color === currentSelectedColor)
-    ? currentSelectedColor
-    : nextPalette[0]?.color ?? currentSelectedColor;
-}
-
-function getFileNameFromPath(filePath?: string): string | null {
-  if (!filePath) {
-    return null;
-  }
-  const parts = filePath.split(/[\\/]/);
-  const fileName = parts[parts.length - 1]?.trim();
-  return fileName || null;
-}
-
-function replaceFileExtension(fileName: string, nextExtension: string): string {
-  const baseName = fileName.replace(/\.[^.]+$/, '') || fileName;
-  return `${baseName}${nextExtension}`;
 }
 
 function clampNumber(value: number, min: number, max: number): number {
@@ -2945,253 +2923,10 @@ export function App() {
     setStatusText(`キャンバス全体を選択しました (${canvasSize}x${canvasSize})`, 'success');
   }, [canvasSize, setStatusText]);
 
-  useEffect(() => {
-    const isEditableElement = (target: EventTarget | null): boolean => {
-      if (!(target instanceof HTMLElement)) {
-        return false;
-      }
-      const tag = target.tagName;
-      return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (isEditableElement(event.target)) {
-        return;
-      }
-      if (selectionRotateRequest) {
-        return;
-      }
-
-      const withSystemKey = event.metaKey || event.ctrlKey;
-      if (withSystemKey && event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        doUndo();
-        return;
-      }
-      if (withSystemKey && event.key.toLowerCase() === 'c') {
-        event.preventDefault();
-        void copySelection();
-        return;
-      }
-      if (withSystemKey && event.key.toLowerCase() === 'v') {
-        event.preventDefault();
-        pasteSelection();
-        return;
-      }
-      if (withSystemKey && event.key.toLowerCase() === 'a') {
-        event.preventDefault();
-        selectEntireCanvas();
-        return;
-      }
-
-      if (withSystemKey || event.altKey) {
-        return;
-      }
-
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        event.preventDefault();
-        deleteSelection();
-        return;
-      }
-
-      switch (event.code) {
-        case 'Digit1':
-        case 'Numpad1':
-          event.preventDefault();
-          if (!selectReferenceByNumber(1)) {
-            setStatusText('参照 1 は未登録です', 'warning');
-          }
-          break;
-        case 'Digit2':
-        case 'Numpad2':
-          event.preventDefault();
-          if (!selectReferenceByNumber(2)) {
-            setStatusText('参照 2 は未登録です', 'warning');
-          }
-          break;
-        case 'Digit3':
-        case 'Numpad3':
-          event.preventDefault();
-          if (!selectReferenceByNumber(3)) {
-            setStatusText('参照 3 は未登録です', 'warning');
-          }
-          break;
-        case 'Digit4':
-        case 'Numpad4':
-          event.preventDefault();
-          if (!selectReferenceByNumber(4)) {
-            setStatusText('参照 4 は未登録です', 'warning');
-          }
-          break;
-        case 'Digit5':
-        case 'Numpad5':
-          event.preventDefault();
-          if (!selectReferenceByNumber(5)) {
-            setStatusText('参照 5 は未登録です', 'warning');
-          }
-          break;
-        case 'Digit6':
-        case 'Numpad6':
-          event.preventDefault();
-          if (!selectReferenceByNumber(6)) {
-            setStatusText('参照 6 は未登録です', 'warning');
-          }
-          break;
-        case 'Digit7':
-        case 'Numpad7':
-          event.preventDefault();
-          if (!selectReferenceByNumber(7)) {
-            setStatusText('参照 7 は未登録です', 'warning');
-          }
-          break;
-        case 'Digit8':
-        case 'Numpad8':
-          event.preventDefault();
-          if (!selectReferenceByNumber(8)) {
-            setStatusText('参照 8 は未登録です', 'warning');
-          }
-          break;
-        case 'Digit9':
-        case 'Numpad9':
-          event.preventDefault();
-          if (!selectReferenceByNumber(9)) {
-            setStatusText('参照 9 は未登録です', 'warning');
-          }
-          break;
-        case 'Enter':
-        case 'NumpadEnter':
-          if (!floatingPasteRef.current) {
-            break;
-          }
-          event.preventDefault();
-          finalizeFloatingPaste();
-          break;
-        case 'Escape':
-          // Esc priority: cancel floating paste first, otherwise clear active selection.
-          if (floatingPasteRef.current) {
-            event.preventDefault();
-            cancelFloatingPaste();
-            break;
-          }
-          if (selection) {
-            event.preventDefault();
-            setSelection(null);
-            setStatusText('選択を解除しました', 'success');
-          }
-          break;
-        case 'ArrowUp':
-          if (!floatingPasteRef.current) {
-            break;
-          }
-          event.preventDefault();
-          nudgeFloatingPaste(0, -1);
-          break;
-        case 'ArrowDown':
-          if (!floatingPasteRef.current) {
-            break;
-          }
-          event.preventDefault();
-          nudgeFloatingPaste(0, 1);
-          break;
-        case 'ArrowLeft':
-          if (!floatingPasteRef.current) {
-            break;
-          }
-          event.preventDefault();
-          nudgeFloatingPaste(-1, 0);
-          break;
-        case 'ArrowRight':
-          if (!floatingPasteRef.current) {
-            break;
-          }
-          event.preventDefault();
-          nudgeFloatingPaste(1, 0);
-          break;
-        case 'KeyQ':
-          event.preventDefault();
-          setTool('select');
-          setStatusText('ツール: 矩形選択', 'info');
-          break;
-        case 'KeyW':
-          event.preventDefault();
-          setTool('pencil');
-          setStatusText('ツール: 描画', 'info');
-          break;
-        case 'KeyE':
-          event.preventDefault();
-          setTool('eraser');
-          setStatusText('ツール: 消しゴム', 'info');
-          break;
-        case 'KeyP':
-          event.preventDefault();
-          setTool('fill');
-          setStatusText('ツール: 塗りつぶし', 'info');
-          break;
-        case 'KeyT':
-          event.preventDefault();
-          addAnimationFrame();
-          break;
-        case 'KeyG':
-          event.preventDefault();
-          addTilePreviewLayer();
-          break;
-        case 'KeyY':
-          event.preventDefault();
-          openSelectionRotateModal();
-          break;
-        case 'Equal':
-        case 'NumpadAdd':
-        case 'KeyD':
-        case 'BracketRight':
-        case 'Period':
-          event.preventDefault();
-          zoomIn();
-          break;
-        case 'Minus':
-        case 'NumpadSubtract':
-        case 'KeyA':
-        case 'BracketLeft':
-        case 'Comma':
-          event.preventDefault();
-          zoomOut();
-          break;
-        case 'KeyF':
-          event.preventDefault();
-          freezeHoveredPixelInfo();
-          break;
-        case 'KeyS':
-          event.preventDefault();
-          focusHoveredPixel();
-          break;
-        default:
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [
-    addAnimationFrame,
-    addTilePreviewLayer,
-    cancelFloatingPaste,
-    copySelection,
-    doUndo,
-    finalizeFloatingPaste,
-    focusHoveredPixel,
-    freezeHoveredPixelInfo,
-    nudgeFloatingPaste,
-    pasteSelection,
-    deleteSelection,
-    openSelectionRotateModal,
-    selectEntireCanvas,
-    selectReferenceByNumber,
-    selectionRotateRequest,
-    selection,
-    zoomIn,
-    zoomOut
-  ]);
+  const clearSelection = useCallback(() => {
+    setSelection(null);
+    setStatusText('選択を解除しました', 'success');
+  }, [setStatusText]);
 
   const addPaletteColor = useCallback(
     ({ color: nextColor, caption: nextCaption, locked: nextLocked }: PaletteEntry) => {
@@ -3454,332 +3189,74 @@ export function App() {
     }
   }, [currentFilePath, palette, setStatusText]);
 
-  const createSavePayload = useCallback(() => {
-    const canvas = document.createElement('canvas');
-    const stage = canvasStageRef.current;
-    canvas.width = canvasSize;
-    canvas.height = canvasSize;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return null;
-    }
+  const { savePng, saveAsPng, loadPng } = useDocumentFileActions({
+    canvasSize,
+    currentFilePath,
+    gridSpacing,
+    hasUnsavedChanges,
+    palette,
+    pixels,
+    selectedColor,
+    tool,
+    transparentBackgroundMode,
+    zoom,
+    canvasStageRef,
+    pendingZoomAnchorRef,
+    pendingViewportRestoreRef,
+    undoStackRef,
+    setCanvasSize,
+    setPixels,
+    setSelection,
+    setLastTilePreviewSelection,
+    setCurrentFilePath,
+    setPalette,
+    setSelectedColor,
+    setTool,
+    setGridSpacing,
+    setZoom,
+    setTransparentBackgroundMode,
+    setViewportRestoreSequence,
+    setHasUnsavedChanges,
+    resetTilePreviewLayers,
+    resetAnimationFrames,
+    clearFloatingPaste,
+    setStatusText
+  });
 
-    ctx.putImageData(new ImageData(pixels.slice(), canvasSize, canvasSize), 0, 0);
-    const dataUrl = canvas.toDataURL('image/png');
-    const base64Png = dataUrl.replace(/^data:image\/png;base64,/, '');
-
-    const metadata: EditorMeta = {
-      dlaPixy: {
-        schemaVersion: SIDECAR_SCHEMA_VERSION,
-        document: {
-          palette: {
-            entries: clonePaletteEntries(palette)
-          }
-        },
-        editor: {
-          gridSpacing,
-          transparentBackgroundMode,
-          zoom,
-          viewport: {
-            scrollLeft: stage?.scrollLeft ?? 0,
-            scrollTop: stage?.scrollTop ?? 0
-          },
-          lastTool: tool
-        }
-      }
-    };
-
-    return { base64Png, metadata };
-  }, [canvasSize, gridSpacing, palette, pixels, tool, transparentBackgroundMode, zoom]);
-
-  const performSave = useCallback(
-    async (options: { saveAs: boolean; suppressCancelToast?: boolean }): Promise<'saved' | 'canceled' | 'failed'> => {
-      const payload = createSavePayload();
-      if (!payload) {
-        setStatusText('保存に失敗しました: キャンバスの初期化に失敗しました', 'error');
-        return 'failed';
-      }
-
-      try {
-        const result = await window.pixelApi.savePng({
-          ...payload,
-          filePath: currentFilePath,
-          saveAs: options.saveAs
-        });
-
-        if (result.canceled || !result.filePath) {
-          if (!options.suppressCancelToast) {
-            setStatusText('保存をキャンセルしました', 'warning');
-          }
-          return 'canceled';
-        }
-
-        setCurrentFilePath(result.filePath);
-        setHasUnsavedChanges(false);
-        setStatusText(`保存しました: ${result.filePath}`, 'success');
-        return 'saved';
-      } catch (error) {
-        const message = error instanceof Error ? error.message : '不明なエラー';
-        setStatusText(`保存に失敗しました: ${message}`, 'error');
-        return 'failed';
-      }
-    },
-    [createSavePayload, currentFilePath]
-  );
-
-  const savePng = useCallback(async () => {
-    await performSave({ saveAs: false });
-  }, [performSave]);
-
-  const saveAsPng = useCallback(async () => {
-    await performSave({ saveAs: true });
-  }, [performSave]);
-
-  const confirmBeforeOpen = useCallback(async (): Promise<boolean> => {
-    if (hasUnsavedChanges) {
-      const confirmResult = await window.pixelApi.confirmOpenWithUnsaved();
-      if (confirmResult.action === 'cancel') {
-        setStatusText('読み込みをキャンセルしました', 'warning');
-        return false;
-      }
-      if (confirmResult.action === 'save-open') {
-        const saveResult = await performSave({ saveAs: false, suppressCancelToast: true });
-        if (saveResult === 'saved') {
-          return true;
-        } else if (saveResult === 'canceled') {
-          setStatusText('保存がキャンセルされたため、読み込みを中止しました', 'warning');
-          return false;
-        } else {
-          setStatusText('保存に失敗したため、読み込みを中止しました', 'error');
-          return false;
-        }
-      }
-    }
-    return true;
-  }, [hasUnsavedChanges, performSave]);
-
-  const loadPng = useCallback(async (options?: { filePath?: string; bypassUnsavedCheck?: boolean }) => {
-    if (!options?.bypassUnsavedCheck) {
-      const canProceed = await confirmBeforeOpen();
-      if (!canProceed) {
-        return;
-      }
-    }
-
-    try {
-      const result = await window.pixelApi.openPng(options?.filePath ? { filePath: options.filePath } : undefined);
-      if (result.canceled || !result.base64Png) {
-        setStatusText('読み込みをキャンセルしました', 'warning');
-        return;
-      }
-      if (result.error === 'not-found') {
-        setStatusText(`ファイルが見つかりません: ${result.filePath ?? options?.filePath ?? '-'}`, 'error');
-        return;
-      }
-      if (result.error === 'read-failed') {
-        setStatusText(`読み込みに失敗しました: ${result.filePath ?? options?.filePath ?? '-'}`, 'error');
-        return;
-      }
-
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('PNG画像の読み込みに失敗'));
-        img.src = `data:image/png;base64,${result.base64Png}`;
-      });
-
-      const fallbackSize = img.width === img.height ? img.width : DEFAULT_CANVAS_SIZE;
-      const targetCanvasSize = clampCanvasSize(fallbackSize, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-      const editorState = result.metadata?.dlaPixy.editor;
-
-      const canvas = document.createElement('canvas');
-      canvas.width = targetCanvasSize;
-      canvas.height = targetCanvasSize;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        setStatusText('読み込みに失敗しました: キャンバスの初期化に失敗しました', 'error');
-        return;
-      }
-
-      ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0, 0, targetCanvasSize, targetCanvasSize);
-      ctx.drawImage(img, 0, 0, targetCanvasSize, targetCanvasSize);
-
-      const imageData = ctx.getImageData(0, 0, targetCanvasSize, targetCanvasSize);
-
-      const loadedPixels = new Uint8ClampedArray(imageData.data);
-      const usageFromLoadedPixels = collectPaletteUsageFromPixels(loadedPixels, targetCanvasSize);
-
-      setCanvasSize(targetCanvasSize);
-      setPixels(loadedPixels);
-      setSelection(null);
-      setLastTilePreviewSelection(null);
-      resetTilePreviewLayers();
-      resetAnimationFrames();
-      clearFloatingPaste();
-      undoStackRef.current = [];
-      pendingZoomAnchorRef.current = null;
-      setCurrentFilePath(result.filePath);
-
-      const metadataPalette = result.metadata?.dlaPixy.document.palette.entries.length
-        ? normalizePaletteEntries(result.metadata.dlaPixy.document.palette.entries)
-        : [];
-      const nextPalette = syncPaletteEntriesWithUsage(metadataPalette, usageFromLoadedPixels, {
-        removeUnusedColors: false,
-        addUsedColors: true
-      });
-      setPalette(nextPalette);
-      setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
-
-      setTool(editorState?.lastTool ?? 'select');
-
-      const loadedGridSpacing = editorState?.gridSpacing;
-      if (typeof loadedGridSpacing === 'number' && Number.isFinite(loadedGridSpacing)) {
-        if (loadedGridSpacing <= 0) {
-          setGridSpacing(DEFAULT_GRID_SPACING);
-        } else {
-          setGridSpacing(Math.max(1, Math.min(targetCanvasSize, Math.trunc(loadedGridSpacing))));
-        }
-      } else {
-        setGridSpacing(DEFAULT_GRID_SPACING);
-      }
-
-      const loadedZoom = editorState?.zoom;
-      if (typeof loadedZoom === 'number' && Number.isFinite(loadedZoom)) {
-        setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.trunc(loadedZoom))));
-      } else {
-        setZoom(DEFAULT_ZOOM);
-      }
-
-      setTransparentBackgroundMode(editorState?.transparentBackgroundMode ?? DEFAULT_TRANSPARENT_BACKGROUND_MODE);
-
-      pendingViewportRestoreRef.current = {
-        scrollLeft: Math.max(0, editorState?.viewport.scrollLeft ?? 0),
-        scrollTop: Math.max(0, editorState?.viewport.scrollTop ?? 0)
-      };
-      setViewportRestoreSequence((prev) => prev + 1);
-
-      setHasUnsavedChanges(false);
-
-      const nonSquareNote = img.width !== img.height ? ' / 非正方形PNGは正方形キャンバスに合わせて変換' : '';
-      setStatusText(`読み込みました: ${result.filePath} (${img.width}x${img.height})${nonSquareNote}`, 'success');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '不明なエラー';
-      setStatusText(`読み込みに失敗しました: ${message}`, 'error');
-    }
-  }, [clearFloatingPaste, confirmBeforeOpen, resetAnimationFrames, resetTilePreviewLayers, selectedColor]);
-
-  useEffect(() => {
-    const isEditableElement = (target: EventTarget | null): boolean => {
-      if (!(target instanceof HTMLElement)) {
-        return false;
-      }
-      const tag = target.tagName;
-      return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.metaKey && !event.ctrlKey) {
-        return;
-      }
-      if (isEditableElement(event.target)) {
-        return;
-      }
-      if (selectionRotateRequest) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-      if (key === 's') {
-        event.preventDefault();
-        if (event.shiftKey) {
-          void saveAsPng();
-        } else {
-          void savePng();
-        }
-        return;
-      }
-      if (key === 'o') {
-        event.preventDefault();
-        void loadPng();
-        return;
-      }
-      if (key === 'r') {
-        event.preventDefault();
-        openZoomModal();
-        return;
-      }
-      if (key === 'i') {
-        event.preventDefault();
-        openCanvasSizeModal();
-        return;
-      }
-      if (key === 'g') {
-        event.preventDefault();
-        openGridSpacingModal();
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [loadPng, openCanvasSizeModal, openGridSpacingModal, openZoomModal, saveAsPng, savePng, selectionRotateRequest]);
-
-  useEffect(() => {
-    const unsubscribe = window.pixelApi.onMenuAction((action: FileMenuAction) => {
-      switch (action.type) {
-        case 'open':
-          void loadPng();
-          break;
-        case 'save':
-          void savePng();
-          break;
-        case 'save-as':
-          void saveAsPng();
-          break;
-        case 'open-recent':
-          void loadPng({ filePath: action.filePath });
-          break;
-        case 'canvas-size':
-          openCanvasSizeModal();
-          break;
-        case 'grid-spacing':
-          openGridSpacingModal();
-          break;
-        case 'transparent-background':
-          setTransparentBackgroundMode(action.mode);
-          break;
-        case 'palette-kmeans-quantize':
-          openKMeansQuantizeModal();
-          break;
-        case 'palette-import-replace':
-          void importGplPalette('replace');
-          break;
-        case 'palette-import-append':
-          void importGplPalette('append');
-          break;
-        case 'palette-export':
-          void exportGplPalette(action.format);
-          break;
-        default:
-          break;
-      }
-    });
-    return () => {
-      unsubscribe();
-    };
-  }, [
-    exportGplPalette,
-    importGplPalette,
+  useEditorShortcuts({
+    selectionRotateRequestActive: selectionRotateRequest !== null,
+    hasSelection: selection !== null,
+    floatingPasteRef,
+    setTool,
+    setTransparentBackgroundMode,
+    setStatusText,
+    clearSelection,
+    doUndo,
+    copySelection,
+    pasteSelection,
+    selectEntireCanvas,
+    deleteSelection,
+    selectReferenceByNumber,
+    finalizeFloatingPaste,
+    cancelFloatingPaste,
+    nudgeFloatingPaste,
+    addAnimationFrame,
+    addTilePreviewLayer,
+    openSelectionRotateModal,
+    zoomIn,
+    zoomOut,
+    freezeHoveredPixelInfo,
+    focusHoveredPixel,
+    savePng,
+    saveAsPng,
     loadPng,
+    openZoomModal,
     openCanvasSizeModal,
     openGridSpacingModal,
     openKMeansQuantizeModal,
-    saveAsPng,
-    savePng
-  ]);
+    importGplPalette,
+    exportGplPalette,
+  });
 
   const hasCommittedSelection = selection !== null && !isFloatingPasteActive;
   const selectionOverlaySelection = selection;
@@ -3853,256 +3330,54 @@ export function App() {
             paletteColorModalRequest={paletteColorModalRequest}
           />
 
-          <main className="col-12 col-lg-8 col-xl-9 d-flex">
-            <div className="card shadow-sm editor-card flex-grow-1">
-              <div
-                ref={canvasStageRef}
-                className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''}`}
-                style={{ '--floating-stage-padding': `${FLOATING_STAGE_PADDING_PX}px` } as CSSProperties}
-                onMouseDown={onCanvasStageMouseDown}
-              >
-                <div className="canvas-surface">
-                  <canvas
-                    ref={canvasRef}
-                    width={displaySize}
-                    height={displaySize}
-                    className={`pixel-canvas ${transparentBackgroundClassName} ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
-                    onMouseDown={onMouseDown}
-                    onMouseMove={onMouseMove}
-                    onMouseUp={onMouseUp}
-                    onMouseLeave={onMouseLeaveCanvas}
-                  />
-                  {selectionOverlaySelection ? (
-                    <>
-                      {isFloatingPasteActive ? (
-                        <div className="canvas-floating-visual" style={selectionOverlayVisualStyle}>
-                          <canvas
-                            ref={floatingPreviewCanvasRef}
-                            width={selectionOverlaySelection.w}
-                            height={selectionOverlaySelection.h}
-                            className={`canvas-floating-preview ${transparentBackgroundClassName}`}
-                            style={{
-                              width: `${selectionOverlaySelection.w * zoom}px`,
-                              height: `${selectionOverlaySelection.h * zoom}px`
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                      <div
-                        className={`canvas-selection-overlay ${isFloatingPasteActive ? 'is-floating' : 'is-static'}`}
-                        style={selectionOverlayBaseStyle}
-                        onMouseDown={isFloatingPasteActive ? onFloatingOverlayMouseDown : undefined}
-                      >
-                        {isFloatingPasteActive
-                          ? FLOATING_HANDLE_ORDER.map((handle) => (
-                              <button
-                                key={handle}
-                                type="button"
-                                className="canvas-floating-handle"
-                                data-handle={handle}
-                                aria-label={`resize-${handle}`}
-                                style={getFloatingHandleStyle(handle)}
-                                tabIndex={-1}
-                              />
-                            ))
-                          : null}
-                        <span className="canvas-selection-size-label corner">
-                          {selectionOverlaySelection.x},{selectionOverlaySelection.y}
-                        </span>
-                        <span className="canvas-selection-size-label top">{selectionOverlaySelection.w}</span>
-                        <span className="canvas-selection-size-label bottom">{selectionOverlaySelection.w}</span>
-                        <span className="canvas-selection-size-label left">{selectionOverlaySelection.h}</span>
-                        <span className="canvas-selection-size-label right">{selectionOverlaySelection.h}</span>
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-              <div className="canvas-hover-info px-3 py-2 border-top">
-                {hoveredPixelInfo ? (
-                  (() => {
-                    const fields = getPixelInfoFields(hoveredPixelInfo);
-                    return (
-                      <span className="canvas-hover-row">
-                        <span className="canvas-hover-swatch" title={hoveredPixelInfo.hex8}>
-                          <span
-                            className="canvas-hover-swatch-color"
-                            style={{
-                              backgroundColor: `rgba(${hoveredPixelInfo.rgba.r}, ${hoveredPixelInfo.rgba.g}, ${hoveredPixelInfo.rgba.b}, ${hoveredPixelInfo.rgba.a / 255})`
-                            }}
-                          />
-                        </span>
-                        <span className="canvas-hover-text">x,y: {hoveredPixelInfo.x}, {hoveredPixelInfo.y}</span>
-                        <span className="canvas-data-field">
-                          RGBA: {fields.rgba}
-                        </span>
-                        <span className="canvas-data-field">
-                          HEX8: {fields.hex8}
-                        </span>
-                        <span className="canvas-data-field">
-                          HSVA: {fields.hsva}
-                        </span>
-                        <span className="canvas-data-field">
-                          PaletteIndex: {fields.paletteIndex}
-                        </span>
-                        <span className="canvas-data-field">
-                          Caption: {fields.paletteCaption}
-                        </span>
-                      </span>
-                    );
-                  })()
-                ) : (
-                  <span className="canvas-hover-row">
-                    <span className="canvas-hover-swatch" aria-hidden="true" />
-                    <span className="canvas-hover-text">x,y: -</span>
-                    <span className="canvas-data-field">RGBA: -</span>
-                    <span className="canvas-data-field">HEX8: -</span>
-                    <span className="canvas-data-field">HSVA: -</span>
-                    <span className="canvas-data-field">PaletteIndex: -</span>
-                    <span className="canvas-data-field">Caption: -</span>
-                  </span>
-                )}
-              </div>
-              <div className="canvas-reference-info px-3 py-2 border-top">
-                <div className="canvas-reference-header">
-                  <span className="canvas-reference-label">参照 (F):</span>
-                  <button
-                    type="button"
-                    className="canvas-copy-btn"
-                    onClick={clearReferencePixelInfos}
-                    title="参照をクリア"
-                    aria-label="参照をクリア"
-                  >
-                    <i className="fa-solid fa-trash-can" aria-hidden="true" />
-                  </button>
-                </div>
-                {referencePixelInfos.length > 0 ? (
-                  <div className="canvas-reference-list">
-                    {referencePixelInfos.map((info, index) => {
-                      const syncedInfo = syncReferencePixelInfo(info);
-                      const fields = getPixelInfoFields(syncedInfo);
-                      const referenceKey = getReferenceKey(info);
-                      const lineNumber = index < 9 ? String(index + 1) : '-';
-                      return (
-                        <div
-                          key={referenceKey}
-                          className={`canvas-reference-line ${draggingReferenceKey === referenceKey ? 'is-dragging' : ''}`}
-                          title={syncedInfo.hex8}
-                          draggable
-                          onDragStart={(event) => onReferenceDragStart(event, referenceKey)}
-                          onDragEnd={onReferenceDragEnd}
-                          onDragOver={onReferenceDragOver}
-                          onDrop={(event) => onReferenceDrop(event, referenceKey)}
-                        >
-                          <span className="canvas-reference-number">{lineNumber}</span>
-                          <span
-                            className="canvas-reference-swatch"
-                            onDoubleClick={() => openReferencePaletteColorModal(info)}
-                            title="ダブルクリックで色モーダルを開く"
-                            aria-label="ダブルクリックで色モーダルを開く"
-                          >
-                            <span
-                              className="canvas-hover-swatch-color"
-                              style={{
-                                backgroundColor: `rgba(${syncedInfo.rgba.r}, ${syncedInfo.rgba.g}, ${syncedInfo.rgba.b}, ${syncedInfo.rgba.a / 255})`
-                              }}
-                            />
-                          </span>
-                          <span className="canvas-reference-text canvas-data-field">
-                            RGBA: {fields.rgba}
-                            <button
-                              type="button"
-                              className="canvas-copy-btn"
-                              onClick={() => void copyPixelField('RGBA', fields.rgba)}
-                              title="RGBAをコピー"
-                              aria-label="RGBAをコピー"
-                            >
-                              <i className="fa-regular fa-copy" aria-hidden="true" />
-                            </button>
-                          </span>
-                          <span className="canvas-reference-text canvas-data-field">
-                            HEX8: {fields.hex8}
-                            <button
-                              type="button"
-                              className="canvas-copy-btn"
-                              onClick={() => void copyPixelField('HEX8', fields.hex8)}
-                              title="HEX8をコピー"
-                              aria-label="HEX8をコピー"
-                            >
-                              <i className="fa-regular fa-copy" aria-hidden="true" />
-                            </button>
-                          </span>
-                          <span className="canvas-reference-text canvas-data-field">
-                            HSVA: {fields.hsva}
-                            <button
-                              type="button"
-                              className="canvas-copy-btn"
-                              onClick={() => void copyPixelField('HSVA', fields.hsva)}
-                              title="HSVAをコピー"
-                              aria-label="HSVAをコピー"
-                            >
-                              <i className="fa-regular fa-copy" aria-hidden="true" />
-                            </button>
-                          </span>
-                          <span className="canvas-reference-text canvas-data-field">
-                            PaletteIndex: {fields.paletteIndex}
-                            <button
-                              type="button"
-                              className="canvas-copy-btn"
-                              onClick={() => void copyPixelField('PaletteIndex', fields.paletteIndex)}
-                              title="PaletteIndexをコピー"
-                              aria-label="PaletteIndexをコピー"
-                            >
-                              <i className="fa-regular fa-copy" aria-hidden="true" />
-                            </button>
-                          </span>
-                          <span className="canvas-reference-text canvas-data-field">
-                            Caption: {fields.paletteCaption}
-                            <button
-                              type="button"
-                              className="canvas-copy-btn"
-                              onClick={() => void copyPixelField('Caption', fields.paletteCaption)}
-                              title="Captionをコピー"
-                              aria-label="Captionをコピー"
-                            >
-                              <i className="fa-regular fa-copy" aria-hidden="true" />
-                            </button>
-                          </span>
-                          <button
-                            type="button"
-                            className="canvas-copy-btn"
-                            onClick={() => removeReferencePixelInfo(info.x, info.y)}
-                            title="この参照を削除"
-                            aria-label="この参照を削除"
-                          >
-                            <i className="fa-solid fa-xmark" aria-hidden="true" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <span className="canvas-reference-empty">-</span>
-                )}
-              </div>
-              <EditorToolbar
-                tool={tool}
-                setTool={setTool}
-                canAddAnimationFrame={hasCommittedSelection}
-                canDeleteSelection={hasCommittedSelection}
-                addAnimationFrame={addAnimationFrame}
-                canRotateSelection={hasCommittedSelection}
-                openSelectionRotateModal={openSelectionRotateModal}
-                zoom={zoom}
-                zoomIn={zoomIn}
-                zoomOut={zoomOut}
-                doUndo={doUndo}
-                copySelection={copySelection}
-                pasteSelection={pasteSelection}
-                deleteSelection={deleteSelection}
-              />
-            </div>
-          </main>
+          <EditorCanvasWorkspace
+            canvasStageRef={canvasStageRef}
+            canvasRef={canvasRef}
+            floatingPreviewCanvasRef={floatingPreviewCanvasRef}
+            displaySize={displaySize}
+            floatingStagePaddingPx={FLOATING_STAGE_PADDING_PX}
+            transparentBackgroundClassName={transparentBackgroundClassName}
+            isPanning={isPanning}
+            isSpacePressed={isSpacePressed}
+            onCanvasStageMouseDown={onCanvasStageMouseDown}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeaveCanvas={onMouseLeaveCanvas}
+            selectionOverlaySelection={selectionOverlaySelection}
+            selectionOverlayBaseStyle={selectionOverlayBaseStyle}
+            selectionOverlayVisualStyle={selectionOverlayVisualStyle}
+            isFloatingPasteActive={isFloatingPasteActive}
+            zoom={zoom}
+            floatingHandleOrder={FLOATING_HANDLE_ORDER}
+            getFloatingHandleStyle={getFloatingHandleStyle}
+            onFloatingOverlayMouseDown={onFloatingOverlayMouseDown}
+            hoveredPixelInfo={hoveredPixelInfo}
+            getPixelInfoFields={getPixelInfoFields}
+            referencePixelInfos={referencePixelInfos}
+            clearReferencePixelInfos={clearReferencePixelInfos}
+            syncReferencePixelInfo={syncReferencePixelInfo}
+            getReferenceKey={getReferenceKey}
+            draggingReferenceKey={draggingReferenceKey}
+            onReferenceDragStart={onReferenceDragStart}
+            onReferenceDragEnd={onReferenceDragEnd}
+            onReferenceDragOver={onReferenceDragOver}
+            onReferenceDrop={onReferenceDrop}
+            openReferencePaletteColorModal={openReferencePaletteColorModal}
+            copyPixelField={copyPixelField}
+            removeReferencePixelInfo={removeReferencePixelInfo}
+            tool={tool}
+            setTool={setTool}
+            hasCommittedSelection={hasCommittedSelection}
+            addAnimationFrame={addAnimationFrame}
+            openSelectionRotateModal={openSelectionRotateModal}
+            zoomIn={zoomIn}
+            zoomOut={zoomOut}
+            doUndo={doUndo}
+            copySelection={copySelection}
+            pasteSelection={pasteSelection}
+            deleteSelection={deleteSelection}
+          />
         </div>
         <div className={`status-toast ${isToastVisible ? 'show' : ''} ${toastType}`} role="status" aria-live="polite">
           {statusText}
