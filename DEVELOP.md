@@ -270,6 +270,12 @@ Current metadata shape:
 - `src/hooks/useCanvasEditingCore.ts`
   - Canvas render sync, floating preview sync, coordinate resolution, stroke, and flood fill primitives
   - Owns low-level canvas editing logic so `App.tsx` no longer carries that render/draw callback cluster
+- `src/hooks/useEditorShellUi.ts`
+  - Status toast state, toast auto-hide, document title sync, and transparent-background sync
+  - Owns root UI side effects so `App.tsx` no longer carries those shell-level UI effects directly
+- `src/hooks/useSelectionOverlay.ts`
+  - Selection overlay visibility and overlay style calculation
+  - Owns overlay presentation math so `App.tsx` no longer carries those layout/style computations directly
 - `src/hooks/useFloatingSelectionState.ts`
   - Floating selection refs, clipboard ref, and floating-clear helper
   - Owns floating selection state holders so `App.tsx` no longer carries those bridge refs directly

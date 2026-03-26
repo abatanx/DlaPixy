@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { EditorCanvasWorkspace } from './components/EditorCanvasWorkspace';
 import { EditorSidebar } from './components/EditorSidebar';
 import { CanvasSizeModal } from './components/modals/CanvasSizeModal';
@@ -13,10 +13,12 @@ import { useCanvasViewport } from './hooks/useCanvasViewport';
 import { useCanvasPointerInteractions } from './hooks/useCanvasPointerInteractions';
 import { useCanvasEditingCore } from './hooks/useCanvasEditingCore';
 import { useDocumentFileActions } from './hooks/useDocumentFileActions';
+import { useEditorShellUi } from './hooks/useEditorShellUi';
 import { useFloatingSelectionState } from './hooks/useFloatingSelectionState';
 import { usePaletteManagement } from './hooks/usePaletteManagement';
 import { useEditorPreviews } from './hooks/useEditorPreviews';
 import { useSelectionOperations } from './hooks/useSelectionOperations';
+import { useSelectionOverlay } from './hooks/useSelectionOverlay';
 import { useEditorShortcuts } from './hooks/useEditorShortcuts';
 import { useFloatingPaste } from './hooks/useFloatingPaste';
 import { usePixelReferences } from './hooks/usePixelReferences';
@@ -45,10 +47,7 @@ import {
   getFloatingHandleStyle
 } from './editor/floating-interaction';
 import { collectPaletteUsageFromPixels, type PaletteUsageAnalysis } from './editor/palette-sync';
-import { getTransparentBackgroundSurfaceClassName } from './editor/transparent-background';
 import { clonePaletteEntries, createEmptyPixels, normalizePaletteEntries } from './editor/utils';
-
-type ToastType = 'success' | 'warning' | 'error' | 'info';
 
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
@@ -68,34 +67,24 @@ export function App() {
   const [selectedColor, setSelectedColor] = useState<string>(INITIAL_SELECTED_COLOR);
   const [tool, setTool] = useState<Tool>('select');
   const [selection, setSelection] = useState<Selection>(null);
-  const [statusText, setStatusTextRaw] = useState<string>('準備OK');
-  const [toastType, setToastType] = useState<ToastType>('info');
-  const [isToastVisible, setIsToastVisible] = useState<boolean>(false);
-  const [toastSequence, setToastSequence] = useState<number>(0);
   const [paletteColorModalRequest, setPaletteColorModalRequest] = useState<PaletteColorModalRequest>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
-
-  const setStatusText = useCallback((text: string, type: ToastType) => {
-    setStatusTextRaw(text);
-    setToastType(type);
-    setIsToastVisible(true);
-    setToastSequence((prev) => prev + 1);
-  }, []);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const floatingPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
-  const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
-
-  useEffect(() => {
-    document.title = `DlaPixy${hasUnsavedChanges ? ' *' : ''}`;
-  }, [hasUnsavedChanges]);
-
-  useEffect(() => {
-    void window.pixelApi.setTransparentBackgroundMode(transparentBackgroundMode).catch(() => undefined);
-  }, [transparentBackgroundMode]);
+  const {
+    statusText,
+    toastType,
+    isToastVisible,
+    setStatusText,
+    transparentBackgroundClassName
+  } = useEditorShellUi({
+    hasUnsavedChanges,
+    transparentBackgroundMode
+  });
   // drawStateRef: pointer interaction state machine for draw/select/move.
   const drawStateRef = useRef<DrawState>({
     active: false,
@@ -196,16 +185,6 @@ export function App() {
     setPixels,
     setHasUnsavedChanges
   });
-
-  useEffect(() => {
-    if (!isToastVisible) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      setIsToastVisible(false);
-    }, 3000);
-    return () => window.clearTimeout(timer);
-  }, [isToastVisible, toastSequence]);
   const { undoStackRef, pushUndo, doUndo } = useUndoHistory({
     canvasSize,
     pixels,
@@ -411,6 +390,18 @@ export function App() {
     setHasUnsavedChanges,
     setStatusText
   });
+  const {
+    hasCommittedSelection,
+    selectionOverlaySelection,
+    selectionOverlayBaseStyle,
+    selectionOverlayVisualStyle
+  } = useSelectionOverlay({
+    selection,
+    zoom,
+    displaySize,
+    isFloatingPasteActive,
+    canvasFramePx: CANVAS_FRAME_PX
+  });
 
   const { savePng, saveAsPng, loadPng } = useDocumentFileActions({
     canvasSize,
@@ -480,33 +471,6 @@ export function App() {
     importGplPalette,
     exportGplPalette,
   });
-
-  const hasCommittedSelection = selection !== null && !isFloatingPasteActive;
-  const selectionOverlaySelection = selection;
-  const selectionOverlayLeftPx = selectionOverlaySelection ? selectionOverlaySelection.x * zoom : 0;
-  const selectionOverlayTopPx = selectionOverlaySelection ? selectionOverlaySelection.y * zoom : 0;
-  const selectionOverlayWidthPx = selectionOverlaySelection ? selectionOverlaySelection.w * zoom : 0;
-  const selectionOverlayHeightPx = selectionOverlaySelection ? selectionOverlaySelection.h * zoom : 0;
-  const selectionOverlayBaseStyle = selectionOverlaySelection
-    ? ({
-        left: `${CANVAS_FRAME_PX + selectionOverlayLeftPx}px`,
-        top: `${CANVAS_FRAME_PX + selectionOverlayTopPx}px`,
-        width: `${selectionOverlayWidthPx}px`,
-        height: `${selectionOverlayHeightPx}px`
-      } as CSSProperties)
-    : undefined;
-  const selectionOverlayVisualStyle = selectionOverlaySelection
-    ? ({
-        ...selectionOverlayBaseStyle,
-        clipPath: `inset(${Math.max(0, -selectionOverlayTopPx)}px ${Math.max(
-          0,
-          selectionOverlayLeftPx + selectionOverlayWidthPx - displaySize
-        )}px ${Math.max(0, selectionOverlayTopPx + selectionOverlayHeightPx - displaySize)}px ${Math.max(
-          0,
-          -selectionOverlayLeftPx
-        )}px)`
-      } as CSSProperties)
-    : undefined;
 
   return (
     <div className="app-layout">

@@ -263,6 +263,12 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/hooks/useCanvasEditingCore.ts`
   - キャンバス描画同期、floating preview 同期、座標解決、stroke、flood fill の低レベル処理をまとめる hook
   - 描画系の編集コアを 1 か所に寄せて、`App.tsx` から render/draw callback 群を減らす
+- `src/hooks/useEditorShellUi.ts`
+  - status toast の state、toast 自動非表示、document title 同期、透明背景同期をまとめる hook
+  - root UI の副作用を 1 か所に寄せて、`App.tsx` から shell レベルの UI effect を減らす
+- `src/hooks/useSelectionOverlay.ts`
+  - selection overlay の表示判定と style 計算をまとめる hook
+  - overlay 表示用のレイアウト計算を 1 か所に寄せて、`App.tsx` から style 計算を減らす
 - `src/hooks/useFloatingSelectionState.ts`
   - floating selection の ref、clipboard ref、clear helper をまとめる hook
   - 浮動選択まわりの state holder を 1 か所に寄せて、`App.tsx` から橋渡し用 ref を減らす
