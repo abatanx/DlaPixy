@@ -238,11 +238,67 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 
 ## 7. 主要ファイル
 - `src/App.tsx`
-  - エディター本体の状態管理と処理オーケストレーション
-  - キャンバス操作ハンドラとキーボードショートカット
-  - ネイティブ `Palette` メニューの action を受けて GPL パレット import/export を適用する
+  - エディター本体の状態管理と高レベルなオーケストレーション
+  - サイドバー、中央ワークスペース、shell chrome component、各種編集 callback を束ねる
+- `src/components/EditorCanvasWorkspace.tsx`
+  - 中央のキャンバスカード UI。キャンバス面、選択オーバーレイ、ホバー情報、参照ライン、右ツールバーを担当する
+  - 編集ロジックは `App.tsx` に残しつつ、中央レイアウトの見通しをよくする
 - `src/components/EditorSidebar.tsx`
   - 左サイドバーのコンテナ。プレビュー部とパレット部を組み立てる
+- `src/components/EditorModalLayer.tsx`
+  - toast と、canvas/grid/zoom、K-Means、rotation、パレット削除確認の renderer modal 群をまとめる
+  - shell レベルの modal JSX を `App.tsx` から外しつつ、既存の配線はそのまま保つ
+- `src/components/EditorStatusFooter.tsx`
+  - canvas/grid/zoom/file status を表示する footer ステータスバー
+  - footer の JSX と表示文言を `App.tsx` から外す
+- `src/hooks/useDocumentFileActions.ts`
+  - PNG + sidecar metadata の保存 / 名前を付けて保存 / 読込フローをまとめる hook
+  - 未保存確認ダイアログと、renderer 側での PNG decode / state 反映を担当する
+- `src/hooks/useEditorShortcuts.ts`
+  - グローバルショートカットとネイティブメニュー action の配線をまとめる hook
+  - shortcut 系の副作用を root JSX から切り離す
+- `src/hooks/useCanvasViewport.ts`
+  - Space キー中の pan、wheel zoom、zoom anchor 復元、viewport 復元をまとめる hook
+  - ドキュメント読込/保存やキャンバス操作が viewport 副作用を `App.tsx` で直接持たないようにする
+- `src/hooks/useCanvasSettings.ts`
+  - キャンバスサイズ / グリッド線 / 表示倍率モーダルの open-close と、canvas/grid 適用処理をまとめる hook
+  - キャンバス設定系の副作用を 1 か所に寄せて、`App.tsx` から callback 群を減らす
+- `src/hooks/useUndoHistory.ts`
+  - Undo スタックの snapshot 管理と undo 適用フローをまとめる hook
+  - 履歴 push/pop と復元処理を 1 か所に寄せて、`App.tsx` から undo ロジックを減らす
+- `src/hooks/useCanvasEditingCore.ts`
+  - キャンバス描画同期、floating preview 同期、座標解決、stroke、flood fill の低レベル処理をまとめる hook
+  - 描画系の編集コアを 1 か所に寄せて、`App.tsx` から render/draw callback 群を減らす
+- `src/hooks/useEditorShellUi.ts`
+  - status toast の state、toast 自動非表示、document title 同期、透明背景同期をまとめる hook
+  - root UI の副作用を 1 か所に寄せて、`App.tsx` から shell レベルの UI effect を減らす
+- `src/hooks/useSelectionOverlay.ts`
+  - selection overlay の表示判定と style 計算をまとめる hook
+  - overlay 表示用のレイアウト計算を 1 か所に寄せて、`App.tsx` から style 計算を減らす
+- `src/hooks/useFloatingSelectionState.ts`
+  - floating selection の ref、clipboard ref、clear helper をまとめる hook
+  - 浮動選択まわりの state holder を 1 か所に寄せて、`App.tsx` から橋渡し用 ref を減らす
+- `src/hooks/useCanvasPointerInteractions.ts`
+  - draw/select/fill の pointer event をまとめるキャンバス用 hook
+  - `onMouseDown` / `onMouseMove` / `onMouseUp` の制御を持ちつつ、floating move/resize は専用 hook へ委譲する
+- `src/hooks/useEditorPreviews.ts`
+  - 1x preview / tile preview / animation preview をまとめるサイドバー向け hook
+  - プレビュー用 Data URL、tile/animation の state、サイドバー callback を `App.tsx` から切り離す
+- `src/hooks/usePaletteManagement.ts`
+  - パレット編集/削除フローと GPL import/export をまとめる hook
+  - パレット CRUD の副作用と削除確認 state を 1 か所に寄せて、`App.tsx` から callback 群を減らす
+- `src/hooks/useSelectionOperations.ts`
+  - 選択削除/全選択/選択解除と、K-Means / rotation modal request をまとめる hook
+  - 選択まわりの編集副作用と modal request 管理を 1 か所に寄せて、`App.tsx` から callback 群を減らす
+- `src/hooks/usePixelReferences.ts`
+  - ホバー中ピクセル、参照ライン、パレット hover からの `F` 固定、drag/copy 操作をまとめる hook
+  - キャンバスの参照/インスペクタ挙動を 1 か所に寄せて、`App.tsx` から callback 群を減らす
+- `src/hooks/useFloatingPaste.ts`
+  - copy/paste/finalize/cancel/nudge と、確定済み選択範囲の floating 化をまとめる hook
+  - floating paste の副作用と selection -> floating 変換を `App.tsx` から切り離す
+- `src/hooks/useFloatingInteraction.ts`
+  - floating 選択範囲の move/resize を扱うポインタイベント hook
+  - リサイズハンドルの hit test と overlay drag をまとめつつ、既存 ref/state をそのまま再利用する
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - 1xプレビュー / タイルプレビュー / アニメーションプレビューを担当するプレビューセクション
   - 3つのプレビューは Bootstrap 風のタブ切り替えで表示する
@@ -250,6 +306,14 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - `src/editor/preview.ts`
   - 1x / Tile Preview 用の Data URL 生成を担当する
   - Tile Preview の重ねを 1 枚目サイズへ正規化して合成し、その結果を `3x3` 反復表示する
+- `src/editor/app-utils.ts`
+  - `App.tsx` から切り出した小さな共通 helper。ファイル名処理や selectedColor 解決を担当する
+- `src/editor/canvas-pointer.ts`
+  - canvas pointer interaction 用の共有 state 型
+- `src/editor/floating-paste.ts`
+  - `App.tsx` と floating paste hook で共有する、内部クリップボード / floating paste の型定義
+- `src/editor/floating-interaction.ts`
+  - floating 選択範囲の移動/リサイズ用の幾何計算、ハンドル定義、overlay style をまとめる
 - `src/components/sidebar/SidebarPaletteSection.tsx`
   - 色セレクタ起点とパレット一覧を担当するパレットセクション。memo 化して再描画を減らしている
   - パレット一覧はコンパクト表示 + 独立スクロールにして、大量色でも使いやすくしている

@@ -245,11 +245,67 @@ Current metadata shape:
 
 ## 7. Key File Map
 - `src/App.tsx`
-  - Main editor state and behavior orchestration
-  - Canvas interaction handlers and keyboard shortcuts
-  - Handles native `Palette` menu actions and applies GPL palette import/export results
+  - Main editor state and high-level orchestration
+  - Wires sidebar, canvas workspace, shell chrome components, and editor domain callbacks
+- `src/components/EditorCanvasWorkspace.tsx`
+  - Main canvas card UI including canvas surface, selection overlay, hover info, reference lines, and right toolbar
+  - Keeps the central editor layout readable without moving core editing logic out of `App.tsx`
 - `src/components/EditorSidebar.tsx`
   - Left sidebar container that composes preview and palette sections
+- `src/components/EditorModalLayer.tsx`
+  - Toast plus renderer modal cluster for canvas/grid/zoom, K-Means, rotation, and palette-removal confirmation
+  - Keeps shell-level modal JSX out of `App.tsx` while preserving existing modal wiring
+- `src/components/EditorStatusFooter.tsx`
+  - Footer status bar for canvas/grid/zoom/file status actions
+  - Keeps footer JSX and footer-specific labels out of `App.tsx`
+- `src/hooks/useDocumentFileActions.ts`
+  - Save / Save As / Open document flow for PNG + sidecar metadata
+  - Owns unsaved-confirmation handling and renderer-side PNG decode/apply steps
+- `src/hooks/useEditorShortcuts.ts`
+  - Global keyboard shortcuts and native menu action wiring
+  - Keeps shortcut side effects out of the root JSX/orchestration file
+- `src/hooks/useCanvasViewport.ts`
+  - Space-key pan, wheel zoom, zoom-anchor restore, and viewport restore hook for the canvas stage
+  - Owns viewport-side effects so document load/save and canvas interactions no longer wire them directly in `App.tsx`
+- `src/hooks/useCanvasSettings.ts`
+  - Canvas size/grid/zoom modal open-close and canvas/grid apply actions
+  - Owns canvas-setting side effects so `App.tsx` no longer carries that settings callback cluster
+- `src/hooks/useUndoHistory.ts`
+  - Undo stack snapshots and undo-apply flow
+  - Owns undo history mutation so `App.tsx` no longer carries push/pop snapshot logic directly
+- `src/hooks/useCanvasEditingCore.ts`
+  - Canvas render sync, floating preview sync, coordinate resolution, stroke, and flood fill primitives
+  - Owns low-level canvas editing logic so `App.tsx` no longer carries that render/draw callback cluster
+- `src/hooks/useEditorShellUi.ts`
+  - Status toast state, toast auto-hide, document title sync, and transparent-background sync
+  - Owns root UI side effects so `App.tsx` no longer carries those shell-level UI effects directly
+- `src/hooks/useSelectionOverlay.ts`
+  - Selection overlay visibility and overlay style calculation
+  - Owns overlay presentation math so `App.tsx` no longer carries those layout/style computations directly
+- `src/hooks/useFloatingSelectionState.ts`
+  - Floating selection refs, clipboard ref, and floating-clear helper
+  - Owns floating selection state holders so `App.tsx` no longer carries those bridge refs directly
+- `src/hooks/useCanvasPointerInteractions.ts`
+  - Pointer event hook for draw/select/fill interactions on the canvas and stage
+  - Owns `onMouseDown` / `onMouseMove` / `onMouseUp` orchestration while delegating floating move/resize to dedicated hook
+- `src/hooks/useEditorPreviews.ts`
+  - Sidebar preview state hook for 1x preview, tile preview, and animation preview
+  - Owns preview-derived Data URLs, tile/animation collections, and sidebar preview callbacks outside `App.tsx`
+- `src/hooks/usePaletteManagement.ts`
+  - Palette edit/remove flow plus GPL import/export handling
+  - Owns palette CRUD side effects and removal-confirmation state so `App.tsx` no longer carries that callback cluster
+- `src/hooks/useSelectionOperations.ts`
+  - Selection delete/select-all/clear plus K-Means and rotation modal request handling
+  - Owns selection-oriented editing side effects so `App.tsx` no longer carries that modal/request callback cluster
+- `src/hooks/usePixelReferences.ts`
+  - Hovered pixel state, reference-line state, palette-hover freeze (`F`), and related drag/copy actions
+  - Keeps canvas inspector/reference behavior together so `App.tsx` no longer owns that callback cluster
+- `src/hooks/useFloatingPaste.ts`
+  - Clipboard-driven paste lifecycle for copy/paste/finalize/cancel/nudge plus lifting a committed selection into floating state
+  - Keeps floating-paste side effects and selection-to-floating conversion together outside `App.tsx`
+- `src/hooks/useFloatingInteraction.ts`
+  - Pointer-driven floating selection move/resize interaction hook
+  - Owns resize-handle hit testing and floating overlay drag behavior while reusing `App.tsx` refs/state
 - `src/components/sidebar/SidebarPreviewSection.tsx`
   - Preview section for 1x preview, tiling preview, and animation preview
   - These three preview blocks are switched by Bootstrap-style tabs
@@ -257,6 +313,14 @@ Current metadata shape:
 - `src/editor/preview.ts`
   - Generates the 1x / tile preview images
   - Normalizes Tile Preview layers to the first registered size, composites them, then repeats the result in `3x3`
+- `src/editor/app-utils.ts`
+  - Small shared helpers extracted from `App.tsx` for file-name handling and selected-color resolution
+- `src/editor/canvas-pointer.ts`
+  - Shared pointer-interaction state type used by canvas pointer hooks and root orchestration
+- `src/editor/floating-paste.ts`
+  - Shared floating-paste and internal clipboard types used by `App.tsx` and floating-paste hook
+- `src/editor/floating-interaction.ts`
+  - Shared floating selection resize/move geometry, handle metadata, and overlay styles
 - `src/editor/transparent-background.ts`
   - Maps transparent background mode to reusable renderer surface classes
 - `src/components/sidebar/SidebarPaletteSection.tsx`
