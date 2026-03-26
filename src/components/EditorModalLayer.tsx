@@ -8,130 +8,142 @@ import type { TransparentBackgroundMode } from '../../shared/transparent-backgro
 import type { QuantizeSelectionResult, QuantizeSelectionSource } from '../editor/kmeans-quantize';
 import type { SelectionPixelBlock } from '../editor/selection-rotate';
 import type { Selection } from '../editor/types';
+import type { StatusToastType } from '../hooks/useEditorShellUi';
 import type { PaletteRemovalRequest } from '../hooks/usePaletteManagement';
 
-type ToastType = 'success' | 'warning' | 'error' | 'info';
+type ToastState = {
+  text: string;
+  type: StatusToastType;
+  isVisible: boolean;
+};
+
+type CanvasSizeModalState = {
+  isOpen: boolean;
+  canvasSize: number;
+  onApply: (normalized: number) => void;
+  onClose: () => void;
+};
+
+type GridSpacingModalState = {
+  isOpen: boolean;
+  gridSpacing: number;
+  canvasSize: number;
+  onApply: (value: number) => void;
+  onClose: () => void;
+};
+
+type ZoomModalState = {
+  isOpen: boolean;
+  zoom: number;
+  onApply: (value: number) => void;
+  onClose: () => void;
+};
+
+type KMeansQuantizeModalState = {
+  request: {
+    selection: Selection;
+    source: QuantizeSelectionSource | null;
+    initialColorCount: number;
+  } | null;
+  onApply: (result: QuantizeSelectionResult) => void;
+  onClose: () => void;
+};
+
+type SelectionRotateModalState = {
+  request: {
+    selection: Selection;
+    source: SelectionPixelBlock | null;
+  } | null;
+  onApply: (result: SelectionPixelBlock) => void;
+  onClose: () => void;
+};
+
+type PaletteRemovalModalState = {
+  request: PaletteRemovalRequest | null;
+  onConfirm: () => void;
+  onClose: () => void;
+};
 
 type EditorModalLayerProps = {
-  statusText: string;
-  toastType: ToastType;
-  isToastVisible: boolean;
-  isCanvasSizeModalOpen: boolean;
-  canvasSize: number;
-  onApplyCanvasSize: (normalized: number) => void;
-  onCloseCanvasSize: () => void;
-  isGridSpacingModalOpen: boolean;
-  gridSpacing: number;
-  onApplyGridSpacing: (value: number) => void;
-  onCloseGridSpacing: () => void;
-  isZoomModalOpen: boolean;
-  zoom: number;
-  onApplyZoom: (value: number) => void;
-  onCloseZoom: () => void;
+  toast: ToastState;
+  canvasSizeModal: CanvasSizeModalState;
+  gridSpacingModal: GridSpacingModalState;
+  zoomModal: ZoomModalState;
   transparentBackgroundMode: TransparentBackgroundMode;
-  kMeansQuantizeSelection: Selection;
-  kMeansQuantizeSource: QuantizeSelectionSource | null;
-  kMeansInitialColorCount: number;
-  onApplyKMeansQuantize: (result: QuantizeSelectionResult) => void;
-  onCloseKMeansQuantize: () => void;
-  selectionRotateSelection: Selection;
-  selectionRotateSource: SelectionPixelBlock | null;
-  onApplySelectionRotate: (result: SelectionPixelBlock) => void;
-  onCloseSelectionRotate: () => void;
-  paletteRemovalRequest: PaletteRemovalRequest | null;
-  onConfirmPaletteRemoval: () => void;
-  onClosePaletteRemoval: () => void;
-  showValidationWarning: (message: string) => void;
+  kMeansQuantizeModal: KMeansQuantizeModalState;
+  selectionRotateModal: SelectionRotateModalState;
+  paletteRemovalModal: PaletteRemovalModalState;
+  onValidationError: (message: string) => void;
 };
 
 export function EditorModalLayer({
-  statusText,
-  toastType,
-  isToastVisible,
-  isCanvasSizeModalOpen,
-  canvasSize,
-  onApplyCanvasSize,
-  onCloseCanvasSize,
-  isGridSpacingModalOpen,
-  gridSpacing,
-  onApplyGridSpacing,
-  onCloseGridSpacing,
-  isZoomModalOpen,
-  zoom,
-  onApplyZoom,
-  onCloseZoom,
+  toast,
+  canvasSizeModal,
+  gridSpacingModal,
+  zoomModal,
   transparentBackgroundMode,
-  kMeansQuantizeSelection,
-  kMeansQuantizeSource,
-  kMeansInitialColorCount,
-  onApplyKMeansQuantize,
-  onCloseKMeansQuantize,
-  selectionRotateSelection,
-  selectionRotateSource,
-  onApplySelectionRotate,
-  onCloseSelectionRotate,
-  paletteRemovalRequest,
-  onConfirmPaletteRemoval,
-  onClosePaletteRemoval,
-  showValidationWarning
+  kMeansQuantizeModal,
+  selectionRotateModal,
+  paletteRemovalModal,
+  onValidationError
 }: EditorModalLayerProps) {
   return (
     <>
-      <div className={`status-toast ${isToastVisible ? 'show' : ''} ${toastType}`} role="status" aria-live="polite">
-        {statusText}
+      <div className={`status-toast ${toast.isVisible ? 'show' : ''} ${toast.type}`} role="status" aria-live="polite">
+        {toast.text}
       </div>
       <CanvasSizeModal
-        isOpen={isCanvasSizeModalOpen}
-        canvasSize={canvasSize}
-        onApply={onApplyCanvasSize}
-        onClose={onCloseCanvasSize}
-        onValidationError={showValidationWarning}
+        isOpen={canvasSizeModal.isOpen}
+        canvasSize={canvasSizeModal.canvasSize}
+        onApply={canvasSizeModal.onApply}
+        onClose={canvasSizeModal.onClose}
+        onValidationError={onValidationError}
       />
       <GridSpacingModal
-        isOpen={isGridSpacingModalOpen}
-        gridSpacing={gridSpacing}
-        canvasSize={canvasSize}
-        onApply={onApplyGridSpacing}
-        onClose={onCloseGridSpacing}
-        onValidationError={showValidationWarning}
+        isOpen={gridSpacingModal.isOpen}
+        gridSpacing={gridSpacingModal.gridSpacing}
+        canvasSize={gridSpacingModal.canvasSize}
+        onApply={gridSpacingModal.onApply}
+        onClose={gridSpacingModal.onClose}
+        onValidationError={onValidationError}
       />
       <ZoomModal
-        isOpen={isZoomModalOpen}
-        zoom={zoom}
-        onApply={onApplyZoom}
-        onClose={onCloseZoom}
-        onValidationError={showValidationWarning}
+        isOpen={zoomModal.isOpen}
+        zoom={zoomModal.zoom}
+        onApply={zoomModal.onApply}
+        onClose={zoomModal.onClose}
+        onValidationError={onValidationError}
       />
       <KMeansQuantizeModal
-        isOpen={kMeansQuantizeSelection !== null}
+        isOpen={kMeansQuantizeModal.request !== null}
         transparentBackgroundMode={transparentBackgroundMode}
-        selection={kMeansQuantizeSelection}
-        source={kMeansQuantizeSource}
-        initialColorCount={kMeansInitialColorCount}
-        onApply={onApplyKMeansQuantize}
-        onClose={onCloseKMeansQuantize}
-        onValidationError={showValidationWarning}
+        selection={kMeansQuantizeModal.request?.selection ?? null}
+        source={kMeansQuantizeModal.request?.source ?? null}
+        initialColorCount={kMeansQuantizeModal.request?.initialColorCount ?? 1}
+        onApply={kMeansQuantizeModal.onApply}
+        onClose={kMeansQuantizeModal.onClose}
+        onValidationError={onValidationError}
       />
       <SelectionRotateModal
-        isOpen={selectionRotateSelection !== null}
+        isOpen={selectionRotateModal.request !== null}
         transparentBackgroundMode={transparentBackgroundMode}
-        selection={selectionRotateSelection}
-        source={selectionRotateSource}
-        onApply={onApplySelectionRotate}
-        onClose={onCloseSelectionRotate}
-        onValidationError={showValidationWarning}
+        selection={selectionRotateModal.request?.selection ?? null}
+        source={selectionRotateModal.request?.source ?? null}
+        onApply={selectionRotateModal.onApply}
+        onClose={selectionRotateModal.onClose}
+        onValidationError={onValidationError}
       />
       <ConfirmModal
-        isOpen={paletteRemovalRequest !== null}
+        isOpen={paletteRemovalModal.request !== null}
         title="使用中の色を削除しますか？"
         confirmLabel="クリアして削除"
-        onConfirm={onConfirmPaletteRemoval}
-        onClose={onClosePaletteRemoval}
+        onConfirm={paletteRemovalModal.onConfirm}
+        onClose={paletteRemovalModal.onClose}
       >
         <p className="mb-2">
-          <span className="font-monospace">{paletteRemovalRequest?.color.toUpperCase() ?? '-'}</span>
+          <span className="font-monospace">{paletteRemovalModal.request?.color.toUpperCase() ?? '-'}</span>
           {' '}はキャンバス上で{' '}
-          <strong>{paletteRemovalRequest?.usedPixelCount.toLocaleString() ?? '0'} px</strong>
+          <strong>{paletteRemovalModal.request?.usedPixelCount.toLocaleString() ?? '0'} px</strong>
           {' '}使用されています。
         </p>
         <p className="mb-0 text-body-secondary">

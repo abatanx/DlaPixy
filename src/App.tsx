@@ -468,7 +468,7 @@ export function App() {
     exportGplPalette,
   });
 
-  const showValidationWarning = (message: string) => {
+  const onValidationError = (message: string) => {
     setStatusText(message, 'warning');
   };
 
@@ -567,35 +567,47 @@ export function App() {
           />
         </div>
         <EditorModalLayer
-          statusText={statusText}
-          toastType={toastType}
-          isToastVisible={isToastVisible}
-          isCanvasSizeModalOpen={isCanvasSizeModalOpen}
-          canvasSize={canvasSize}
-          onApplyCanvasSize={applyCanvasSize}
-          onCloseCanvasSize={closeCanvasSizeModal}
-          isGridSpacingModalOpen={isGridSpacingModalOpen}
-          gridSpacing={gridSpacing}
-          onApplyGridSpacing={applyGridSpacing}
-          onCloseGridSpacing={closeGridSpacingModal}
-          isZoomModalOpen={isZoomModalOpen}
-          zoom={zoom}
-          onApplyZoom={applyZoom}
-          onCloseZoom={closeZoomModal}
+          toast={{
+            text: statusText,
+            type: toastType,
+            isVisible: isToastVisible
+          }}
+          canvasSizeModal={{
+            isOpen: isCanvasSizeModalOpen,
+            canvasSize,
+            onApply: applyCanvasSize,
+            onClose: closeCanvasSizeModal
+          }}
+          gridSpacingModal={{
+            isOpen: isGridSpacingModalOpen,
+            gridSpacing,
+            canvasSize,
+            onApply: applyGridSpacing,
+            onClose: closeGridSpacingModal
+          }}
+          zoomModal={{
+            isOpen: isZoomModalOpen,
+            zoom,
+            onApply: applyZoom,
+            onClose: closeZoomModal
+          }}
           transparentBackgroundMode={transparentBackgroundMode}
-          kMeansQuantizeSelection={kMeansQuantizeRequest?.selection ?? null}
-          kMeansQuantizeSource={kMeansQuantizeRequest?.source ?? null}
-          kMeansInitialColorCount={kMeansQuantizeRequest?.initialColorCount ?? 1}
-          onApplyKMeansQuantize={applyKMeansQuantize}
-          onCloseKMeansQuantize={closeKMeansQuantizeModal}
-          selectionRotateSelection={selectionRotateRequest?.selection ?? null}
-          selectionRotateSource={selectionRotateRequest?.source ?? null}
-          onApplySelectionRotate={applySelectionRotate}
-          onCloseSelectionRotate={closeSelectionRotateModal}
-          paletteRemovalRequest={paletteRemovalRequest}
-          onConfirmPaletteRemoval={confirmPaletteRemoval}
-          onClosePaletteRemoval={closePaletteRemovalModal}
-          showValidationWarning={showValidationWarning}
+          kMeansQuantizeModal={{
+            request: kMeansQuantizeRequest,
+            onApply: applyKMeansQuantize,
+            onClose: closeKMeansQuantizeModal
+          }}
+          selectionRotateModal={{
+            request: selectionRotateRequest,
+            onApply: applySelectionRotate,
+            onClose: closeSelectionRotateModal
+          }}
+          paletteRemovalModal={{
+            request: paletteRemovalRequest,
+            onConfirm: confirmPaletteRemoval,
+            onClose: closePaletteRemovalModal
+          }}
+          onValidationError={onValidationError}
         />
       </div>
       <EditorStatusFooter

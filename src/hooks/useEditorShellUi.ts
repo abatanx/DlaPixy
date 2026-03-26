@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TransparentBackgroundMode } from '../../shared/transparent-background';
 import { getTransparentBackgroundSurfaceClassName } from '../editor/transparent-background';
 
-type ToastType = 'success' | 'warning' | 'error' | 'info';
+export type StatusToastType = 'success' | 'warning' | 'error' | 'info';
 
 type UseEditorShellUiOptions = {
   hasUnsavedChanges: boolean;
@@ -14,11 +14,11 @@ export function useEditorShellUi({
   transparentBackgroundMode
 }: UseEditorShellUiOptions) {
   const [statusText, setStatusTextRaw] = useState<string>('準備OK');
-  const [toastType, setToastType] = useState<ToastType>('info');
+  const [toastType, setToastType] = useState<StatusToastType>('info');
   const [isToastVisible, setIsToastVisible] = useState<boolean>(false);
   const [toastSequence, setToastSequence] = useState<number>(0);
 
-  const setStatusText = useCallback((text: string, type: ToastType) => {
+  const setStatusText = useCallback((text: string, type: StatusToastType) => {
     setStatusTextRaw(text);
     setToastType(type);
     setIsToastVisible(true);
