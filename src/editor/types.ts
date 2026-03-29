@@ -4,9 +4,12 @@
  **/
 
 import type { PaletteEntry as SharedPaletteEntry } from '../../shared/palette';
+import type { FloatingCompositeMode as SharedFloatingCompositeMode } from '../../shared/floating-composite';
 import type { EditorSidecar, EditorTool } from '../../shared/sidecar';
 
 export type Tool = EditorTool;
+
+export type FloatingCompositeMode = SharedFloatingCompositeMode;
 
 export type PaletteEntry = SharedPaletteEntry;
 

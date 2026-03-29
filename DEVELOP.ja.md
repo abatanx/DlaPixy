@@ -106,6 +106,9 @@ npm run dist
   - 浮動貼り付け中は 8 箇所ハンドル（`TL / TC / TR / ML / MR / BL / BC / BR`）で拡大縮小できる
   - 浮動貼り付けの拡大縮小は nearest-neighbor で行い、縦横比は固定する
   - 浮動貼り付け/移動の操作: `Enter` で確定、`Esc` でキャンセルして貼り付け前状態に復元
+  - floating 中は、選択 overlay の下辺ラベルのさらに下に `置換 / ブレンド` の segmented toggle を表示する
+  - 同じ floating 合成モードを、内部貼り付け / 外部クリップボード貼り付け / 選択範囲ドラッグ移動のすべてへ適用する
+  - floating 合成モードを切り替えると、確定前プレビューへ即時反映される
   - 浮動貼り付けの確定時は、貼り付け画像に含まれる未登録色のスウォッチを追加し、既存スウォッチは削除しない
   - 矩形選択したピクセルのドラッグ移動（貼り付け移動と同じ挙動）
 - Undo
@@ -117,7 +120,7 @@ npm run dist
   - `foo.png` を開くと同階層の `foo.dla-pixy.json` を自動読込し、なければ PNG 単体として開く
   - sidecar JSON が壊れている場合は警告ダイアログを表示し、その後 PNG 単体として開く
   - PNG 内メタ情報（`dla-pixy-meta` を含む）は読込時には使わない
-  - sidecar JSON にはパレット情報に加えて、編集UI状態（`gridSpacing`、`transparentBackgroundMode`、`zoom`、表示位置、`lastTool`）も保存する
+  - sidecar JSON にはパレット情報に加えて、編集UI状態（`floatingCompositeMode`、`gridSpacing`、`transparentBackgroundMode`、`zoom`、表示位置、`lastTool`）も保存する
   - 保存時は sidecar JSON を新規作成または更新しつつ、既存の PNG メタ情報チャンクは壊さず維持する
 - ネイティブ Canvas メニュー
   - `Canvas -> キャンバスサイズ変更...` でモーダルを開く
@@ -217,6 +220,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
       }
     },
     editor: {
+      floatingCompositeMode: 'replace' | 'blend',
       gridSpacing: number,
       transparentBackgroundMode: 'white-check' | 'black-check' | 'white' | 'black' | 'magenta',
       zoom: number,
@@ -477,9 +481,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - https://github.com/abatanx/DlaPixy/issues/49
 - #50 `feat: 貼り付け時に拡大縮小して配置できるようにする`
   - https://github.com/abatanx/DlaPixy/issues/50
-- #51 `feat: アルファ付き画像貼り付け時のブレンド仕様を追加する`
+- #51 `update: PNGメタ保存から外部JSON管理へ移行し、保存/互換仕様を整理する`
   - https://github.com/abatanx/DlaPixy/issues/51
-- #52 `update: PNGメタ保存から外部JSON管理へ移行する`
+- #52 `spec: canvas-selection-overlay 上で合成モード（置換 / ブレンド）を切り替え、editor メタへ保存できるようにする`
   - https://github.com/abatanx/DlaPixy/issues/52
 
 ## 13. Issue #42 仕様メモ（2026-03-24）
@@ -518,7 +522,78 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
       - ロックされていない
       - caption が付いていない
   - 呼び出し側が「外さない」を選んだ場合は、未使用色はロック状態や caption に関係なく残す。
-  - メタ情報の後方互換性は、現時点では不要とする。
-  - `selectedColor` のフォールバックは現状の K-Means 後挙動に合わせる。
-    - まだ存在するなら現在色を維持
-    - なくなったら先頭パレット色へフォールバック
+- メタ情報の後方互換性は、現時点では不要とする。
+- `selectedColor` のフォールバックは現状の K-Means 後挙動に合わせる。
+  - まだ存在するなら現在色を維持
+  - なくなったら先頭パレット色へフォールバック
+
+## 14. Issue #52 仕様メモ（2026-03-28）
+- 目的:
+  - floating 中の選択矩形 overlay 上で `置換 / ブレンド` を切り替えられるようにする。
+  - 貼り付けだけでなく、選択範囲ドラッグ移動を含むすべての floating 操作に同じ合成モードを適用する。
+  - 選択した floating 合成モードを sidecar の `editor` メタへ保存する。
+- 現状の実装起点:
+  - `src/hooks/useFloatingPaste.ts`
+    - `beginFloatingPaste(...)` が内部コピー / 外部クリップボード画像から浮動貼り付けを開始する。
+    - `liftSelectionToFloatingPaste()` は、選択範囲ドラッグ移動でも同じ floating state を再利用している。
+    - `applyFloatingPasteBlock(...)` は `blitBlockOnCanvas(...)` を使ってプレビューを再合成している。
+  - `src/editor/utils.ts`
+    - `blitBlockOnCanvas(...)` は現状だと常に置換動作になっている。
+  - `src/components/EditorCanvasWorkspace.tsx`
+    - `.canvas-selection-overlay` には、すでに floating handle とサイズラベル描画の責務がある。
+  - `shared/sidecar.ts`, `src/hooks/useDocumentFileActions.ts`, `electron/main.ts`
+    - editor メタは現状 `gridSpacing`, `transparentBackgroundMode`, `zoom`, `viewport`, `lastTool` を保存 / 復元している。
+- 実装ブレを防ぐための判断:
+  - `FloatingCompositeMode = 'replace' | 'blend'` を導入する。
+  - sidecar の `editor.floatingCompositeMode` として保存する。
+  - sidecar に値が無い、または無効な場合は `replace` を既定値にする。
+  - `SIDECAR_SCHEMA_VERSION = 1` は維持する。
+    - 既存 sidecar は `floatingCompositeMode` 欠損時に `replace` 補完でそのまま読めるようにする。
+    - この項目追加だけで schema version を上げない。
+  - 合成モードは、すべての floating 操作に共通で適用する。
+    - DlaPixy 内コピー → 貼り付け
+    - OS クリップボード画像 → 貼り付け
+    - 選択範囲ドラッグ移動 → floating 化した移動
+  - overlay の toggle UI は、floating state が存在するときは常に表示する。
+  - この機能のために floating state の origin/kind を分ける必要はない。
+    - 他用途で持つのはよいが、合成ロジック自体は origin に依存させない。
+  - 浮動貼り付け中にモード変更したら、次の材料で即時再合成する。
+    - 現在の `basePixels`
+    - 現在の floating rect（`x / y / width / height`）
+    - 必要なら拡大縮小済みの `sourcePixels`
+  - `Enter` 確定時は、その時点で見えているプレビュー結果をそのまま確定する。
+  - `Esc`、移動、リサイズ、Undo の既存挙動は変えない。
+- ブレンド規則:
+  - `置換`
+    - 貼り付け元 RGBA をそのまま書き込む
+  - `ブレンド`
+    - 貼り付け先ピクセルに対して source-over で合成する
+    - source alpha `0` は貼り付け先を変更しない
+    - source alpha `255` は完全置換になる
+- UI / 操作メモ:
+  - segmented button は `.canvas-selection-overlay` の下辺ラベルよりさらに下へ置く。
+  - overlay は従来どおり overflow-visible のままにする。
+  - ボタン操作で move / resize が始まらないようにする。
+    - ボタン側で `preventDefault` / `stopPropagation` を先に処理して、overlay の drag 開始へ流さない。
+- パレット同期:
+  - 確定時は既存の共通パレット同期をそのまま使う。
+  - 維持条件:
+    - `removeUnusedColors: false`
+    - `addUsedColors: true`
+  - 新しく使われた色は追加する。
+  - 不要になった既存スウォッチは削除しない。
+- 実装分割案:
+  1. `FloatingCompositeMode` 型と sidecar 保存 / 復元を追加する。
+  2. `blitBlockOnCanvas(...)` を、モード指定付きの共通合成 helper へ置き換える。
+  3. 既存の floating state の流れは保ったまま、現在の合成モードを通せるようにする。
+  4. overlay に segmented button と誤操作防止のイベントガードを追加する。
+  5. モード変更時にプレビューを即時再計算する。
+- 確認観点:
+  - 内部コピー貼り付けで `置換 / ブレンド` の両方が正しくプレビューされる。
+  - 外部クリップボード画像貼り付けでも同様に動く。
+  - 選択範囲ドラッグ移動でも `置換 / ブレンド` の両方が正しく動く。
+  - `alpha = 0` は `ブレンド` 時に貼り付け先を変えない。
+  - `alpha = 255` は `ブレンド` でも置換結果と一致する。
+  - toggle を押しても move / resize が始まらない。
+  - 確定結果が最後に見えていたプレビューと一致する。
+  - 保存時に `editor.floatingCompositeMode` が書かれ、読込時に復元される。

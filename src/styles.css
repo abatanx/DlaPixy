@@ -814,6 +814,24 @@ body {
   transform: translate(calc(100% + 0.28rem), -50%) rotate(-90deg);
 }
 
+.canvas-floating-composite-toggle {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, calc(100% + 1.55rem));
+  z-index: 3;
+  pointer-events: auto;
+  box-shadow: 0 0.25rem 0.8rem rgba(15, 23, 42, 0.14);
+}
+
+.canvas-floating-composite-toggle .btn {
+  min-width: 4.4rem;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .pixel-canvas.is-space-pan {
   cursor: grab;
 }

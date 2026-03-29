@@ -12,6 +12,10 @@ import os from 'node:os';
 import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
 import type { MenuAction } from '../shared/ipc';
+import {
+  DEFAULT_FLOATING_COMPOSITE_MODE,
+  isFloatingCompositeMode
+} from '../shared/floating-composite';
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
 import { SIDECAR_SCHEMA_VERSION, type EditorSidecar } from '../shared/sidecar';
@@ -255,6 +259,9 @@ function parseEditorMeta(rawText: string): EditorMeta | null {
         }
       },
       editor: {
+        floatingCompositeMode: isFloatingCompositeMode(candidateEditor.floatingCompositeMode)
+          ? candidateEditor.floatingCompositeMode
+          : DEFAULT_FLOATING_COMPOSITE_MODE,
         gridSpacing: candidateEditor.gridSpacing,
         transparentBackgroundMode: candidateEditor.transparentBackgroundMode,
         zoom: candidateEditor.zoom,

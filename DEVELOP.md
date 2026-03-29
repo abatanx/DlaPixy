@@ -112,6 +112,9 @@ npm run dist
   - Finalize clips pasted pixels to the canvas bounds; only the visible in-canvas area is applied
   - Selection overlay shows compact numeric labels outside the rectangle (`w` on top/bottom, `h` on left/right, `x,y` at top-left)
   - Selection overlay UI (frame / handles / labels) can overflow into the stage padding and is not clipped by the canvas surface
+  - While floating state is active, the selection overlay shows a segmented `Replace / Blend` toggle below the bottom width label
+  - The same floating composite mode applies to internal paste, external clipboard paste, and direct selection move
+  - Changing the floating composite mode recomposites the preview immediately without finalizing the floating state
   - Selection frame uses a lightweight animated marching-ants style
   - Finalizing floating paste adds missing palette swatches for pasted colors and does not remove existing swatches
   - Selected pixels are draggable directly (same behavior as pasted floating block)
@@ -124,7 +127,7 @@ npm run dist
   - Opening `foo.png` auto-loads `foo.dla-pixy.json` if present; if missing, the PNG is opened standalone
   - If the sidecar JSON exists but is invalid, a warning dialog is shown and the PNG is opened standalone
   - PNG-embedded metadata (including `dla-pixy-meta`) is ignored on load
-  - Sidecar JSON keeps palette data plus editor UI state (`gridSpacing`, `transparentBackgroundMode`, `zoom`, viewport scroll, `lastTool`)
+  - Sidecar JSON keeps palette data plus editor UI state (`floatingCompositeMode`, `gridSpacing`, `transparentBackgroundMode`, `zoom`, viewport scroll, `lastTool`)
   - Saving writes/updates the sidecar JSON and keeps existing PNG metadata chunks intact
 - Native Canvas menu
   - `Canvas -> Change Canvas Size...` opens modal dialog in renderer
@@ -224,6 +227,7 @@ Current metadata shape:
       }
     },
     editor: {
+      floatingCompositeMode: 'replace' | 'blend',
       gridSpacing: number,
       transparentBackgroundMode: 'white-check' | 'black-check' | 'white' | 'black' | 'magenta',
       zoom: number,
@@ -473,9 +477,9 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/49
 - #50 `feat: 貼り付け時に拡大縮小して配置できるようにする`
   - https://github.com/abatanx/DlaPixy/issues/50
-- #51 `feat: アルファ付き画像貼り付け時のブレンド仕様を追加する`
+- #51 `update: PNGメタ保存から外部JSON管理へ移行し、保存/互換仕様を整理する`
   - https://github.com/abatanx/DlaPixy/issues/51
-- #52 `update: PNGメタ保存から外部JSON管理へ移行する`
+- #52 `spec: canvas-selection-overlay 上で合成モード（置換 / ブレンド）を切り替え、editor メタへ保存できるようにする`
   - https://github.com/abatanx/DlaPixy/issues/52
 
 ## 13. Issue #42 Draft Notes (2026-03-24)
@@ -513,7 +517,78 @@ Current metadata shape:
     - the swatch is not locked
     - the swatch has no caption
   - When the caller chooses not to remove unused colors, unused swatches remain regardless of lock/caption state.
-  - Backward compatibility for metadata is not required at this time.
-  - Selected color fallback should stay consistent with current K-Means path:
-    - keep current selection if still present
-    - otherwise fall back to first palette color when available
+- Backward compatibility for metadata is not required at this time.
+- Selected color fallback should stay consistent with current K-Means path:
+  - keep current selection if still present
+  - otherwise fall back to first palette color when available
+
+## 14. Issue #52 Spec Notes (2026-03-28)
+- Goal:
+  - Add a `replace / blend` segmented toggle on the floating selection overlay.
+  - Apply the same composite mode to all floating operations, including paste and selection move.
+  - Persist the chosen floating composite mode in sidecar `editor` metadata.
+- Current implementation anchors:
+  - `src/hooks/useFloatingPaste.ts`
+    - `beginFloatingPaste(...)` starts floating paste from internal/external clipboard.
+    - `liftSelectionToFloatingPaste()` reuses the same floating state for direct selection drag/move.
+    - `applyFloatingPasteBlock(...)` re-renders the preview via `blitBlockOnCanvas(...)`.
+  - `src/editor/utils.ts`
+    - `blitBlockOnCanvas(...)` is currently hard-coded replace behavior.
+  - `src/components/EditorCanvasWorkspace.tsx`
+    - `.canvas-selection-overlay` already renders floating handles and size labels.
+  - `shared/sidecar.ts`, `src/hooks/useDocumentFileActions.ts`, `electron/main.ts`
+    - editor metadata currently saves/restores `gridSpacing`, `transparentBackgroundMode`, `zoom`, `viewport`, `lastTool`.
+- Decisions to keep implementation stable:
+  - Introduce `FloatingCompositeMode = 'replace' | 'blend'`.
+  - Store `editor.floatingCompositeMode` in sidecar metadata.
+  - Default to `replace` when sidecar metadata is missing or invalid.
+  - Keep `SIDECAR_SCHEMA_VERSION = 1`.
+    - Existing sidecars should continue to load by defaulting missing `floatingCompositeMode` to `replace`.
+    - Do not force a schema bump for this field addition.
+  - Apply the same composite mode to all floating operations:
+    - DlaPixy internal copy/paste
+    - external image paste from OS clipboard
+    - direct selection drag/move via floating state
+  - The overlay toggle is visible whenever floating state exists.
+  - Floating origin/kind discrimination is not required for this feature.
+    - It can still exist for other reasons, but the composite logic should not depend on it.
+  - Changing the mode during active floating paste must recomposite immediately from:
+    - current `basePixels`
+    - current floating rect (`x / y / width / height`)
+    - resized `sourcePixels`
+  - `Enter` finalize should simply confirm the already-previewed result.
+  - `Esc`, move, resize, and undo behavior must stay unchanged.
+- Blend rule:
+  - `replace`
+    - write source RGBA directly to destination
+  - `blend`
+    - use source-over compositing against destination pixels
+    - source alpha `0` leaves destination unchanged
+    - source alpha `255` becomes full replacement
+- UI / interaction notes:
+  - Place the segmented button below the bottom width label on `.canvas-selection-overlay`.
+  - Overlay remains overflow-visible and must fit inside current stage padding policy.
+  - Button mouse/pointer interaction must not start floating move/resize.
+    - Stop propagation/prevent default on the control itself before overlay drag logic sees it.
+- Palette sync:
+  - Keep using the existing shared sync path on finalize.
+  - Required behavior remains:
+    - `removeUnusedColors: false`
+    - `addUsedColors: true`
+  - Newly used colors are added.
+  - Existing unused swatches are not removed.
+- Suggested implementation split:
+  1. Add `FloatingCompositeMode` type and sidecar save/load support.
+  2. Replace `blitBlockOnCanvas(...)` with a shared composite helper that accepts mode.
+  3. Keep the current floating state flow and thread the active composite mode through it.
+  4. Add overlay segmented button and dedicated event guard for control clicks.
+  5. Recompute preview immediately when mode changes.
+- Verification checklist:
+  - Internal clipboard paste previews correctly in both `replace` and `blend`.
+  - External clipboard image paste previews correctly in both `replace` and `blend`.
+  - Direct selection move previews correctly in both `replace` and `blend`.
+  - `alpha = 0` keeps destination pixels unchanged in `blend`.
+  - `alpha = 255` matches replace result in `blend`.
+  - Clicking the toggle does not start move or resize.
+  - Finalized result matches the last previewed mode.
+  - Saving writes `editor.floatingCompositeMode` to sidecar and loading restores it.

@@ -25,6 +25,10 @@ import { useFloatingPaste } from './hooks/useFloatingPaste';
 import { usePixelReferences } from './hooks/usePixelReferences';
 import { useUndoHistory } from './hooks/useUndoHistory';
 import {
+  DEFAULT_FLOATING_COMPOSITE_MODE,
+  type FloatingCompositeMode
+} from '../shared/floating-composite';
+import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
   type TransparentBackgroundMode
 } from '../shared/transparent-background';
@@ -60,6 +64,9 @@ export function App() {
   const [canvasSize, setCanvasSize] = useState<number>(DEFAULT_CANVAS_SIZE);
   const [gridSpacing, setGridSpacing] = useState<number>(DEFAULT_GRID_SPACING);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
+  const [floatingCompositeMode, setFloatingCompositeMode] = useState<FloatingCompositeMode>(
+    DEFAULT_FLOATING_COMPOSITE_MODE
+  );
   const [transparentBackgroundMode, setTransparentBackgroundMode] = useState<TransparentBackgroundMode>(
     DEFAULT_TRANSPARENT_BACKGROUND_MODE
   );
@@ -238,6 +245,7 @@ export function App() {
     nudgeFloatingPaste
   } = useFloatingPaste({
     canvasSize,
+    floatingCompositeMode,
     zoom,
     pixels,
     selection,
@@ -407,6 +415,7 @@ export function App() {
   const { savePng, saveAsPng, loadPng } = useDocumentFileActions({
     canvasSize,
     currentFilePath,
+    floatingCompositeMode,
     gridSpacing,
     hasUnsavedChanges,
     palette,
@@ -424,6 +433,7 @@ export function App() {
     setSelection,
     setLastTilePreviewSelection,
     setCurrentFilePath,
+    setFloatingCompositeMode,
     setPalette,
     setSelectedColor,
     setTool,
@@ -540,6 +550,8 @@ export function App() {
             selectionOverlayBaseStyle={selectionOverlayBaseStyle}
             selectionOverlayVisualStyle={selectionOverlayVisualStyle}
             isFloatingPasteActive={isFloatingPasteActive}
+            floatingCompositeMode={floatingCompositeMode}
+            setFloatingCompositeMode={setFloatingCompositeMode}
             zoom={zoom}
             floatingHandleOrder={FLOATING_HANDLE_ORDER}
             getFloatingHandleStyle={getFloatingHandleStyle}
