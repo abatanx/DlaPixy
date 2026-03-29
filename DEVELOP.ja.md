@@ -431,6 +431,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - 左上に `x,y`
   - 選択 overlay UI（枠 / ハンドル / ラベル）は stage padding 側へはみ出せて、キャンバス surface で clip されない
   - 選択枠は軽い marching-ants アニメーションで視認しやすくする
+- 浮動貼り付けのプレビュー画素は、現在の合成済み `pixels` をそのままメインキャンバスへ描く
+  - 選択 overlay は枠 / ハンドル / ラベル / 合成モード toggle だけを担当する
+  - overlay 自体は stage padding 側へはみ出せるが、実際の画素はキャンバス surface 内だけに見える
 - 選択範囲のドラッグ移動も `floatingPasteRef` の同じ経路を再利用
   - 選択範囲ドラッグ開始時に、選択ピクセルを浮動ブロック化して移動
 - 浮動貼り付け状態は以下で解除される。

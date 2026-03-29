@@ -426,9 +426,9 @@ Current metadata shape:
 - The last cell in the palette grid is a `+` action that opens the same modal in create mode and adds a new unique palette color.
 - Renderer modals are split into per-modal component files under `src/components/modals/**`.
 - Paste uses an internal clipboard (`selectionClipboardRef`) and floating pasted state (`floatingPasteRef`) for immediate drag-reposition.
-- Floating paste preview is rendered on a stage overlay:
-  - The overlay can extend slightly outside the canvas for interaction, but the visible preview is clipped by the canvas surface
-  - The committed pixel write still goes through clipped `blitBlockOnCanvas` compositing
+- Floating paste preview is rendered directly on the main canvas from current composited `pixels`.
+  - Selection overlay only provides floating chrome (border, handles, labels, composite toggle)
+  - The overlay can extend slightly outside the canvas for interaction, while the actual pixels remain clipped by the canvas surface
 - Selection drag-move also reuses `floatingPasteRef` flow:
   - On drag start from selection, selected pixels are captured as floating block and moved with same path as paste.
 - Floating pasted state is cleared on destructive/reset flows:

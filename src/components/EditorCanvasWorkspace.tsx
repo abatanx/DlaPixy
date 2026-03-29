@@ -28,7 +28,6 @@ type PixelInfoFields = {
 type EditorCanvasWorkspaceProps = {
   canvasStageRef: MutableRefObject<HTMLDivElement | null>;
   canvasRef: MutableRefObject<HTMLCanvasElement | null>;
-  floatingPreviewCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
   displaySize: number;
   floatingStagePaddingPx: number;
   transparentBackgroundClassName: string;
@@ -41,7 +40,6 @@ type EditorCanvasWorkspaceProps = {
   onMouseLeaveCanvas: () => void;
   selectionOverlaySelection: Selection;
   selectionOverlayBaseStyle?: CSSProperties;
-  selectionOverlayVisualStyle?: CSSProperties;
   isFloatingPasteActive: boolean;
   floatingCompositeMode: FloatingCompositeMode;
   setFloatingCompositeMode: (mode: FloatingCompositeMode) => void;
@@ -79,7 +77,6 @@ type EditorCanvasWorkspaceProps = {
 export function EditorCanvasWorkspace({
   canvasStageRef,
   canvasRef,
-  floatingPreviewCanvasRef,
   displaySize,
   floatingStagePaddingPx,
   transparentBackgroundClassName,
@@ -92,7 +89,6 @@ export function EditorCanvasWorkspace({
   onMouseLeaveCanvas,
   selectionOverlaySelection,
   selectionOverlayBaseStyle,
-  selectionOverlayVisualStyle,
   isFloatingPasteActive,
   floatingCompositeMode,
   setFloatingCompositeMode,
@@ -153,20 +149,6 @@ export function EditorCanvasWorkspace({
             />
             {selectionOverlaySelection ? (
               <>
-                {isFloatingPasteActive ? (
-                  <div className="canvas-floating-visual" style={selectionOverlayVisualStyle}>
-                    <canvas
-                      ref={floatingPreviewCanvasRef}
-                      width={selectionOverlaySelection.w}
-                      height={selectionOverlaySelection.h}
-                      className={`canvas-floating-preview ${transparentBackgroundClassName}`}
-                      style={{
-                        width: `${selectionOverlaySelection.w * zoom}px`,
-                        height: `${selectionOverlaySelection.h * zoom}px`
-                      }}
-                    />
-                  </div>
-                ) : null}
                 <div
                   className={`canvas-selection-overlay ${isFloatingPasteActive ? 'is-floating' : 'is-static'}`}
                   style={selectionOverlayBaseStyle}

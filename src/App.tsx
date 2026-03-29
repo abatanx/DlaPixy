@@ -81,7 +81,6 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
-  const floatingPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const {
     statusText,
@@ -186,10 +185,7 @@ export function App() {
     pixels,
     selectedColor,
     selection,
-    isFloatingPasteActive,
     canvasRef,
-    floatingPreviewCanvasRef,
-    floatingPasteRef,
     setPixels,
     setHasUnsavedChanges
   });
@@ -402,12 +398,10 @@ export function App() {
   const {
     hasCommittedSelection,
     selectionOverlaySelection,
-    selectionOverlayBaseStyle,
-    selectionOverlayVisualStyle
+    selectionOverlayBaseStyle
   } = useSelectionOverlay({
     selection,
     zoom,
-    displaySize,
     isFloatingPasteActive,
     canvasFramePx: CANVAS_FRAME_PX
   });
@@ -535,7 +529,6 @@ export function App() {
           <EditorCanvasWorkspace
             canvasStageRef={canvasStageRef}
             canvasRef={canvasRef}
-            floatingPreviewCanvasRef={floatingPreviewCanvasRef}
             displaySize={displaySize}
             floatingStagePaddingPx={FLOATING_STAGE_PADDING_PX}
             transparentBackgroundClassName={transparentBackgroundClassName}
@@ -548,7 +541,6 @@ export function App() {
             onMouseLeaveCanvas={onMouseLeaveCanvas}
             selectionOverlaySelection={selectionOverlaySelection}
             selectionOverlayBaseStyle={selectionOverlayBaseStyle}
-            selectionOverlayVisualStyle={selectionOverlayVisualStyle}
             isFloatingPasteActive={isFloatingPasteActive}
             floatingCompositeMode={floatingCompositeMode}
             setFloatingCompositeMode={setFloatingCompositeMode}

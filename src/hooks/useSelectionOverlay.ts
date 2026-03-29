@@ -9,7 +9,6 @@ import type { Selection } from '../editor/types';
 type UseSelectionOverlayOptions = {
   selection: Selection;
   zoom: number;
-  displaySize: number;
   isFloatingPasteActive: boolean;
   canvasFramePx: number;
 };
@@ -17,7 +16,6 @@ type UseSelectionOverlayOptions = {
 export function useSelectionOverlay({
   selection,
   zoom,
-  displaySize,
   isFloatingPasteActive,
   canvasFramePx
 }: UseSelectionOverlayOptions) {
@@ -37,32 +35,9 @@ export function useSelectionOverlay({
     } as CSSProperties;
   }, [canvasFramePx, selectionOverlaySelection, zoom]);
 
-  const selectionOverlayVisualStyle = useMemo(() => {
-    if (!selectionOverlaySelection || !selectionOverlayBaseStyle) {
-      return undefined;
-    }
-
-    const selectionOverlayLeftPx = selectionOverlaySelection.x * zoom;
-    const selectionOverlayTopPx = selectionOverlaySelection.y * zoom;
-    const selectionOverlayWidthPx = selectionOverlaySelection.w * zoom;
-    const selectionOverlayHeightPx = selectionOverlaySelection.h * zoom;
-
-    return {
-      ...selectionOverlayBaseStyle,
-      clipPath: `inset(${Math.max(0, -selectionOverlayTopPx)}px ${Math.max(
-        0,
-        selectionOverlayLeftPx + selectionOverlayWidthPx - displaySize
-      )}px ${Math.max(0, selectionOverlayTopPx + selectionOverlayHeightPx - displaySize)}px ${Math.max(
-        0,
-        -selectionOverlayLeftPx
-      )}px)`
-    } as CSSProperties;
-  }, [displaySize, selectionOverlayBaseStyle, selectionOverlaySelection, zoom]);
-
   return {
     hasCommittedSelection,
     selectionOverlaySelection,
-    selectionOverlayBaseStyle,
-    selectionOverlayVisualStyle
+    selectionOverlayBaseStyle
   };
 }
