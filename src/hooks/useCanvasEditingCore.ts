@@ -3,7 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { useCallback, useEffect, useMemo, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { Selection } from '../editor/types';
 import { clonePixels, hexToRgba, pointInSelection, rasterLinePoints } from '../editor/utils';
 
@@ -19,6 +19,13 @@ type UseCanvasEditingCoreOptions = {
   setHasUnsavedChanges: Dispatch<SetStateAction<boolean>>;
 };
 
+type CanvasRenderBuffer = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  imageData: ImageData;
+  size: number;
+};
+
 export function useCanvasEditingCore({
   canvasSize,
   gridSpacing,
@@ -30,6 +37,8 @@ export function useCanvasEditingCore({
   setPixels,
   setHasUnsavedChanges
 }: UseCanvasEditingCoreOptions) {
+  const renderBufferRef = useRef<CanvasRenderBuffer | null>(null);
+
   const drawCanvas = useCallback(
     (sourcePixels: Uint8ClampedArray) => {
       const canvas = canvasRef.current;
@@ -42,19 +51,30 @@ export function useCanvasEditingCore({
         return;
       }
 
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvasSize;
-      tempCanvas.height = canvasSize;
-      const tctx = tempCanvas.getContext('2d');
-      if (!tctx) {
-        return;
+      let renderBuffer = renderBufferRef.current;
+      if (!renderBuffer || renderBuffer.size !== canvasSize) {
+        const bufferCanvas = document.createElement('canvas');
+        bufferCanvas.width = canvasSize;
+        bufferCanvas.height = canvasSize;
+        const bufferCtx = bufferCanvas.getContext('2d');
+        if (!bufferCtx) {
+          return;
+        }
+        renderBuffer = {
+          canvas: bufferCanvas,
+          ctx: bufferCtx,
+          imageData: new ImageData(canvasSize, canvasSize),
+          size: canvasSize
+        };
+        renderBufferRef.current = renderBuffer;
       }
 
-      tctx.putImageData(new ImageData(sourcePixels.slice(), canvasSize, canvasSize), 0, 0);
+      renderBuffer.imageData.data.set(sourcePixels);
+      renderBuffer.ctx.putImageData(renderBuffer.imageData, 0, 0);
 
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(renderBuffer.canvas, 0, 0, canvas.width, canvas.height);
 
       // Grid is a visual overlay only (not a paint constraint).
       if (gridSpacing > 0) {

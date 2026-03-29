@@ -542,6 +542,9 @@ Current metadata shape:
   - Introduce `FloatingCompositeMode = 'replace' | 'blend'`.
   - Store `editor.floatingCompositeMode` in sidecar metadata.
   - Default to `replace` when sidecar metadata is missing or invalid.
+  - Keep floating preview updates allocation-light:
+    - moving without resize should reuse the current resized floating block
+    - main canvas draw should reuse a persistent offscreen raster buffer instead of recreating temp canvas / image data each frame
   - Keep `SIDECAR_SCHEMA_VERSION = 1`.
     - Existing sidecars should continue to load by defaulting missing `floatingCompositeMode` to `replace`.
     - Do not force a schema bump for this field addition.

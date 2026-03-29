@@ -91,13 +91,16 @@ export function useFloatingPaste({
 
   const applyFloatingPasteBlock = useCallback(
     (floating: FloatingPasteState, nextX: number, nextY: number, nextWidth: number, nextHeight: number) => {
-      const nextPixels = resizePixelBlockNearest(
-        floating.sourcePixels,
-        floating.sourceWidth,
-        floating.sourceHeight,
-        nextWidth,
-        nextHeight
-      );
+      const nextPixels =
+        nextWidth === floating.width && nextHeight === floating.height
+          ? floating.pixels
+          : resizePixelBlockNearest(
+              floating.sourcePixels,
+              floating.sourceWidth,
+              floating.sourceHeight,
+              nextWidth,
+              nextHeight
+            );
       const composited = blitBlockOnCanvas(
         floating.basePixels,
         canvasSize,

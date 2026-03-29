@@ -550,6 +550,9 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - `FloatingCompositeMode = 'replace' | 'blend'` を導入する。
   - sidecar の `editor.floatingCompositeMode` として保存する。
   - sidecar に値が無い、または無効な場合は `replace` を既定値にする。
+  - 浮動プレビュー更新は不要な確保を増やさない。
+    - 移動だけでサイズ不変なら、現在の拡大縮小済み floating block を再利用する。
+    - メインキャンバス描画は temp canvas / image data を毎回作らず、再利用可能な offscreen buffer を使う。
   - `SIDECAR_SCHEMA_VERSION = 1` は維持する。
     - 既存 sidecar は `floatingCompositeMode` 欠損時に `replace` 補完でそのまま読めるようにする。
     - この項目追加だけで schema version を上げない。
