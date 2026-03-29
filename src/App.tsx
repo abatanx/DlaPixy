@@ -25,6 +25,10 @@ import { useFloatingPaste } from './hooks/useFloatingPaste';
 import { usePixelReferences } from './hooks/usePixelReferences';
 import { useUndoHistory } from './hooks/useUndoHistory';
 import {
+  DEFAULT_FLOATING_COMPOSITE_MODE,
+  type FloatingCompositeMode
+} from '../shared/floating-composite';
+import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
   type TransparentBackgroundMode
 } from '../shared/transparent-background';
@@ -60,6 +64,9 @@ export function App() {
   const [canvasSize, setCanvasSize] = useState<number>(DEFAULT_CANVAS_SIZE);
   const [gridSpacing, setGridSpacing] = useState<number>(DEFAULT_GRID_SPACING);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
+  const [floatingCompositeMode, setFloatingCompositeMode] = useState<FloatingCompositeMode>(
+    DEFAULT_FLOATING_COMPOSITE_MODE
+  );
   const [transparentBackgroundMode, setTransparentBackgroundMode] = useState<TransparentBackgroundMode>(
     DEFAULT_TRANSPARENT_BACKGROUND_MODE
   );
@@ -74,7 +81,6 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
-  const floatingPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const {
     statusText,
@@ -179,10 +185,7 @@ export function App() {
     pixels,
     selectedColor,
     selection,
-    isFloatingPasteActive,
     canvasRef,
-    floatingPreviewCanvasRef,
-    floatingPasteRef,
     setPixels,
     setHasUnsavedChanges
   });
@@ -238,6 +241,7 @@ export function App() {
     nudgeFloatingPaste
   } = useFloatingPaste({
     canvasSize,
+    floatingCompositeMode,
     zoom,
     pixels,
     selection,
@@ -394,12 +398,10 @@ export function App() {
   const {
     hasCommittedSelection,
     selectionOverlaySelection,
-    selectionOverlayBaseStyle,
-    selectionOverlayVisualStyle
+    selectionOverlayBaseStyle
   } = useSelectionOverlay({
     selection,
     zoom,
-    displaySize,
     isFloatingPasteActive,
     canvasFramePx: CANVAS_FRAME_PX
   });
@@ -407,6 +409,7 @@ export function App() {
   const { savePng, saveAsPng, loadPng } = useDocumentFileActions({
     canvasSize,
     currentFilePath,
+    floatingCompositeMode,
     gridSpacing,
     hasUnsavedChanges,
     palette,
@@ -424,6 +427,7 @@ export function App() {
     setSelection,
     setLastTilePreviewSelection,
     setCurrentFilePath,
+    setFloatingCompositeMode,
     setPalette,
     setSelectedColor,
     setTool,
@@ -525,7 +529,6 @@ export function App() {
           <EditorCanvasWorkspace
             canvasStageRef={canvasStageRef}
             canvasRef={canvasRef}
-            floatingPreviewCanvasRef={floatingPreviewCanvasRef}
             displaySize={displaySize}
             floatingStagePaddingPx={FLOATING_STAGE_PADDING_PX}
             transparentBackgroundClassName={transparentBackgroundClassName}
@@ -538,8 +541,9 @@ export function App() {
             onMouseLeaveCanvas={onMouseLeaveCanvas}
             selectionOverlaySelection={selectionOverlaySelection}
             selectionOverlayBaseStyle={selectionOverlayBaseStyle}
-            selectionOverlayVisualStyle={selectionOverlayVisualStyle}
             isFloatingPasteActive={isFloatingPasteActive}
+            floatingCompositeMode={floatingCompositeMode}
+            setFloatingCompositeMode={setFloatingCompositeMode}
             zoom={zoom}
             floatingHandleOrder={FLOATING_HANDLE_ORDER}
             getFloatingHandleStyle={getFloatingHandleStyle}

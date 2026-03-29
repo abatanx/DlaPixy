@@ -3,7 +3,8 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { useCallback, type MutableRefObject } from 'react';
+import { useCallback, useEffect, type MutableRefObject } from 'react';
+import type { FloatingCompositeMode } from '../../shared/floating-composite';
 import type { ClipboardPixelBlock, FloatingPasteState } from '../editor/floating-paste';
 import type { Selection, Tool } from '../editor/types';
 import {
@@ -20,6 +21,7 @@ type PasteSourceMode = 'internal' | 'external';
 
 type UseFloatingPasteOptions = {
   canvasSize: number;
+  floatingCompositeMode: FloatingCompositeMode;
   zoom: number;
   pixels: Uint8ClampedArray;
   selection: Selection;
@@ -40,6 +42,7 @@ type UseFloatingPasteOptions = {
 
 export function useFloatingPaste({
   canvasSize,
+  floatingCompositeMode,
   zoom,
   pixels,
   selection,
@@ -88,13 +91,16 @@ export function useFloatingPaste({
 
   const applyFloatingPasteBlock = useCallback(
     (floating: FloatingPasteState, nextX: number, nextY: number, nextWidth: number, nextHeight: number) => {
-      const nextPixels = resizePixelBlockNearest(
-        floating.sourcePixels,
-        floating.sourceWidth,
-        floating.sourceHeight,
-        nextWidth,
-        nextHeight
-      );
+      const nextPixels =
+        nextWidth === floating.width && nextHeight === floating.height
+          ? floating.pixels
+          : resizePixelBlockNearest(
+              floating.sourcePixels,
+              floating.sourceWidth,
+              floating.sourceHeight,
+              nextWidth,
+              nextHeight
+            );
       const composited = blitBlockOnCanvas(
         floating.basePixels,
         canvasSize,
@@ -102,7 +108,8 @@ export function useFloatingPaste({
         nextWidth,
         nextHeight,
         nextX,
-        nextY
+        nextY,
+        floatingCompositeMode
       );
 
       floating.x = nextX;
@@ -113,7 +120,7 @@ export function useFloatingPaste({
       setPixels(composited);
       setSelection({ x: nextX, y: nextY, w: nextWidth, h: nextHeight });
     },
-    [canvasSize, setPixels, setSelection]
+    [canvasSize, floatingCompositeMode, setPixels, setSelection]
   );
 
   const loadPixelBlockFromDataUrl = useCallback(async (dataUrl: string): Promise<ClipboardPixelBlock | null> => {
@@ -191,18 +198,7 @@ export function useFloatingPaste({
       pushUndo();
       const basePixels = clonePixels(pixels);
       const pastedPixels = clonePixels(clip.pixels);
-      const composited = blitBlockOnCanvas(
-        basePixels,
-        canvasSize,
-        pastedPixels,
-        clip.width,
-        clip.height,
-        nextRect.x,
-        nextRect.y
-      );
-
-      setPixels(composited);
-      floatingPasteRef.current = {
+      const floating: FloatingPasteState = {
         x: nextRect.x,
         y: nextRect.y,
         width: clip.width,
@@ -216,20 +212,20 @@ export function useFloatingPaste({
         restoreSelection: cloneSelection(selection),
         restoreTool: tool
       };
+      floatingPasteRef.current = floating;
+      applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, clip.width, clip.height);
       setTool('select');
-      setSelection({ x: nextRect.x, y: nextRect.y, w: clip.width, h: clip.height });
       setStatusText(`画像を貼り付けました (${clip.width}x${clip.height}) - Enterで確定 / Escでキャンセル`, 'success');
       return true;
     },
     [
+      applyFloatingPasteBlock,
       canvasSize,
       floatingPasteRef,
       pixels,
       pushUndo,
       resolveDefaultPasteOrigin,
       selection,
-      setPixels,
-      setSelection,
       setStatusText,
       setTool,
       tool
@@ -260,15 +256,6 @@ export function useFloatingPaste({
       }
     }
 
-    const composited = blitBlockOnCanvas(
-      basePixels,
-      canvasSize,
-      selectedPixels,
-      selection.w,
-      selection.h,
-      selection.x,
-      selection.y
-    );
     const floating: FloatingPasteState = {
       x: selection.x,
       y: selection.y,
@@ -284,10 +271,19 @@ export function useFloatingPaste({
       restoreTool: tool
     };
 
-    setPixels(composited);
     floatingPasteRef.current = floating;
+    applyFloatingPasteBlock(floating, selection.x, selection.y, selection.w, selection.h);
     return floating;
-  }, [canvasSize, floatingPasteRef, pixels, pushUndo, selection, setPixels, tool]);
+  }, [applyFloatingPasteBlock, canvasSize, floatingPasteRef, pixels, pushUndo, selection, tool]);
+
+  useEffect(() => {
+    const floating = floatingPasteRef.current;
+    if (!floating) {
+      return;
+    }
+
+    applyFloatingPasteBlock(floating, floating.x, floating.y, floating.width, floating.height);
+  }, [applyFloatingPasteBlock, floatingCompositeMode, floatingPasteRef]);
 
   const finalizeFloatingPaste = useCallback(() => {
     const floating = floatingPasteRef.current;

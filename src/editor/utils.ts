@@ -9,6 +9,7 @@ import {
   normalizePaletteEntries,
   type PaletteEntry
 } from '../../shared/palette';
+import type { FloatingCompositeMode } from '../../shared/floating-composite';
 import type { Selection } from './types';
 
 export { normalizeColorHex, normalizePaletteCaption, normalizePaletteEntries };
@@ -285,7 +286,8 @@ export function blitBlockOnCanvas(
   blockWidth: number,
   blockHeight: number,
   destX: number,
-  destY: number
+  destY: number,
+  compositeMode: FloatingCompositeMode = 'replace'
 ): Uint8ClampedArray {
   const next = clonePixels(basePixels);
   for (let y = 0; y < blockHeight; y += 1) {
@@ -300,10 +302,46 @@ export function blitBlockOnCanvas(
       }
       const srcIdx = (y * blockWidth + x) * 4;
       const dstIdx = (targetY * canvasSize + targetX) * 4;
-      next[dstIdx] = blockPixels[srcIdx];
-      next[dstIdx + 1] = blockPixels[srcIdx + 1];
-      next[dstIdx + 2] = blockPixels[srcIdx + 2];
-      next[dstIdx + 3] = blockPixels[srcIdx + 3];
+      if (compositeMode === 'replace') {
+        next[dstIdx] = blockPixels[srcIdx];
+        next[dstIdx + 1] = blockPixels[srcIdx + 1];
+        next[dstIdx + 2] = blockPixels[srcIdx + 2];
+        next[dstIdx + 3] = blockPixels[srcIdx + 3];
+        continue;
+      }
+
+      const sourceAlpha = blockPixels[srcIdx + 3] / 255;
+      if (sourceAlpha <= 0) {
+        continue;
+      }
+      if (sourceAlpha >= 1) {
+        next[dstIdx] = blockPixels[srcIdx];
+        next[dstIdx + 1] = blockPixels[srcIdx + 1];
+        next[dstIdx + 2] = blockPixels[srcIdx + 2];
+        next[dstIdx + 3] = blockPixels[srcIdx + 3];
+        continue;
+      }
+
+      const destinationAlpha = next[dstIdx + 3] / 255;
+      const outputAlpha = sourceAlpha + destinationAlpha * (1 - sourceAlpha);
+      if (outputAlpha <= 0) {
+        next[dstIdx] = 0;
+        next[dstIdx + 1] = 0;
+        next[dstIdx + 2] = 0;
+        next[dstIdx + 3] = 0;
+        continue;
+      }
+
+      const sourceContribution = sourceAlpha / outputAlpha;
+      const destinationContribution = (destinationAlpha * (1 - sourceAlpha)) / outputAlpha;
+      next[dstIdx] = Math.round(blockPixels[srcIdx] * sourceContribution + next[dstIdx] * destinationContribution);
+      next[dstIdx + 1] = Math.round(
+        blockPixels[srcIdx + 1] * sourceContribution + next[dstIdx + 1] * destinationContribution
+      );
+      next[dstIdx + 2] = Math.round(
+        blockPixels[srcIdx + 2] * sourceContribution + next[dstIdx + 2] * destinationContribution
+      );
+      next[dstIdx + 3] = Math.round(outputAlpha * 255);
     }
   }
   return next;

@@ -3,8 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import type { FloatingPasteState } from '../editor/floating-paste';
+import { useCallback, useEffect, useMemo, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { Selection } from '../editor/types';
 import { clonePixels, hexToRgba, pointInSelection, rasterLinePoints } from '../editor/utils';
 
@@ -15,12 +14,16 @@ type UseCanvasEditingCoreOptions = {
   pixels: Uint8ClampedArray;
   selectedColor: string;
   selection: Selection;
-  isFloatingPasteActive: boolean;
   canvasRef: MutableRefObject<HTMLCanvasElement | null>;
-  floatingPreviewCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
-  floatingPasteRef: MutableRefObject<FloatingPasteState | null>;
   setPixels: Dispatch<SetStateAction<Uint8ClampedArray>>;
   setHasUnsavedChanges: Dispatch<SetStateAction<boolean>>;
+};
+
+type CanvasRenderBuffer = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  imageData: ImageData;
+  size: number;
 };
 
 export function useCanvasEditingCore({
@@ -30,13 +33,12 @@ export function useCanvasEditingCore({
   pixels,
   selectedColor,
   selection,
-  isFloatingPasteActive,
   canvasRef,
-  floatingPreviewCanvasRef,
-  floatingPasteRef,
   setPixels,
   setHasUnsavedChanges
 }: UseCanvasEditingCoreOptions) {
+  const renderBufferRef = useRef<CanvasRenderBuffer | null>(null);
+
   const drawCanvas = useCallback(
     (sourcePixels: Uint8ClampedArray) => {
       const canvas = canvasRef.current;
@@ -49,21 +51,30 @@ export function useCanvasEditingCore({
         return;
       }
 
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvasSize;
-      tempCanvas.height = canvasSize;
-      const tctx = tempCanvas.getContext('2d');
-      if (!tctx) {
-        return;
+      let renderBuffer = renderBufferRef.current;
+      if (!renderBuffer || renderBuffer.size !== canvasSize) {
+        const bufferCanvas = document.createElement('canvas');
+        bufferCanvas.width = canvasSize;
+        bufferCanvas.height = canvasSize;
+        const bufferCtx = bufferCanvas.getContext('2d');
+        if (!bufferCtx) {
+          return;
+        }
+        renderBuffer = {
+          canvas: bufferCanvas,
+          ctx: bufferCtx,
+          imageData: new ImageData(canvasSize, canvasSize),
+          size: canvasSize
+        };
+        renderBufferRef.current = renderBuffer;
       }
 
-      const floating = floatingPasteRef.current;
-      const renderPixels = isFloatingPasteActive && floating ? floating.basePixels : sourcePixels;
-      tctx.putImageData(new ImageData(renderPixels.slice(), canvasSize, canvasSize), 0, 0);
+      renderBuffer.imageData.data.set(sourcePixels);
+      renderBuffer.ctx.putImageData(renderBuffer.imageData, 0, 0);
 
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(renderBuffer.canvas, 0, 0, canvas.width, canvas.height);
 
       // Grid is a visual overlay only (not a paint constraint).
       if (gridSpacing > 0) {
@@ -83,30 +94,12 @@ export function useCanvasEditingCore({
         }
       }
     },
-    [canvasRef, canvasSize, floatingPasteRef, gridSpacing, isFloatingPasteActive, zoom]
+    [canvasRef, canvasSize, gridSpacing, zoom]
   );
 
   useEffect(() => {
     drawCanvas(pixels);
   }, [drawCanvas, pixels]);
-
-  useLayoutEffect(() => {
-    const previewCanvas = floatingPreviewCanvasRef.current;
-    const floating = floatingPasteRef.current;
-    if (!previewCanvas || !floating || !selection) {
-      return;
-    }
-
-    previewCanvas.width = floating.width;
-    previewCanvas.height = floating.height;
-    const ctx = previewCanvas.getContext('2d');
-    if (!ctx) {
-      return;
-    }
-
-    ctx.clearRect(0, 0, floating.width, floating.height);
-    ctx.putImageData(new ImageData(floating.pixels.slice(), floating.width, floating.height), 0, 0);
-  }, [floatingPasteRef, floatingPreviewCanvasRef, pixels, selection]);
 
   const colorBytes = useMemo(() => hexToRgba(selectedColor), [selectedColor]);
 

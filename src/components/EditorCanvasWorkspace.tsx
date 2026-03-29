@@ -9,9 +9,13 @@ import {
   type MutableRefObject,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
+import {
+  FLOATING_COMPOSITE_MODE_LABELS,
+  FLOATING_COMPOSITE_MODES
+} from '../../shared/floating-composite';
 import { EditorToolbar } from './EditorToolbar';
 import type { FloatingResizeHandle } from '../editor/floating-interaction';
-import type { HoveredPixelInfo, Selection, Tool } from '../editor/types';
+import type { FloatingCompositeMode, HoveredPixelInfo, Selection, Tool } from '../editor/types';
 
 type PixelInfoFields = {
   rgba: string;
@@ -24,7 +28,6 @@ type PixelInfoFields = {
 type EditorCanvasWorkspaceProps = {
   canvasStageRef: MutableRefObject<HTMLDivElement | null>;
   canvasRef: MutableRefObject<HTMLCanvasElement | null>;
-  floatingPreviewCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
   displaySize: number;
   floatingStagePaddingPx: number;
   transparentBackgroundClassName: string;
@@ -37,8 +40,9 @@ type EditorCanvasWorkspaceProps = {
   onMouseLeaveCanvas: () => void;
   selectionOverlaySelection: Selection;
   selectionOverlayBaseStyle?: CSSProperties;
-  selectionOverlayVisualStyle?: CSSProperties;
   isFloatingPasteActive: boolean;
+  floatingCompositeMode: FloatingCompositeMode;
+  setFloatingCompositeMode: (mode: FloatingCompositeMode) => void;
   zoom: number;
   floatingHandleOrder: FloatingResizeHandle[];
   getFloatingHandleStyle: (handle: FloatingResizeHandle) => CSSProperties;
@@ -73,7 +77,6 @@ type EditorCanvasWorkspaceProps = {
 export function EditorCanvasWorkspace({
   canvasStageRef,
   canvasRef,
-  floatingPreviewCanvasRef,
   displaySize,
   floatingStagePaddingPx,
   transparentBackgroundClassName,
@@ -86,8 +89,9 @@ export function EditorCanvasWorkspace({
   onMouseLeaveCanvas,
   selectionOverlaySelection,
   selectionOverlayBaseStyle,
-  selectionOverlayVisualStyle,
   isFloatingPasteActive,
+  floatingCompositeMode,
+  setFloatingCompositeMode,
   zoom,
   floatingHandleOrder,
   getFloatingHandleStyle,
@@ -118,6 +122,11 @@ export function EditorCanvasWorkspace({
   pasteSelection,
   deleteSelection
 }: EditorCanvasWorkspaceProps) {
+  const stopFloatingCompositePointerDown = (event: ReactMouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   return (
     <main className="col-12 col-lg-8 col-xl-9 d-flex">
       <div className="card shadow-sm editor-card flex-grow-1">
@@ -140,20 +149,6 @@ export function EditorCanvasWorkspace({
             />
             {selectionOverlaySelection ? (
               <>
-                {isFloatingPasteActive ? (
-                  <div className="canvas-floating-visual" style={selectionOverlayVisualStyle}>
-                    <canvas
-                      ref={floatingPreviewCanvasRef}
-                      width={selectionOverlaySelection.w}
-                      height={selectionOverlaySelection.h}
-                      className={`canvas-floating-preview ${transparentBackgroundClassName}`}
-                      style={{
-                        width: `${selectionOverlaySelection.w * zoom}px`,
-                        height: `${selectionOverlaySelection.h * zoom}px`
-                      }}
-                    />
-                  </div>
-                ) : null}
                 <div
                   className={`canvas-selection-overlay ${isFloatingPasteActive ? 'is-floating' : 'is-static'}`}
                   style={selectionOverlayBaseStyle}
@@ -179,6 +174,28 @@ export function EditorCanvasWorkspace({
                   <span className="canvas-selection-size-label bottom">{selectionOverlaySelection.w}</span>
                   <span className="canvas-selection-size-label left">{selectionOverlaySelection.h}</span>
                   <span className="canvas-selection-size-label right">{selectionOverlaySelection.h}</span>
+                  {isFloatingPasteActive ? (
+                    <div
+                      className="btn-group btn-group-sm canvas-floating-composite-toggle"
+                      role="group"
+                      aria-label="floating-composite-mode"
+                      onMouseDown={stopFloatingCompositePointerDown}
+                    >
+                      {FLOATING_COMPOSITE_MODES.map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          className={`btn ${
+                            floatingCompositeMode === mode ? 'btn-danger active' : 'btn-light'
+                          }`}
+                          aria-pressed={floatingCompositeMode === mode}
+                          onClick={() => setFloatingCompositeMode(mode)}
+                        >
+                          {FLOATING_COMPOSITE_MODE_LABELS[mode]}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : null}
