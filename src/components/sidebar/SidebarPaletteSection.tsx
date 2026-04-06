@@ -20,6 +20,10 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   addPaletteColor,
   removeSelectedColorFromPalette,
   jumpToPaletteUsage,
+  paletteMergeSelection,
+  paletteMergeDestinationColor,
+  togglePaletteMergeColor,
+  clearPaletteMergeSelection,
   paletteColorModalRequest
 }: SidebarPaletteSectionProps) {
   const selectedPaletteEntry = useMemo(
@@ -35,12 +39,14 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     locked: false
   });
   const [isUsageModifierPressed, setIsUsageModifierPressed] = useState<boolean>(false);
+  const showPaletteMergeUi = paletteMergeSelection.length >= 2;
 
   const openPaletteColorModal = useCallback((mode: 'edit' | 'create', entry: { color: string; caption: string; locked: boolean }) => {
+    clearPaletteMergeSelection();
     setPaletteColorModalMode(mode);
     setPaletteColorModalInitial(entry);
     setIsPaletteColorModalOpen(true);
-  }, []);
+  }, [clearPaletteMergeSelection]);
 
   const openEditPaletteColorModal = useCallback((entry: { color: string; caption: string; locked: boolean }) => {
     openPaletteColorModal('edit', entry);
@@ -75,19 +81,23 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
 
   const handlePaletteClick = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
-      const nextColor = event.currentTarget.dataset.color ?? selectedColor;
-      const shouldJumpToUsage = isUsageModifierPressed || event.metaKey || event.ctrlKey;
-
-      setSelectedColor(nextColor);
-      if (shouldJumpToUsage) {
-        jumpToPaletteUsage(nextColor);
+      const nextColor = (event.currentTarget.dataset.color ?? selectedColor).toLowerCase();
+      if (event.metaKey || event.ctrlKey) {
+        togglePaletteMergeColor(nextColor);
+        return;
       }
+
+      clearPaletteMergeSelection();
+      setSelectedColor(nextColor);
     },
-    [isUsageModifierPressed, jumpToPaletteUsage, selectedColor, setSelectedColor]
+    [clearPaletteMergeSelection, selectedColor, setSelectedColor, togglePaletteMergeColor]
   );
 
   const handlePaletteDoubleClick = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
+      if (event.metaKey || event.ctrlKey) {
+        return;
+      }
       const { color, index } = event.currentTarget.dataset;
       if (!color || index === undefined) {
         return;
@@ -119,6 +129,10 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   const handlePaletteMouseLeave = useCallback(() => {
     setHoveredPaletteColor(null);
   }, [setHoveredPaletteColor]);
+
+  const handleSelectedColorUsageJump = useCallback(() => {
+    jumpToPaletteUsage(selectedColor);
+  }, [jumpToPaletteUsage, selectedColor]);
 
   useEffect(() => {
     if (!paletteColorModalRequest) {
@@ -168,10 +182,22 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
         {isSelectedColorInPalette ? (
           <button
             type="button"
+            className="btn btn-sm sidebar-palette-action-btn sidebar-palette-action-btn-jump"
+            onClick={handleSelectedColorUsageJump}
+            title="使用位置へ移動"
+            aria-label="使用位置へ移動"
+          >
+            <i className="fa-solid fa-bullseye" aria-hidden="true" />
+          </button>
+        ) : null}
+        {isSelectedColorInPalette ? (
+          <button
+            type="button"
             className="btn btn-sm sidebar-palette-action-btn sidebar-palette-action-btn-remove"
             onClick={removeSelectedColorFromPalette}
             title="パレットから削除"
             aria-label="パレットから削除"
+            disabled={showPaletteMergeUi}
           >
             <i className="fa-solid fa-trash-can" aria-hidden="true" />
           </button>
@@ -181,6 +207,8 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
         <div className="palette-grid" role="list" aria-label="palette colors">
           {palette.map((entry, index) => (
             (() => {
+              const isMergeSelected = paletteMergeSelection.includes(entry.color);
+              const isMergeDestination = paletteMergeDestinationColor === entry.color;
               const usageCount = paletteUsageByColor[entry.color]?.count ?? 0;
               const usageLabel = formatPaletteUsageLabel(usageCount);
               const titleParts = [entry.color.toUpperCase()];
@@ -190,12 +218,19 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
               if (entry.locked) {
                 titleParts.push('ロック');
               }
+              if (isMergeDestination) {
+                titleParts.push('統合先');
+              } else if (isMergeSelected) {
+                titleParts.push('統合対象');
+              }
 
               return (
                 <button
                   key={`${entry.color}-${index}`}
                   type="button"
-                  className={`palette-item ${selectedColor === entry.color ? 'active' : ''}`}
+                  className={`palette-item ${selectedColor === entry.color ? 'active' : ''} ${isMergeSelected ? 'is-multi-selected' : ''} ${
+                    isMergeDestination ? 'is-merge-destination' : ''
+                  }`}
                   data-color={entry.color}
                   data-index={index}
                   onClick={handlePaletteClick}
@@ -207,6 +242,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
                 >
                   <span className="palette-item-swatch" aria-hidden="true">
                     <span className="palette-item-swatch-fill" style={{ backgroundColor: entry.color }} />
+                    {isMergeDestination ? <span className="palette-item-merge-badge">残</span> : null}
                     {entry.locked ? (
                       <span className="palette-item-lock">
                         <i className="fa-solid fa-lock" aria-hidden="true" />

@@ -128,7 +128,7 @@ export function EditorCanvasWorkspace({
   };
 
   return (
-    <main className="col-12 col-lg-8 col-xl-9 d-flex">
+    <main className="editor-workspace d-flex flex-column flex-grow-1">
       <div className="card shadow-sm editor-card flex-grow-1">
         <div
           ref={canvasStageRef}

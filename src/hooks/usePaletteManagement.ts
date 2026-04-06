@@ -6,6 +6,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import type { GplExportFormat } from '../../shared/palette-gpl';
 import { getFileNameFromPath, hasSamePaletteEntries, replaceFileExtension, resolveNextSelectedColor } from '../editor/app-utils';
+import { mergePaletteColorsIntoDestination } from '../editor/palette-merge';
 import { syncPaletteEntriesFromPixels, type PaletteUsageEntry } from '../editor/palette-sync';
 import type { PaletteEntry } from '../editor/types';
 import { clonePaletteEntries, clonePixels, hexToRgba, normalizePaletteEntries } from '../editor/utils';
@@ -13,7 +14,7 @@ import { clonePaletteEntries, clonePixels, hexToRgba, normalizePaletteEntries } 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
 export type PaletteRemovalRequest = {
-  color: string;
+  colors: string[];
   usedPixelCount: number;
 };
 
@@ -62,31 +63,35 @@ export function usePaletteManagement({
     [canvasSize, palette, selectedColor, setPalette, setSelectedColor]
   );
 
-  const removePaletteColor = useCallback(
-    (colorToRemove: string, clearUsedPixels: boolean) => {
-      const selectedPaletteIndex = palette.findIndex((entry) => entry.color === colorToRemove);
-      if (selectedPaletteIndex < 0) {
+  const removePaletteColorsInternal = useCallback(
+    (colorsToRemove: string[], clearUsedPixels: boolean): boolean => {
+      const normalizedColorsToRemove = Array.from(new Set(colorsToRemove.map((color) => color.toLowerCase()))).filter((color) =>
+        palette.some((entry) => entry.color === color)
+      );
+      if (normalizedColorsToRemove.length === 0) {
         setPaletteRemovalRequest(null);
         setStatusText('削除対象の色はパレットにありません', 'warning');
-        return;
+        return false;
       }
 
-      const nextPalette = palette.filter((_entry, index) => index !== selectedPaletteIndex);
+      const removedColorsSet = new Set(normalizedColorsToRemove);
+      const nextPalette = palette.filter((entry) => !removedColorsSet.has(entry.color));
       const nextSelectedColor = resolveNextSelectedColor(nextPalette, selectedColor);
       let nextPixels = pixels;
       let clearedPixelCount = 0;
 
       if (clearUsedPixels) {
-        const targetColor = hexToRgba(colorToRemove);
+        const targetColors = normalizedColorsToRemove.map((color) => hexToRgba(color));
         const clearedPixels = clonePixels(pixels);
 
         for (let index = 0; index < clearedPixels.length; index += 4) {
-          if (
-            clearedPixels[index] !== targetColor.r ||
-            clearedPixels[index + 1] !== targetColor.g ||
-            clearedPixels[index + 2] !== targetColor.b ||
-            clearedPixels[index + 3] !== targetColor.a
-          ) {
+          const hasMatchingColor = targetColors.some((targetColor) => (
+            clearedPixels[index] === targetColor.r &&
+            clearedPixels[index + 1] === targetColor.g &&
+            clearedPixels[index + 2] === targetColor.b &&
+            clearedPixels[index + 3] === targetColor.a
+          ));
+          if (!hasMatchingColor) {
             continue;
           }
 
@@ -108,12 +113,17 @@ export function usePaletteManagement({
       }
       setPaletteRemovalRequest(null);
       setHasUnsavedChanges(true);
+      const removedLabel =
+        normalizedColorsToRemove.length === 1
+          ? normalizedColorsToRemove[0]?.toUpperCase() ?? '-'
+          : `${normalizedColorsToRemove.length}色`;
       setStatusText(
         clearUsedPixels && clearedPixelCount > 0
-          ? `使用中の色をクリアして削除しました: ${colorToRemove.toUpperCase()} / ${clearedPixelCount.toLocaleString()}px`
-          : `パレットから削除しました: ${colorToRemove.toUpperCase()}`,
+          ? `使用中の色をクリアして削除しました: ${removedLabel} / ${clearedPixelCount.toLocaleString()}px`
+          : `パレットから削除しました: ${removedLabel}`,
         'success'
       );
+      return true;
     },
     [palette, pixels, pushUndo, selectedColor, setHasUnsavedChanges, setPalette, setPixels, setSelectedColor, setStatusText]
   );
@@ -144,14 +154,77 @@ export function usePaletteManagement({
     const usedPixelCount = paletteUsageByColor[selectedColor]?.count ?? 0;
     if (usedPixelCount > 0) {
       setPaletteRemovalRequest({
-        color: selectedColor,
+        colors: [selectedColor],
         usedPixelCount
       });
       return;
     }
 
-    removePaletteColor(selectedColor, false);
-  }, [palette, paletteUsageByColor, removePaletteColor, selectedColor, setStatusText]);
+    void removePaletteColorsInternal([selectedColor], false);
+  }, [palette, paletteUsageByColor, removePaletteColorsInternal, selectedColor, setStatusText]);
+
+  const removePaletteColors = useCallback(
+    (colorsToRemove: string[]): boolean => {
+      const normalizedColorsToRemove = Array.from(new Set(colorsToRemove.map((color) => color.toLowerCase()))).filter((color) =>
+        palette.some((entry) => entry.color === color)
+      );
+      if (normalizedColorsToRemove.length === 0) {
+        setStatusText('削除対象の色はパレットにありません', 'warning');
+        return false;
+      }
+
+      const usedPixelCount = normalizedColorsToRemove.reduce(
+        (total, color) => total + (paletteUsageByColor[color]?.count ?? 0),
+        0
+      );
+      if (usedPixelCount > 0) {
+        setPaletteRemovalRequest({
+          colors: normalizedColorsToRemove,
+          usedPixelCount
+        });
+        return false;
+      }
+
+      return removePaletteColorsInternal(normalizedColorsToRemove, false);
+    },
+    [palette, paletteUsageByColor, removePaletteColorsInternal, setStatusText]
+  );
+
+  const mergePaletteColors = useCallback(
+    (selectedColors: string[], destinationColor: string): boolean => {
+      const mergeResult = mergePaletteColorsIntoDestination({
+        palette,
+        pixels,
+        selectedColors,
+        destinationColor,
+        currentSelectedColor: selectedColor
+      });
+      if (!mergeResult) {
+        setStatusText('統合できる色の組み合わせを選んでください', 'warning');
+        return false;
+      }
+
+      pushUndo();
+      setPalette(mergeResult.nextPalette);
+      setPixels(mergeResult.nextPixels);
+      setSelectedColor(mergeResult.nextSelectedColor);
+      setHasUnsavedChanges(true);
+      const mergeStatusParts = [
+        `${mergeResult.mergedColorCount}色`,
+        `削除 ${mergeResult.removedColorCount}`,
+      ];
+      if (mergeResult.preservedLockedColorCount > 0) {
+        mergeStatusParts.push(`保持 ${mergeResult.preservedLockedColorCount}`);
+      }
+      mergeStatusParts.push(`置換 ${mergeResult.replacedPixelCount.toLocaleString()}px`);
+      setStatusText(
+        `パレット色を統合しました: ${mergeStatusParts.join(' / ')} -> ${mergeResult.nextSelectedColor.toUpperCase()}`,
+        'success'
+      );
+      return true;
+    },
+    [palette, pixels, pushUndo, selectedColor, setHasUnsavedChanges, setPalette, setPixels, setSelectedColor, setStatusText]
+  );
 
   const applySelectedColorChange = useCallback(
     ({ color: nextColor, caption: nextCaption, locked: nextLocked }: PaletteEntry) => {
@@ -330,8 +403,8 @@ export function usePaletteManagement({
     if (!paletteRemovalRequest) {
       return;
     }
-    removePaletteColor(paletteRemovalRequest.color, true);
-  }, [paletteRemovalRequest, removePaletteColor]);
+    void removePaletteColorsInternal(paletteRemovalRequest.colors, true);
+  }, [paletteRemovalRequest, removePaletteColorsInternal]);
 
   const closePaletteRemovalModal = useCallback(() => {
     setPaletteRemovalRequest(null);
@@ -342,6 +415,8 @@ export function usePaletteManagement({
     syncPaletteAfterPaste,
     addPaletteColor,
     removeSelectedColorFromPalette,
+    removePaletteColors,
+    mergePaletteColors,
     applySelectedColorChange,
     importGplPalette,
     exportGplPalette,

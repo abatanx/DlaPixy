@@ -59,8 +59,20 @@ npm run dist
   - GPL import defaults imported entries to unlocked
 - Swatch panel usage overlay
   - While `Ctrl/Cmd` is held, each swatch shows current canvas usage count as an overlaid summarized label
-  - Clicking a swatch during that overlay mode scrolls the canvas to the first matching pixel (`for y` then `for x`) and sets a `1x1` selection there
+  - The selected swatch has a dedicated jump button that scrolls the canvas to the first matching pixel (`for y` then `for x`) and sets a `1x1` selection there
   - Removing a swatch that is still used opens a confirmation modal; confirming clears all matching canvas pixels to transparent before removing the swatch
+- Palette colors can be merged inline from the swatch panel
+  - `Cmd/Ctrl + click` toggles multi-selection on palette swatches
+  - If one swatch is already selected normally, the first `Cmd/Ctrl + click` seeds the merge selection with both that selected swatch and the clicked swatch
+  - When 2 or more swatches are selected, a Bootstrap-style merge bar appears above the workspace canvas column without pushing the swatch grid down
+  - If merge selection falls back below 2 swatches, the inline merge state is cleared and the palette returns to normal single-selection behavior
+  - The merge bar lets the user choose which selected swatch remains as the destination color
+  - The current destination swatch is also marked with a `残` badge inside the workspace merge bar
+  - Each selected swatch chip in the workspace merge bar has its own `×` button to remove it from merge selection
+  - The merge bar also has a `Delete` action that removes all selected swatches with the same clear-if-used behavior as the palette trash button
+  - Adding another merge source swatch does not move the current destination; the destination changes only when the user explicitly picks another one in the merge bar
+  - Applying the merge replaces matching canvas pixels and removes the other selected swatches in one undoable operation
+  - Selected swatches that are `locked` stay in the palette even if their usage becomes `0px` after merge
 - Palette sync behavior is now driven by shared helper logic
   - K-Means sync uses reusable `removeUnusedColors` / `addUsedColors` options
   - PNG load merges metadata palette entries with actually used canvas colors
@@ -357,6 +369,8 @@ Current metadata shape:
 - `src/editor/palette-sync.ts`
   - Shared palette usage analysis + swatch synchronization helpers
   - Owns summarized usage labels and first-match jump target selection data
+- `src/editor/palette-merge.ts`
+  - Pure helper for collapsing multiple palette colors into one destination color across both palette entries and canvas pixels
 - `src/editor/preview.ts`
   - Renderer preview helpers for region/block PNG Data URLs
 - `src/editor/types.ts`
@@ -469,7 +483,7 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/42
 - #46 `feat: パレットの並び替えと削除を追加する`
   - https://github.com/abatanx/DlaPixy/issues/46
-- #47 `feat: パレット色統合機能を追加する`
+- #47 `feat: パレットで複数スウォッチを選択して1色へ統合するUIを追加する`
   - https://github.com/abatanx/DlaPixy/issues/47
 - #48 `release: App Store 登録とサブスク関連ロジックを整備する`
   - https://github.com/abatanx/DlaPixy/issues/48
@@ -499,7 +513,7 @@ Current metadata shape:
   - Lock / unlock is controlled from the palette color modal.
   - Each swatch should also expose how many canvas pixels currently use that color.
   - The swatch panel should show that usage count only while `Ctrl/Cmd` is held, as a text overlay on the swatch.
-  - Clicking a swatch while the usage-count overlay is visible should auto-move the canvas viewport to the center of a pixel using that swatch color and set a `1x1` rectangular selection there.
+  - The currently selected swatch should expose a dedicated jump action that auto-moves the canvas viewport to the center of a pixel using that swatch color and sets a `1x1` rectangular selection there.
   - If multiple pixels use the same swatch color, the jump target should be the first pixel found by scanning in `for y in 0..` then `for x in 0..` order.
   - The usage count display should be summarized as:
     - `0..999`: show the exact number as-is

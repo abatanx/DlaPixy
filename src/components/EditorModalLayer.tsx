@@ -92,6 +92,9 @@ export function EditorModalLayer({
   paletteRemovalModal,
   onValidationError
 }: EditorModalLayerProps) {
+  const removalColors = paletteRemovalModal.request?.colors ?? [];
+  const isBulkPaletteRemoval = removalColors.length > 1;
+
   return (
     <>
       <div className={`status-toast ${toast.isVisible ? 'show' : ''} ${toast.type}`} role="status" aria-live="polite">
@@ -145,14 +148,29 @@ export function EditorModalLayer({
         onConfirm={paletteRemovalModal.onConfirm}
         onClose={paletteRemovalModal.onClose}
       >
-        <p className="mb-2">
-          <span className="font-monospace">{paletteRemovalModal.request?.color.toUpperCase() ?? '-'}</span>
-          {' '}はキャンバス上で{' '}
-          <strong>{paletteRemovalModal.request?.usedPixelCount.toLocaleString() ?? '0'} px</strong>
-          {' '}使用されています。
-        </p>
+        {isBulkPaletteRemoval ? (
+          <>
+            <p className="mb-2">
+              選択中の <strong>{removalColors.length}色</strong> はキャンバス上で{' '}
+              <strong>{paletteRemovalModal.request?.usedPixelCount.toLocaleString() ?? '0'} px</strong>
+              {' '}使用されています。
+            </p>
+            <p className="mb-2 font-monospace small text-break">
+              {removalColors.map((color) => color.toUpperCase()).join(', ')}
+            </p>
+          </>
+        ) : (
+          <p className="mb-2">
+            <span className="font-monospace">{removalColors[0]?.toUpperCase() ?? '-'}</span>
+            {' '}はキャンバス上で{' '}
+            <strong>{paletteRemovalModal.request?.usedPixelCount.toLocaleString() ?? '0'} px</strong>
+            {' '}使用されています。
+          </p>
+        )}
         <p className="mb-0 text-body-secondary">
-          この色を削除すると、該当するピクセルはすべて透明になります。続けてよければ削除してください。
+          {isBulkPaletteRemoval
+            ? 'これらの色を削除すると、該当するピクセルはすべて透明になります。続けてよければ削除してください。'
+            : 'この色を削除すると、該当するピクセルはすべて透明になります。続けてよければ削除してください。'}
         </p>
       </ConfirmModal>
     </>
