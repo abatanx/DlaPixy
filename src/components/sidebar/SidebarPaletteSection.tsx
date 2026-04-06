@@ -164,6 +164,11 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
         const nextMergeSelection = isSelectedForMerge
           ? mergeSelectionBase.filter((color) => color !== nextColor)
           : [...mergeSelectionBase, nextColor];
+        if (nextMergeSelection.length < 2) {
+          clearPaletteMergeSelection();
+          setSelectedColor(nextColor);
+          return;
+        }
         setPaletteMergeSelection(nextMergeSelection);
         setPaletteMergeDestinationColor(resolvePaletteMergeDestination(nextMergeSelection));
         setSelectedColor(nextColor);
@@ -249,6 +254,13 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
 
   useEffect(() => {
     const nextMergeSelection = paletteMergeSelection.filter((color) => palette.some((entry) => entry.color === color));
+    if (nextMergeSelection.length < 2) {
+      if (paletteMergeSelection.length > 0 || paletteMergeDestinationColor !== null) {
+        clearPaletteMergeSelection();
+      }
+      return;
+    }
+
     if (nextMergeSelection.length !== paletteMergeSelection.length) {
       setPaletteMergeSelection(nextMergeSelection);
     }

@@ -65,6 +65,7 @@ npm run dist
   - `Cmd/Ctrl + click` toggles multi-selection on palette swatches
   - If one swatch is already selected normally, the first `Cmd/Ctrl + click` seeds the merge selection with both that selected swatch and the clicked swatch
   - When 2 or more swatches are selected, an inline merge bar appears under the palette controls
+  - If merge selection falls back below 2 swatches, the inline merge state is cleared and the palette returns to normal single-selection behavior
   - The merge bar lets the user choose which selected swatch remains as the destination color
   - Adding another merge source swatch does not move the current destination; the destination changes only when the user explicitly picks another one in the merge bar
   - Applying the merge replaces matching canvas pixels and removes the other selected swatches in one undoable operation
