@@ -6,6 +6,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import type { GplExportFormat } from '../../shared/palette-gpl';
 import { getFileNameFromPath, hasSamePaletteEntries, replaceFileExtension, resolveNextSelectedColor } from '../editor/app-utils';
+import { mergePaletteColorsIntoDestination } from '../editor/palette-merge';
 import { syncPaletteEntriesFromPixels, type PaletteUsageEntry } from '../editor/palette-sync';
 import type { PaletteEntry } from '../editor/types';
 import { clonePaletteEntries, clonePixels, hexToRgba, normalizePaletteEntries } from '../editor/utils';
@@ -152,6 +153,42 @@ export function usePaletteManagement({
 
     removePaletteColor(selectedColor, false);
   }, [palette, paletteUsageByColor, removePaletteColor, selectedColor, setStatusText]);
+
+  const mergePaletteColors = useCallback(
+    (selectedColors: string[], destinationColor: string): boolean => {
+      const mergeResult = mergePaletteColorsIntoDestination({
+        palette,
+        pixels,
+        selectedColors,
+        destinationColor,
+        currentSelectedColor: selectedColor
+      });
+      if (!mergeResult) {
+        setStatusText('統合できる色の組み合わせを選んでください', 'warning');
+        return false;
+      }
+
+      pushUndo();
+      setPalette(mergeResult.nextPalette);
+      setPixels(mergeResult.nextPixels);
+      setSelectedColor(mergeResult.nextSelectedColor);
+      setHasUnsavedChanges(true);
+      const mergeStatusParts = [
+        `${mergeResult.mergedColorCount}色`,
+        `削除 ${mergeResult.removedColorCount}`,
+      ];
+      if (mergeResult.preservedLockedColorCount > 0) {
+        mergeStatusParts.push(`保持 ${mergeResult.preservedLockedColorCount}`);
+      }
+      mergeStatusParts.push(`置換 ${mergeResult.replacedPixelCount.toLocaleString()}px`);
+      setStatusText(
+        `パレット色を統合しました: ${mergeStatusParts.join(' / ')} -> ${mergeResult.nextSelectedColor.toUpperCase()}`,
+        'success'
+      );
+      return true;
+    },
+    [palette, pixels, pushUndo, selectedColor, setHasUnsavedChanges, setPalette, setPixels, setSelectedColor, setStatusText]
+  );
 
   const applySelectedColorChange = useCallback(
     ({ color: nextColor, caption: nextCaption, locked: nextLocked }: PaletteEntry) => {
@@ -342,6 +379,7 @@ export function usePaletteManagement({
     syncPaletteAfterPaste,
     addPaletteColor,
     removeSelectedColorFromPalette,
+    mergePaletteColors,
     applySelectedColorChange,
     importGplPalette,
     exportGplPalette,

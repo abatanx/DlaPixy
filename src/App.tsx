@@ -210,6 +210,7 @@ export function App() {
     paletteRemovalRequest,
     addPaletteColor,
     removeSelectedColorFromPalette,
+    mergePaletteColors,
     applySelectedColorChange,
     importGplPalette,
     exportGplPalette,
@@ -522,6 +523,7 @@ export function App() {
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
+            mergePaletteColors={mergePaletteColors}
             jumpToPaletteUsage={jumpToPaletteUsage}
             paletteColorModalRequest={paletteColorModalRequest}
           />

@@ -46,6 +46,7 @@ export const EditorSidebar = memo(function EditorSidebar({
   setHoveredPaletteColor,
   addPaletteColor,
   removeSelectedColorFromPalette,
+  mergePaletteColors,
   jumpToPaletteUsage,
   paletteColorModalRequest
 }: EditorSidebarProps) {
@@ -97,6 +98,7 @@ export const EditorSidebar = memo(function EditorSidebar({
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
+            mergePaletteColors={mergePaletteColors}
             jumpToPaletteUsage={jumpToPaletteUsage}
             paletteColorModalRequest={paletteColorModalRequest}
           />
