@@ -68,6 +68,49 @@ body {
   padding: 0.9rem;
 }
 
+.editor-workspace-column,
+.editor-workspace {
+  min-height: 0;
+}
+
+.editor-palette-merge-card {
+  flex: 0 0 auto;
+  border-color: rgba(191, 219, 254, 0.85);
+  background:
+    linear-gradient(135deg, rgba(239, 246, 255, 0.92), rgba(248, 250, 252, 0.98)),
+    #ffffff;
+}
+
+.editor-palette-merge-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.8rem 0.95rem;
+}
+
+.editor-palette-merge-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.editor-palette-merge-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.editor-palette-merge-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+
 .canvas-stage {
   --floating-stage-padding: 0.5rem;
   overflow: auto;
@@ -981,9 +1024,9 @@ body {
 .sidebar-palette-merge-destination {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.15rem;
   max-width: 100%;
-  padding: 0.22rem 0.42rem;
+  padding: 0.16rem 0.18rem 0.16rem 0.36rem;
   border: 1px solid #bfdbfe;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.88);
@@ -1002,6 +1045,38 @@ body {
   background: rgba(219, 234, 254, 0.98);
   color: #1e3a8a;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14);
+}
+
+.sidebar-palette-merge-destination-select {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.sidebar-palette-merge-destination-remove {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.sidebar-palette-merge-destination-remove:hover,
+.sidebar-palette-merge-destination-remove:focus-visible {
+  background: rgba(148, 163, 184, 0.16);
+  opacity: 1;
 }
 
 .sidebar-palette-merge-destination-swatch {
@@ -1027,10 +1102,43 @@ body {
   text-overflow: ellipsis;
 }
 
+.sidebar-palette-merge-destination-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.9rem;
+  height: 0.9rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: rgba(153, 27, 27, 0.88);
+  color: #fef2f2;
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .sidebar-palette-merge-actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.4rem;
+}
+
+.editor-palette-merge-action-btn {
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.editor-palette-merge-action-btn-labeled {
+  width: auto;
+  padding: 0 0.6rem;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .palette-grid-wrap {

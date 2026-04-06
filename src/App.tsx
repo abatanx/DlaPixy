@@ -6,6 +6,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { EditorCanvasWorkspace } from './components/EditorCanvasWorkspace';
 import { EditorModalLayer } from './components/EditorModalLayer';
+import { EditorPaletteMergeBar } from './components/EditorPaletteMergeBar';
 import { EditorSidebar } from './components/EditorSidebar';
 import { EditorStatusFooter } from './components/EditorStatusFooter';
 import type { PaletteColorModalRequest } from './components/sidebar/types';
@@ -17,6 +18,7 @@ import { useDocumentFileActions } from './hooks/useDocumentFileActions';
 import { useEditorShellUi } from './hooks/useEditorShellUi';
 import { useFloatingSelectionState } from './hooks/useFloatingSelectionState';
 import { usePaletteManagement } from './hooks/usePaletteManagement';
+import { usePaletteMergeSelection } from './hooks/usePaletteMergeSelection';
 import { useEditorPreviews } from './hooks/useEditorPreviews';
 import { useSelectionOperations } from './hooks/useSelectionOperations';
 import { useSelectionOverlay } from './hooks/useSelectionOverlay';
@@ -210,6 +212,7 @@ export function App() {
     paletteRemovalRequest,
     addPaletteColor,
     removeSelectedColorFromPalette,
+    removePaletteColors,
     mergePaletteColors,
     applySelectedColorChange,
     importGplPalette,
@@ -230,6 +233,19 @@ export function App() {
     setPixels,
     setHasUnsavedChanges,
     setStatusText
+  });
+  const {
+    paletteMergeSelection,
+    paletteMergeDestinationColor,
+    showPaletteMergeUi,
+    clearPaletteMergeSelection,
+    togglePaletteMergeColor,
+    selectPaletteMergeDestination,
+    removePaletteMergeColor
+  } = usePaletteMergeSelection({
+    palette,
+    selectedColor,
+    setSelectedColor
   });
 
   const {
@@ -523,59 +539,76 @@ export function App() {
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
-            mergePaletteColors={mergePaletteColors}
             jumpToPaletteUsage={jumpToPaletteUsage}
+            paletteMergeSelection={paletteMergeSelection}
+            paletteMergeDestinationColor={paletteMergeDestinationColor}
+            togglePaletteMergeColor={togglePaletteMergeColor}
+            clearPaletteMergeSelection={clearPaletteMergeSelection}
             paletteColorModalRequest={paletteColorModalRequest}
           />
-
-          <EditorCanvasWorkspace
-            canvasStageRef={canvasStageRef}
-            canvasRef={canvasRef}
-            displaySize={displaySize}
-            floatingStagePaddingPx={FLOATING_STAGE_PADDING_PX}
-            transparentBackgroundClassName={transparentBackgroundClassName}
-            isPanning={isPanning}
-            isSpacePressed={isSpacePressed}
-            onCanvasStageMouseDown={onCanvasStageMouseDown}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onMouseLeaveCanvas={onMouseLeaveCanvas}
-            selectionOverlaySelection={selectionOverlaySelection}
-            selectionOverlayBaseStyle={selectionOverlayBaseStyle}
-            isFloatingPasteActive={isFloatingPasteActive}
-            floatingCompositeMode={floatingCompositeMode}
-            setFloatingCompositeMode={setFloatingCompositeMode}
-            zoom={zoom}
-            floatingHandleOrder={FLOATING_HANDLE_ORDER}
-            getFloatingHandleStyle={getFloatingHandleStyle}
-            onFloatingOverlayMouseDown={onFloatingOverlayMouseDown}
-            hoveredPixelInfo={hoveredPixelInfo}
-            getPixelInfoFields={getPixelInfoFields}
-            referencePixelInfos={referencePixelInfos}
-            clearReferencePixelInfos={clearReferencePixelInfos}
-            syncReferencePixelInfo={syncReferencePixelInfo}
-            getReferenceKey={getReferenceKey}
-            draggingReferenceKey={draggingReferenceKey}
-            onReferenceDragStart={onReferenceDragStart}
-            onReferenceDragEnd={onReferenceDragEnd}
-            onReferenceDragOver={onReferenceDragOver}
-            onReferenceDrop={onReferenceDrop}
-            openReferencePaletteColorModal={openReferencePaletteColorModal}
-            copyPixelField={copyPixelField}
-            removeReferencePixelInfo={removeReferencePixelInfo}
-            tool={tool}
-            setTool={setTool}
-            hasCommittedSelection={hasCommittedSelection}
-            addAnimationFrame={addAnimationFrame}
-            openSelectionRotateModal={openSelectionRotateModal}
-            zoomIn={zoomIn}
-            zoomOut={zoomOut}
-            doUndo={doUndo}
-            copySelection={copySelection}
-            pasteSelection={pasteSelection}
-            deleteSelection={deleteSelection}
-          />
+          <div className="col-12 col-lg-8 col-xl-9 d-flex flex-column gap-3 editor-workspace-column">
+            {showPaletteMergeUi ? (
+              <EditorPaletteMergeBar
+                palette={palette}
+                paletteUsageByColor={paletteUsage.byColor}
+                paletteMergeSelection={paletteMergeSelection}
+                paletteMergeDestinationColor={paletteMergeDestinationColor}
+                selectPaletteMergeDestination={selectPaletteMergeDestination}
+                removePaletteMergeColor={removePaletteMergeColor}
+                clearPaletteMergeSelection={clearPaletteMergeSelection}
+                removePaletteColors={removePaletteColors}
+                mergePaletteColors={mergePaletteColors}
+              />
+            ) : null}
+            <EditorCanvasWorkspace
+              canvasStageRef={canvasStageRef}
+              canvasRef={canvasRef}
+              displaySize={displaySize}
+              floatingStagePaddingPx={FLOATING_STAGE_PADDING_PX}
+              transparentBackgroundClassName={transparentBackgroundClassName}
+              isPanning={isPanning}
+              isSpacePressed={isSpacePressed}
+              onCanvasStageMouseDown={onCanvasStageMouseDown}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeaveCanvas={onMouseLeaveCanvas}
+              selectionOverlaySelection={selectionOverlaySelection}
+              selectionOverlayBaseStyle={selectionOverlayBaseStyle}
+              isFloatingPasteActive={isFloatingPasteActive}
+              floatingCompositeMode={floatingCompositeMode}
+              setFloatingCompositeMode={setFloatingCompositeMode}
+              zoom={zoom}
+              floatingHandleOrder={FLOATING_HANDLE_ORDER}
+              getFloatingHandleStyle={getFloatingHandleStyle}
+              onFloatingOverlayMouseDown={onFloatingOverlayMouseDown}
+              hoveredPixelInfo={hoveredPixelInfo}
+              getPixelInfoFields={getPixelInfoFields}
+              referencePixelInfos={referencePixelInfos}
+              clearReferencePixelInfos={clearReferencePixelInfos}
+              syncReferencePixelInfo={syncReferencePixelInfo}
+              getReferenceKey={getReferenceKey}
+              draggingReferenceKey={draggingReferenceKey}
+              onReferenceDragStart={onReferenceDragStart}
+              onReferenceDragEnd={onReferenceDragEnd}
+              onReferenceDragOver={onReferenceDragOver}
+              onReferenceDrop={onReferenceDrop}
+              openReferencePaletteColorModal={openReferencePaletteColorModal}
+              copyPixelField={copyPixelField}
+              removeReferencePixelInfo={removeReferencePixelInfo}
+              tool={tool}
+              setTool={setTool}
+              hasCommittedSelection={hasCommittedSelection}
+              addAnimationFrame={addAnimationFrame}
+              openSelectionRotateModal={openSelectionRotateModal}
+              zoomIn={zoomIn}
+              zoomOut={zoomOut}
+              doUndo={doUndo}
+              copySelection={copySelection}
+              pasteSelection={pasteSelection}
+              deleteSelection={deleteSelection}
+            />
+          </div>
         </div>
         <EditorModalLayer
           toast={{

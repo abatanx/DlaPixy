@@ -19,8 +19,11 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   setHoveredPaletteColor,
   addPaletteColor,
   removeSelectedColorFromPalette,
-  mergePaletteColors,
   jumpToPaletteUsage,
+  paletteMergeSelection,
+  paletteMergeDestinationColor,
+  togglePaletteMergeColor,
+  clearPaletteMergeSelection,
   paletteColorModalRequest
 }: SidebarPaletteSectionProps) {
   const selectedPaletteEntry = useMemo(
@@ -36,80 +39,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     locked: false
   });
   const [isUsageModifierPressed, setIsUsageModifierPressed] = useState<boolean>(false);
-  const [paletteMergeSelection, setPaletteMergeSelection] = useState<string[]>([]);
-  const [paletteMergeDestinationColor, setPaletteMergeDestinationColor] = useState<string | null>(null);
-
-  const clearPaletteMergeSelection = useCallback(() => {
-    setPaletteMergeSelection([]);
-    setPaletteMergeDestinationColor(null);
-  }, []);
-
-  const resolvePaletteMergeDestination = useCallback(
-    (nextColors: string[], preferredColor?: string | null) => {
-      if (nextColors.length === 0) {
-        return null;
-      }
-
-      const normalizedPreferredColor = preferredColor?.toLowerCase() ?? null;
-      if (normalizedPreferredColor && nextColors.includes(normalizedPreferredColor)) {
-        return normalizedPreferredColor;
-      }
-
-      if (paletteMergeDestinationColor && nextColors.includes(paletteMergeDestinationColor)) {
-        return paletteMergeDestinationColor;
-      }
-
-      const normalizedSelectedColor = selectedColor.toLowerCase();
-      if (nextColors.includes(normalizedSelectedColor)) {
-        return normalizedSelectedColor;
-      }
-
-      return nextColors[nextColors.length - 1] ?? nextColors[0] ?? null;
-    },
-    [paletteMergeDestinationColor, selectedColor]
-  );
-
-  const selectedPaletteMergeEntries = useMemo(
-    () => palette.filter((entry) => paletteMergeSelection.includes(entry.color)),
-    [palette, paletteMergeSelection]
-  );
   const showPaletteMergeUi = paletteMergeSelection.length >= 2;
-  const canApplyPaletteMerge =
-    paletteMergeSelection.length >= 2 &&
-    paletteMergeDestinationColor !== null &&
-    paletteMergeSelection.includes(paletteMergeDestinationColor);
-  const paletteMergeReplaceCount = useMemo(() => {
-    if (!paletteMergeDestinationColor) {
-      return 0;
-    }
-
-    return paletteMergeSelection.reduce((total, color) => {
-      if (color === paletteMergeDestinationColor) {
-        return total;
-      }
-      return total + (paletteUsageByColor[color]?.count ?? 0);
-    }, 0);
-  }, [paletteMergeDestinationColor, paletteMergeSelection, paletteUsageByColor]);
-  const paletteMergeRemovalCount = useMemo(
-    () =>
-      selectedPaletteMergeEntries.reduce((total, entry) => {
-        if (entry.color === paletteMergeDestinationColor || entry.locked) {
-          return total;
-        }
-        return total + 1;
-      }, 0),
-    [paletteMergeDestinationColor, selectedPaletteMergeEntries]
-  );
-  const paletteMergePreservedLockedCount = useMemo(
-    () =>
-      selectedPaletteMergeEntries.reduce((total, entry) => {
-        if (entry.color === paletteMergeDestinationColor || !entry.locked) {
-          return total;
-        }
-        return total + 1;
-      }, 0),
-    [paletteMergeDestinationColor, selectedPaletteMergeEntries]
-  );
 
   const openPaletteColorModal = useCallback((mode: 'edit' | 'create', entry: { color: string; caption: string; locked: boolean }) => {
     clearPaletteMergeSelection();
@@ -153,39 +83,14 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     (event: ReactMouseEvent<HTMLButtonElement>) => {
       const nextColor = (event.currentTarget.dataset.color ?? selectedColor).toLowerCase();
       if (event.metaKey || event.ctrlKey) {
-        const normalizedSelectedColor = selectedColor.toLowerCase();
-        const mergeSelectionBase =
-          paletteMergeSelection.length > 0
-            ? paletteMergeSelection
-            : isSelectedColorInPalette && normalizedSelectedColor !== nextColor
-              ? [normalizedSelectedColor]
-              : [];
-        const isSelectedForMerge = mergeSelectionBase.includes(nextColor);
-        const nextMergeSelection = isSelectedForMerge
-          ? mergeSelectionBase.filter((color) => color !== nextColor)
-          : [...mergeSelectionBase, nextColor];
-        if (nextMergeSelection.length < 2) {
-          clearPaletteMergeSelection();
-          setSelectedColor(nextColor);
-          return;
-        }
-        setPaletteMergeSelection(nextMergeSelection);
-        setPaletteMergeDestinationColor(resolvePaletteMergeDestination(nextMergeSelection));
-        setSelectedColor(nextColor);
+        togglePaletteMergeColor(nextColor);
         return;
       }
 
       clearPaletteMergeSelection();
       setSelectedColor(nextColor);
     },
-    [
-      clearPaletteMergeSelection,
-      isSelectedColorInPalette,
-      paletteMergeSelection,
-      resolvePaletteMergeDestination,
-      selectedColor,
-      setSelectedColor
-    ]
+    [clearPaletteMergeSelection, selectedColor, setSelectedColor, togglePaletteMergeColor]
   );
 
   const handlePaletteDoubleClick = useCallback(
@@ -225,21 +130,6 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     setHoveredPaletteColor(null);
   }, [setHoveredPaletteColor]);
 
-  const handlePaletteMergeDestinationSelect = useCallback((color: string) => {
-    setPaletteMergeDestinationColor(color.toLowerCase());
-    setSelectedColor(color.toLowerCase());
-  }, [setSelectedColor]);
-
-  const handlePaletteMergeApply = useCallback(() => {
-    if (!canApplyPaletteMerge || !paletteMergeDestinationColor) {
-      return;
-    }
-
-    if (mergePaletteColors(paletteMergeSelection, paletteMergeDestinationColor)) {
-      clearPaletteMergeSelection();
-    }
-  }, [canApplyPaletteMerge, clearPaletteMergeSelection, mergePaletteColors, paletteMergeDestinationColor, paletteMergeSelection]);
-
   const handleSelectedColorUsageJump = useCallback(() => {
     jumpToPaletteUsage(selectedColor);
   }, [jumpToPaletteUsage, selectedColor]);
@@ -251,25 +141,6 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     setSelectedColor(paletteColorModalRequest.entry.color);
     openPaletteColorModal(paletteColorModalRequest.mode, paletteColorModalRequest.entry);
   }, [openPaletteColorModal, paletteColorModalRequest, setSelectedColor]);
-
-  useEffect(() => {
-    const nextMergeSelection = paletteMergeSelection.filter((color) => palette.some((entry) => entry.color === color));
-    if (nextMergeSelection.length < 2) {
-      if (paletteMergeSelection.length > 0 || paletteMergeDestinationColor !== null) {
-        clearPaletteMergeSelection();
-      }
-      return;
-    }
-
-    if (nextMergeSelection.length !== paletteMergeSelection.length) {
-      setPaletteMergeSelection(nextMergeSelection);
-    }
-
-    const nextDestinationColor = resolvePaletteMergeDestination(nextMergeSelection);
-    if (nextDestinationColor !== paletteMergeDestinationColor) {
-      setPaletteMergeDestinationColor(nextDestinationColor);
-    }
-  }, [palette, paletteMergeDestinationColor, paletteMergeSelection, resolvePaletteMergeDestination]);
 
   useEffect(() => {
     const updateModifierState = (event: KeyboardEvent) => {
@@ -332,55 +203,6 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
           </button>
         ) : null}
       </div>
-      {showPaletteMergeUi ? (
-        <div className="sidebar-palette-merge-panel">
-          <div className="sidebar-palette-merge-header">
-            <span className="sidebar-palette-merge-title">{paletteMergeSelection.length}色 → 1色</span>
-            <span className="sidebar-palette-merge-summary">
-              削除 {paletteMergeRemovalCount}
-              {paletteMergePreservedLockedCount > 0 ? ` / 保持 ${paletteMergePreservedLockedCount}` : ''}
-              {` / 置換 ${paletteMergeReplaceCount.toLocaleString()}px`}
-            </span>
-          </div>
-          <div className="sidebar-palette-merge-destination-list" role="list" aria-label="merge destination colors">
-            {selectedPaletteMergeEntries.map((entry) => (
-              <button
-                key={`merge-destination-${entry.color}`}
-                type="button"
-                className={`sidebar-palette-merge-destination ${
-                  paletteMergeDestinationColor === entry.color ? 'active' : ''
-                }`}
-                onClick={() => handlePaletteMergeDestinationSelect(entry.color)}
-                aria-pressed={paletteMergeDestinationColor === entry.color}
-                title={`統合先にする: ${entry.color.toUpperCase()}`}
-              >
-                <span className="sidebar-palette-merge-destination-swatch" aria-hidden="true">
-                  <span
-                    className="sidebar-palette-merge-destination-swatch-fill"
-                    style={{ backgroundColor: entry.color }}
-                  />
-                </span>
-                <span className="sidebar-palette-merge-destination-label">
-                  {entry.color.toUpperCase()}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="sidebar-palette-merge-actions">
-            <button
-              type="button"
-              className="btn btn-sm btn-danger"
-              onClick={handlePaletteMergeApply}
-              disabled={!canApplyPaletteMerge}
-            >
-              統合
-            </button>
-            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearPaletteMergeSelection}>
-              キャンセル
-            </button>
-          </div>
-        </div>
-      ) : null}
       <div className="palette-grid-wrap flex-grow-1">
         <div className="palette-grid" role="list" aria-label="palette colors">
           {palette.map((entry, index) => (

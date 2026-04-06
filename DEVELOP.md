@@ -64,9 +64,12 @@ npm run dist
 - Palette colors can be merged inline from the swatch panel
   - `Cmd/Ctrl + click` toggles multi-selection on palette swatches
   - If one swatch is already selected normally, the first `Cmd/Ctrl + click` seeds the merge selection with both that selected swatch and the clicked swatch
-  - When 2 or more swatches are selected, an inline merge bar appears under the palette controls
+  - When 2 or more swatches are selected, a Bootstrap-style merge bar appears above the workspace canvas column without pushing the swatch grid down
   - If merge selection falls back below 2 swatches, the inline merge state is cleared and the palette returns to normal single-selection behavior
   - The merge bar lets the user choose which selected swatch remains as the destination color
+  - The current destination swatch is also marked with a `残` badge inside the workspace merge bar
+  - Each selected swatch chip in the workspace merge bar has its own `×` button to remove it from merge selection
+  - The merge bar also has a `Delete` action that removes all selected swatches with the same clear-if-used behavior as the palette trash button
   - Adding another merge source swatch does not move the current destination; the destination changes only when the user explicitly picks another one in the merge bar
   - Applying the merge replaces matching canvas pixels and removes the other selected swatches in one undoable operation
   - Selected swatches that are `locked` stay in the palette even if their usage becomes `0px` after merge

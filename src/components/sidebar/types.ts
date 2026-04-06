@@ -53,8 +53,11 @@ export type EditorSidebarProps = {
   setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
   addPaletteColor: (value: PaletteEntry) => void;
   removeSelectedColorFromPalette: () => void;
-  mergePaletteColors: (selectedColors: string[], destinationColor: string) => boolean;
   jumpToPaletteUsage: (color: string) => boolean;
+  paletteMergeSelection: string[];
+  paletteMergeDestinationColor: string | null;
+  togglePaletteMergeColor: (color: string) => void;
+  clearPaletteMergeSelection: () => void;
   paletteColorModalRequest: PaletteColorModalRequest;
 };
 
@@ -101,7 +104,10 @@ export type SidebarPaletteSectionProps = Pick<
   | 'setHoveredPaletteColor'
   | 'addPaletteColor'
   | 'removeSelectedColorFromPalette'
-  | 'mergePaletteColors'
   | 'jumpToPaletteUsage'
+  | 'paletteMergeSelection'
+  | 'paletteMergeDestinationColor'
+  | 'togglePaletteMergeColor'
+  | 'clearPaletteMergeSelection'
   | 'paletteColorModalRequest'
 >;
