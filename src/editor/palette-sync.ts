@@ -3,7 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { normalizePaletteEntries, type PaletteEntry } from '../../shared/palette';
+import { generatePaletteEntryId, normalizePaletteEntries, type PaletteEntry } from '../../shared/palette';
 import { rgbaToHex8 } from './utils';
 
 export type PaletteUsageEntry = {
@@ -91,6 +91,7 @@ export function syncPaletteEntriesWithUsage(
     }
     seenColors.add(color);
     nextPalette.push({
+      id: generatePaletteEntryId(),
       color,
       caption: '',
       locked: false

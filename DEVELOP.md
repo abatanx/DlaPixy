@@ -481,7 +481,7 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/33
 - #42 `refactor: スウォッチ整理処理を共通化する`
   - https://github.com/abatanx/DlaPixy/issues/42
-- #46 `feat: パレットの並び替えと削除を追加する`
+- #46 `feat: パレットの並び順モードを追加する（手動並び替え / 自動ソート）`
   - https://github.com/abatanx/DlaPixy/issues/46
 - #47 `feat: パレットで複数スウォッチを選択して1色へ統合するUIを追加する`
   - https://github.com/abatanx/DlaPixy/issues/47
@@ -495,6 +495,8 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/51
 - #52 `spec: canvas-selection-overlay 上で合成モード（置換 / ブレンド）を切り替え、editor メタへ保存できるようにする`
   - https://github.com/abatanx/DlaPixy/issues/52
+- #56 `refactor: パレットスウォッチに安定IDを導入する`
+  - https://github.com/abatanx/DlaPixy/issues/56
 
 ## 13. Issue #42 Draft Notes (2026-03-24)
 - Goal:
@@ -609,3 +611,141 @@ Current metadata shape:
   - Clicking the toggle does not start move or resize.
   - Finalized result matches the last previewed mode.
   - Saving writes `editor.floatingCompositeMode` to sidecar and loading restores it.
+
+## 15. Issue #46 Spec Notes (2026-04-06)
+- Goal:
+  - Add two palette order modes:
+    - manual reorder mode that persists through sidecar save/load
+    - automatic sort mode used only for on-screen display
+  - Let the user switch these modes from a new palette-side tab.
+- Prerequisite:
+  - Complete `#56 refactor: パレットスウォッチに安定IDを導入する` first.
+  - The palette order mode work should assume stable swatch identity is already available.
+- Current implementation anchors:
+  - `src/components/sidebar/SidebarPaletteSection.tsx`
+    - currently renders the palette grid and owns select / edit / add / remove interactions
+  - `src/hooks/usePaletteManagement.ts`
+    - owns add / edit / remove / merge flows plus undo / dirty / toast updates
+  - `shared/sidecar.ts`, `src/hooks/useDocumentFileActions.ts`
+    - currently persist `document.palette.entries` and existing editor UI state
+  - Existing drag-and-drop examples:
+    - `src/hooks/usePixelReferences.ts`
+    - `src/components/sidebar/SidebarPreviewSection.tsx`
+- Decisions to keep implementation stable:
+  - Treat `palette` state as the canonical manual order at all times.
+  - Saving always writes the canonical manual order to `document.palette.entries`.
+  - Loading restores that manual order.
+  - Automatic sort is a derived display-only view and is not saved in sidecar metadata.
+  - After `New` / `Open`, the palette order mode returns to manual.
+  - The existing palette `+` add button stays fixed and out of manual reorder scope.
+  - Manual reorder changes only palette order.
+    - Do not change canvas pixels, `caption`, `locked`, or usage values.
+  - Keep `selectedColor` selected even when its swatch moves or the display mode changes.
+  - Manual reorder is one undoable action and marks the document dirty.
+  - View-only mode switches and auto-sort-key changes do not enter undo history.
+  - Keep current delete flows:
+    - unused colors can be removed immediately
+    - used colors require confirmation and clear matching pixels to transparent
+    - merge UI keeps its current multi-delete path
+  - Disable manual drag-and-drop while palette merge UI is active.
+- Display model:
+  - Manual mode:
+    - `displayPalette === palette`
+  - Auto mode:
+    - `displayPalette = sortPaletteEntries(palette, autoSortKey)`
+  - Existing write paths (add / edit / delete / merge / PNG load / K-Means sync) keep mutating the canonical `palette`.
+  - Auto mode only recomputes the displayed order from that canonical palette.
+- Identity / index handling:
+  - Use `PaletteEntry.id` as the stable swatch identity after `#56`.
+  - Avoid treating raw array index as a durable identifier across order modes.
+  - Hover / reference UI that needs a palette index should resolve it from the current `displayPalette`, while tracking the swatch itself by `id`.
+- Auto-sort keys for the first version:
+  - `Hue`
+    - hue ascending, with near-achromatic colors pushed later
+  - `Saturation`
+    - higher first
+  - `Value`
+    - brighter first
+  - `Red`, `Green`, `Blue`
+    - higher channel first
+  - Final tie-breaker should be the canonical manual order to keep display stable.
+- UI direction:
+  - Add a new tab inside the palette card (name TBD, e.g. `Sort` / `Arrange`).
+  - Keep the existing palette grid in the palette tab.
+  - The new tab controls:
+    - manual vs auto mode
+    - auto sort key when auto mode is active
+  - In manual mode, enable drag-and-drop reorder on the palette grid.
+  - In auto mode, disable drag-and-drop and redraw the grid from the derived sort result.
+- Suggested implementation split:
+  1. Add non-persistent palette order UI state (`paletteOrderMode`, `paletteAutoSortKey`).
+  2. Add a shared `sortPaletteEntries(...)` helper in `src/editor/`.
+  3. Update `SidebarPaletteSection` to render tabs and use `displayPalette`.
+  4. Add manual DnD reorder handlers for the palette tab.
+  5. Replace index-based assumptions in hover / reference palette lookups with `id`-based identity plus display-index resolution.
+  6. Verify sidecar round-trip, mode reset on load, and undo scope.
+- Verification checklist:
+  - Manual drag-and-drop changes palette order and persists through save / reopen.
+  - Auto mode rearranges the visible swatches without changing saved order.
+  - Saving while auto mode is active still restores manual order after reopen.
+  - Switching back to manual shows the last canonical manual order.
+  - `selectedColor` survives mode switches and reorder.
+  - Hover / reference palette index output matches the current display order.
+  - Existing delete behavior remains unchanged.
+  - Manual reorder is undoable; mode/key switches are not.
+
+## 16. Issue #56 Spec Notes (2026-04-06)
+- Goal:
+  - Introduce stable swatch identity before palette order modes land in `#46`.
+- Current implementation anchors:
+  - `shared/palette.ts`
+    - `PaletteEntry` currently has only `color`, `caption`, `locked`
+    - normalization currently deduplicates by `color`
+  - `src/components/sidebar/SidebarPaletteSection.tsx`
+    - palette interactions still lean on `color` and display index
+  - `src/hooks/usePixelReferences.ts`
+    - hovered palette state currently stores color plus index
+  - `src/hooks/useDocumentFileActions.ts`, `shared/sidecar.ts`
+    - sidecar persists palette entries directly
+- Decisions to keep implementation stable:
+  - Add `id: string` to `PaletteEntry`.
+  - `id` is a hyphenated UUID-format string that identifies the swatch entity.
+  - Generate it with `crypto.randomUUID()` and avoid adding an extra dependency for ID generation.
+  - Validation does not need to enforce UUID version / variant bits strictly.
+  - `color` keeps its meaning for pixels / usage / replacement.
+  - Generate `id` for every new palette entry source:
+    - initial palette
+    - manual add
+    - palette sync add
+    - GPL import
+    - PNG / sidecar load construction for the new schema only
+  - Backward compatibility for older sidecars is not required.
+  - Treat this as a palette-metadata breaking change.
+  - It is acceptable to bump `SIDECAR_SCHEMA_VERSION`.
+  - If an older sidecar is opened, warning + PNG-only fallback is sufficient.
+  - Keep `id` stable across color edits for the same swatch.
+  - Keep the current no-duplicate-color assumption.
+  - Move UI identity-sensitive flows toward `id`:
+    - selection target
+    - hover target
+    - drag-and-drop target
+    - merge selection target
+  - Keep color-semantic flows on `color`:
+    - usage counts
+    - pixel replacement
+    - jump to first usage
+- Suggested implementation split:
+  1. Expand `PaletteEntry` and normalization / clone helpers to include `id`.
+  2. Add palette entry ID generation helpers for all creation paths.
+  3. Update sidecar read/write to require the new shape.
+  4. Replace index-based UI assumptions with `id` plus display-index lookup where needed.
+  5. Verify #46 can build on stable swatch identity without extra migration work.
+- Verification checklist:
+  - Every palette entry in memory has a UUID-format `id`.
+  - Saving writes `id` values into sidecar palette entries.
+  - Editing a swatch color does not change its `id`.
+  - Palette UI flows no longer depend on raw index as durable identity.
+- Implementation memo:
+  - `SIDECAR_SCHEMA_VERSION` was bumped to `2`, and sidecar palette entries now require UUID-format `id`.
+  - Palette hover / reference lines and merge-selection UI now track swatches by `id`, resolving display index only when needed.
+  - Color-semantic operations such as usage counts, pixel replacement, delete, and merge execution still resolve through `color`.

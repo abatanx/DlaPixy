@@ -16,7 +16,7 @@ type PaletteColorModalProps = {
   transparentBackgroundMode: TransparentBackgroundMode;
   selectedPalette: PaletteEntry;
   palette: PaletteEntry[];
-  paletteEditTarget?: string | null;
+  paletteEditTargetId?: string | null;
   onApply: (value: PaletteEntry) => void;
   onClose: () => void;
 };
@@ -124,7 +124,7 @@ export function PaletteColorModal({
   transparentBackgroundMode,
   selectedPalette,
   palette,
-  paletteEditTarget = selectedPalette.color,
+  paletteEditTargetId = selectedPalette.id,
   onApply,
   onClose
 }: PaletteColorModalProps) {
@@ -298,8 +298,7 @@ export function PaletteColorModal({
       : null;
   const hasDuplicatePaletteColor =
     normalizedPendingColor !== null &&
-    normalizedPendingColor !== paletteEditTarget &&
-    palette.some((entry) => entry.color === normalizedPendingColor);
+    palette.some((entry) => entry.color === normalizedPendingColor && entry.id !== paletteEditTargetId);
   const effectiveValidationMessage =
     validationMessage || (hasDuplicatePaletteColor ? 'パレットに同じ色がすでにあります' : '');
   const hasValidationError = effectiveValidationMessage.length > 0;
@@ -329,6 +328,7 @@ export function PaletteColorModal({
         return;
       }
       onApply({
+        id: selectedPalette.id,
         color: nextColor,
         caption: normalizePaletteCaption(pendingCaptionInput),
         locked: pendingLocked

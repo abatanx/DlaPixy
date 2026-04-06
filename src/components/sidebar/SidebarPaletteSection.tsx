@@ -5,7 +5,9 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
+import type { PaletteEntry } from '../../editor/types';
 import { formatPaletteUsageLabel } from '../../editor/palette-sync';
+import { generatePaletteEntryId } from '../../editor/utils';
 import { PaletteColorModal } from '../modals/PaletteColorModal';
 import type { SidebarPaletteSectionProps } from './types';
 
@@ -21,7 +23,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   removeSelectedColorFromPalette,
   jumpToPaletteUsage,
   paletteMergeSelection,
-  paletteMergeDestinationColor,
+  paletteMergeDestinationId,
   togglePaletteMergeColor,
   clearPaletteMergeSelection,
   paletteColorModalRequest
@@ -33,27 +35,32 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   const isSelectedColorInPalette = selectedPaletteEntry !== null;
   const [isPaletteColorModalOpen, setIsPaletteColorModalOpen] = useState<boolean>(false);
   const [paletteColorModalMode, setPaletteColorModalMode] = useState<'edit' | 'create'>('edit');
-  const [paletteColorModalInitial, setPaletteColorModalInitial] = useState({
+  const [paletteColorModalInitial, setPaletteColorModalInitial] = useState<PaletteEntry>(() => ({
+    id: generatePaletteEntryId(),
     color: selectedColor,
     caption: '',
     locked: false
-  });
+  }));
   const [isUsageModifierPressed, setIsUsageModifierPressed] = useState<boolean>(false);
   const showPaletteMergeUi = paletteMergeSelection.length >= 2;
 
-  const openPaletteColorModal = useCallback((mode: 'edit' | 'create', entry: { color: string; caption: string; locked: boolean }) => {
-    clearPaletteMergeSelection();
-    setPaletteColorModalMode(mode);
-    setPaletteColorModalInitial(entry);
-    setIsPaletteColorModalOpen(true);
-  }, [clearPaletteMergeSelection]);
+  const openPaletteColorModal = useCallback(
+    (mode: 'edit' | 'create', entry: PaletteEntry) => {
+      clearPaletteMergeSelection();
+      setPaletteColorModalMode(mode);
+      setPaletteColorModalInitial(entry);
+      setIsPaletteColorModalOpen(true);
+    },
+    [clearPaletteMergeSelection]
+  );
 
-  const openEditPaletteColorModal = useCallback((entry: { color: string; caption: string; locked: boolean }) => {
+  const openEditPaletteColorModal = useCallback((entry: PaletteEntry) => {
     openPaletteColorModal('edit', entry);
   }, [openPaletteColorModal]);
 
   const openSelectedColorEditPaletteColorModal = useCallback(() => {
     openEditPaletteColorModal({
+      id: selectedPaletteEntry?.id ?? generatePaletteEntryId(),
       color: selectedColor,
       caption: selectedPaletteEntry?.caption ?? '',
       locked: selectedPaletteEntry?.locked ?? false
@@ -62,6 +69,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
 
   const openCreatePaletteColorModal = useCallback(() => {
     openPaletteColorModal('create', {
+      id: generatePaletteEntryId(),
       color: selectedColor,
       caption: '',
       locked: false
@@ -69,7 +77,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   }, [openPaletteColorModal, selectedColor]);
 
   const handlePaletteColorModalApply = useCallback(
-    (nextEntry: { color: string; caption: string; locked: boolean }) => {
+    (nextEntry: PaletteEntry) => {
       if (paletteColorModalMode === 'create') {
         addPaletteColor(nextEntry);
         return;
@@ -82,15 +90,18 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   const handlePaletteClick = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
       const nextColor = (event.currentTarget.dataset.color ?? selectedColor).toLowerCase();
+      const nextPaletteEntry = palette.find((entry) => entry.color === nextColor) ?? null;
       if (event.metaKey || event.ctrlKey) {
-        togglePaletteMergeColor(nextColor);
+        if (nextPaletteEntry) {
+          togglePaletteMergeColor(nextPaletteEntry);
+        }
         return;
       }
 
       clearPaletteMergeSelection();
       setSelectedColor(nextColor);
     },
-    [clearPaletteMergeSelection, selectedColor, setSelectedColor, togglePaletteMergeColor]
+    [clearPaletteMergeSelection, palette, selectedColor, setSelectedColor, togglePaletteMergeColor]
   );
 
   const handlePaletteDoubleClick = useCallback(
@@ -98,13 +109,12 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
       if (event.metaKey || event.ctrlKey) {
         return;
       }
-      const { color, index } = event.currentTarget.dataset;
-      if (!color || index === undefined) {
+      const { id } = event.currentTarget.dataset;
+      if (!id) {
         return;
       }
 
-      const paletteIndex = Number.parseInt(index, 10);
-      const entry = palette[paletteIndex];
+      const entry = palette.find((candidate) => candidate.id === id);
       if (!entry) {
         return;
       }
@@ -117,11 +127,11 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
 
   const handlePaletteMouseEnter = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
-      const { color, index } = event.currentTarget.dataset;
-      if (!color || index === undefined) {
+      const { id } = event.currentTarget.dataset;
+      if (!id) {
         return;
       }
-      setHoveredPaletteColor({ hex: color, index: Number.parseInt(index, 10) });
+      setHoveredPaletteColor({ id });
     },
     [setHoveredPaletteColor]
   );
@@ -205,10 +215,10 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
       </div>
       <div className="palette-grid-wrap flex-grow-1">
         <div className="palette-grid" role="list" aria-label="palette colors">
-          {palette.map((entry, index) => (
+          {palette.map((entry) => (
             (() => {
-              const isMergeSelected = paletteMergeSelection.includes(entry.color);
-              const isMergeDestination = paletteMergeDestinationColor === entry.color;
+              const isMergeSelected = paletteMergeSelection.includes(entry.id);
+              const isMergeDestination = paletteMergeDestinationId === entry.id;
               const usageCount = paletteUsageByColor[entry.color]?.count ?? 0;
               const usageLabel = formatPaletteUsageLabel(usageCount);
               const titleParts = [entry.color.toUpperCase()];
@@ -226,13 +236,13 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
 
               return (
                 <button
-                  key={`${entry.color}-${index}`}
+                  key={entry.id}
                   type="button"
                   className={`palette-item ${selectedColor === entry.color ? 'active' : ''} ${isMergeSelected ? 'is-multi-selected' : ''} ${
                     isMergeDestination ? 'is-merge-destination' : ''
                   }`}
+                  data-id={entry.id}
                   data-color={entry.color}
-                  data-index={index}
                   onClick={handlePaletteClick}
                   onDoubleClick={handlePaletteDoubleClick}
                   onMouseEnter={handlePaletteMouseEnter}
@@ -276,7 +286,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
         transparentBackgroundMode={transparentBackgroundMode}
         selectedPalette={paletteColorModalInitial}
         palette={palette}
-        paletteEditTarget={paletteColorModalMode === 'edit' ? paletteColorModalInitial.color : null}
+        paletteEditTargetId={paletteColorModalMode === 'edit' ? paletteColorModalInitial.id : null}
         onApply={handlePaletteColorModalApply}
         onClose={() => setIsPaletteColorModalOpen(false)}
       />

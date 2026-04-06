@@ -15,7 +15,7 @@ import {
 import type { PaletteColorModalRequest } from '../components/sidebar/types';
 import type { PaletteUsageEntry } from '../editor/palette-sync';
 import type { HoveredPixelInfo, PaletteEntry, Selection } from '../editor/types';
-import { hexToRgba, rgbaToHex8, rgbaToHsva } from '../editor/utils';
+import { generatePaletteEntryId, hexToRgba, rgbaToHex8, rgbaToHsva } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -59,6 +59,7 @@ function hasHoveredPixelInfoSameContent(
     left.hsva.s === right.hsva.s &&
     left.hsva.v === right.hsva.v &&
     left.hsva.a === right.hsva.a &&
+    left.paletteId === right.paletteId &&
     left.paletteIndex === right.paletteIndex &&
     left.paletteCaption === right.paletteCaption
   );
@@ -80,20 +81,40 @@ export function usePixelReferences({
   setStatusText
 }: UsePixelReferencesOptions) {
   const [hoveredPixelInfo, setHoveredPixelInfo] = useState<HoveredPixelInfo>(null);
-  const [hoveredPaletteColor, setHoveredPaletteColor] = useState<{ hex: string; index: number } | null>(null);
+  const [hoveredPaletteColor, setHoveredPaletteColor] = useState<{ id: string } | null>(null);
   const [referencePixelInfos, setReferencePixelInfos] = useState<Array<NonNullable<HoveredPixelInfo>>>([]);
   const [draggingReferenceKey, setDraggingReferenceKey] = useState<string | null>(null);
 
   const resolvePaletteMatch = useCallback(
-    (hex8: string): { paletteIndex: number | null; paletteCaption: string | null } => {
+    (hex8: string): { paletteId: string | null; paletteIndex: number | null; paletteCaption: string | null } => {
       const paletteIndex = palette.findIndex((entry) => entry.color === hex8.toLowerCase());
       if (paletteIndex < 0) {
-        return { paletteIndex: null, paletteCaption: null };
+        return { paletteId: null, paletteIndex: null, paletteCaption: null };
       }
 
       return {
+        paletteId: palette[paletteIndex]?.id ?? null,
         paletteIndex,
         paletteCaption: palette[paletteIndex]?.caption || null
+      };
+    },
+    [palette]
+  );
+
+  const resolvePaletteEntryById = useCallback(
+    (paletteId: string | null | undefined): { entry: PaletteEntry | null; index: number | null } => {
+      if (!paletteId) {
+        return { entry: null, index: null };
+      }
+
+      const paletteIndex = palette.findIndex((entry) => entry.id === paletteId);
+      if (paletteIndex < 0) {
+        return { entry: null, index: null };
+      }
+
+      return {
+        entry: palette[paletteIndex] ?? null,
+        index: paletteIndex
       };
     },
     [palette]
@@ -108,23 +129,25 @@ export function usePixelReferences({
         const b = pixels[idx + 2];
         const a = pixels[idx + 3];
         const hex8 = rgbaToHex8(r, g, b, a).toUpperCase();
-        const { paletteIndex, paletteCaption } = resolvePaletteMatch(hex8);
+        const { paletteId, paletteIndex, paletteCaption } = resolvePaletteMatch(hex8);
         return {
           x: info.x,
           y: info.y,
           rgba: { r, g, b, a },
           hex8,
           hsva: rgbaToHsva(r, g, b, a),
+          paletteId,
           paletteIndex,
           paletteCaption
         };
       }
 
-      const paletteSourceIndex = info.paletteIndex ?? info.y;
-      const paletteEntry = paletteSourceIndex >= 0 ? palette[paletteSourceIndex] ?? null : null;
+      const paletteSource = resolvePaletteEntryById(info.paletteId);
+      const paletteEntry = paletteSource.entry;
       if (!paletteEntry) {
         return {
           ...info,
+          paletteId: null,
           paletteIndex: null,
           paletteCaption: null
         };
@@ -133,15 +156,16 @@ export function usePixelReferences({
       const { r, g, b, a } = hexToRgba(paletteEntry.color);
       return {
         x: info.x,
-        y: paletteSourceIndex,
+        y: info.y,
         rgba: { r, g, b, a },
         hex8: rgbaToHex8(r, g, b, a).toUpperCase(),
         hsva: rgbaToHsva(r, g, b, a),
-        paletteIndex: paletteSourceIndex,
+        paletteId: paletteEntry.id,
+        paletteIndex: paletteSource.index,
         paletteCaption: paletteEntry.caption || null
       };
     },
-    [canvasSize, palette, pixels, resolvePaletteMatch]
+    [canvasSize, pixels, resolvePaletteEntryById, resolvePaletteMatch]
   );
 
   const updateHoveredPixelInfo = useCallback(
@@ -158,7 +182,7 @@ export function usePixelReferences({
       const a = pixels[idx + 3];
       const hsva = rgbaToHsva(r, g, b, a);
       const hex8 = rgbaToHex8(r, g, b, a).toUpperCase();
-      const { paletteIndex, paletteCaption } = resolvePaletteMatch(hex8);
+      const { paletteId, paletteIndex, paletteCaption } = resolvePaletteMatch(hex8);
 
       setHoveredPixelInfo({
         x: cell.x,
@@ -166,6 +190,7 @@ export function usePixelReferences({
         rgba: { r, g, b, a },
         hex8,
         hsva,
+        paletteId,
         paletteIndex,
         paletteCaption
       });
@@ -289,6 +314,11 @@ export function usePixelReferences({
     return info.x >= 0 ? `(${info.x}, ${info.y})` : `パレット[${info.paletteIndex ?? '-'}]`;
   }, []);
 
+  const getReferenceKey = useCallback(
+    (info: NonNullable<HoveredPixelInfo>): string => (info.x < 0 && info.paletteId ? `palette:${info.paletteId}` : `${info.x}:${info.y}`),
+    []
+  );
+
   const selectReferenceByNumber = useCallback(
     (number: number): boolean => {
       if (number < 1 || number > 9) {
@@ -314,15 +344,22 @@ export function usePixelReferences({
         return null;
       }
 
-      const { r, g, b, a } = hexToRgba(hoveredPaletteColor.hex);
+      const hoveredEntry = palette.find((entry) => entry.id === hoveredPaletteColor.id) ?? null;
+      if (!hoveredEntry) {
+        return null;
+      }
+
+      const paletteIndex = palette.findIndex((entry) => entry.id === hoveredEntry.id);
+      const { r, g, b, a } = hexToRgba(hoveredEntry.color);
       return {
         x: -1,
-        y: hoveredPaletteColor.index,
+        y: paletteIndex >= 0 ? paletteIndex : -1,
         rgba: { r, g, b, a },
         hex8: rgbaToHex8(r, g, b, a).toUpperCase(),
         hsva: rgbaToHsva(r, g, b, a),
-        paletteIndex: hoveredPaletteColor.index,
-        paletteCaption: null
+        paletteId: hoveredEntry.id,
+        paletteIndex: paletteIndex >= 0 ? paletteIndex : null,
+        paletteCaption: hoveredEntry.caption || null
       } satisfies NonNullable<HoveredPixelInfo>;
     })();
 
@@ -333,8 +370,9 @@ export function usePixelReferences({
     }
 
     const syncedActiveInfo = syncReferencePixelInfo(activeInfo);
-    const matchingPaletteColor =
-      syncedActiveInfo.paletteIndex !== null ? palette[syncedActiveInfo.paletteIndex]?.color ?? null : null;
+    const matchingPaletteColor = syncedActiveInfo.paletteId
+      ? (resolvePaletteEntryById(syncedActiveInfo.paletteId).entry?.color ?? null)
+      : null;
     if (matchingPaletteColor) {
       setSelectedColor(matchingPaletteColor);
     }
@@ -349,9 +387,8 @@ export function usePixelReferences({
       return;
     }
 
-    const existingIndex = referencePixelInfos.findIndex(
-      (info) => info.x === syncedActiveInfo.x && info.y === syncedActiveInfo.y
-    );
+    const nextReferenceKey = getReferenceKey(syncedActiveInfo);
+    const existingIndex = referencePixelInfos.findIndex((info) => getReferenceKey(info) === nextReferenceKey);
     if (existingIndex < 0) {
       setReferencePixelInfos((prev) => [...prev, syncedActiveInfo]);
       setStatusText(`参照追加: ${formatReferenceSourceLabel(syncedActiveInfo)} ${syncedActiveInfo.hex8}`, 'success');
@@ -375,9 +412,11 @@ export function usePixelReferences({
     hoveredPixelInfo,
     palette,
     referencePixelInfos,
+    resolvePaletteEntryById,
     setSelectedColor,
     setStatusText,
-    syncReferencePixelInfo
+    syncReferencePixelInfo,
+    getReferenceKey
   ]);
 
   useEffect(() => {
@@ -406,31 +445,33 @@ export function usePixelReferences({
   }, [referencePixelInfos.length, setStatusText]);
 
   const removeReferencePixelInfo = useCallback(
-    (x: number, y: number) => {
-      let removed = false;
+    (referenceKey: string) => {
+      let removedInfo: NonNullable<HoveredPixelInfo> | null = null;
       setReferencePixelInfos((prev) => {
         const next = prev.filter((info) => {
-          const isTarget = info.x === x && info.y === y;
+          const isTarget = getReferenceKey(info) === referenceKey;
           if (isTarget) {
-            removed = true;
+            removedInfo = info;
           }
           return !isTarget;
         });
         return next.length === prev.length ? prev : next;
       });
 
-      if (removed) {
-        setStatusText(`参照を削除しました: (${x}, ${y})`, 'success');
+      if (removedInfo) {
+        const syncedInfo = syncReferencePixelInfo(removedInfo);
+        setStatusText(`参照を削除しました: ${formatReferenceSourceLabel(syncedInfo)}`, 'success');
       }
     },
-    [setStatusText]
+    [formatReferenceSourceLabel, getReferenceKey, setStatusText, syncReferencePixelInfo]
   );
 
   const openReferencePaletteColorModal = useCallback(
     (info: NonNullable<HoveredPixelInfo>) => {
       const syncedInfo = syncReferencePixelInfo(info);
-      const matchedEntry = syncedInfo.paletteIndex !== null ? palette[syncedInfo.paletteIndex] ?? null : null;
+      const matchedEntry = syncedInfo.paletteId ? resolvePaletteEntryById(syncedInfo.paletteId).entry : null;
       const modalEntry: PaletteEntry = matchedEntry ?? {
+        id: generatePaletteEntryId(),
         color: syncedInfo.hex8.toLowerCase(),
         caption: syncedInfo.paletteCaption ?? '',
         locked: false
@@ -442,10 +483,8 @@ export function usePixelReferences({
         entry: modalEntry
       });
     },
-    [palette, setPaletteColorModalRequest, setSelectedColor, syncReferencePixelInfo]
+    [resolvePaletteEntryById, setPaletteColorModalRequest, setSelectedColor, syncReferencePixelInfo]
   );
-
-  const getReferenceKey = useCallback((info: NonNullable<HoveredPixelInfo>): string => `${info.x}:${info.y}`, []);
 
   const onReferenceDragStart = useCallback((event: ReactDragEvent<HTMLDivElement>, sourceKey: string) => {
     setDraggingReferenceKey(sourceKey);

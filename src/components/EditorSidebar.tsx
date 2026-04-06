@@ -48,7 +48,7 @@ export const EditorSidebar = memo(function EditorSidebar({
   removeSelectedColorFromPalette,
   jumpToPaletteUsage,
   paletteMergeSelection,
-  paletteMergeDestinationColor,
+  paletteMergeDestinationId,
   togglePaletteMergeColor,
   clearPaletteMergeSelection,
   paletteColorModalRequest
@@ -103,7 +103,7 @@ export const EditorSidebar = memo(function EditorSidebar({
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
             jumpToPaletteUsage={jumpToPaletteUsage}
             paletteMergeSelection={paletteMergeSelection}
-            paletteMergeDestinationColor={paletteMergeDestinationColor}
+            paletteMergeDestinationId={paletteMergeDestinationId}
             togglePaletteMergeColor={togglePaletteMergeColor}
             clearPaletteMergeSelection={clearPaletteMergeSelection}
             paletteColorModalRequest={paletteColorModalRequest}

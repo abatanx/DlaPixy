@@ -11,9 +11,9 @@ type EditorPaletteMergeBarProps = {
   palette: PaletteEntry[];
   paletteUsageByColor: Record<string, PaletteUsageEntry>;
   paletteMergeSelection: string[];
-  paletteMergeDestinationColor: string | null;
-  selectPaletteMergeDestination: (color: string) => void;
-  removePaletteMergeColor: (color: string) => void;
+  paletteMergeDestinationId: string | null;
+  selectPaletteMergeDestination: (paletteId: string) => void;
+  removePaletteMergeColor: (paletteId: string) => void;
   clearPaletteMergeSelection: () => void;
   removePaletteColors: (selectedColors: string[]) => boolean;
   mergePaletteColors: (selectedColors: string[], destinationColor: string) => boolean;
@@ -23,7 +23,7 @@ export const EditorPaletteMergeBar = memo(function EditorPaletteMergeBar({
   palette,
   paletteUsageByColor,
   paletteMergeSelection,
-  paletteMergeDestinationColor,
+  paletteMergeDestinationId,
   selectPaletteMergeDestination,
   removePaletteMergeColor,
   clearPaletteMergeSelection,
@@ -31,45 +31,45 @@ export const EditorPaletteMergeBar = memo(function EditorPaletteMergeBar({
   mergePaletteColors
 }: EditorPaletteMergeBarProps) {
   const selectedPaletteMergeEntries = useMemo(
-    () => palette.filter((entry) => paletteMergeSelection.includes(entry.color)),
+    () => palette.filter((entry) => paletteMergeSelection.includes(entry.id)),
     [palette, paletteMergeSelection]
   );
   const showPaletteMergeUi = paletteMergeSelection.length >= 2;
   const canApplyPaletteMerge =
     paletteMergeSelection.length >= 2 &&
-    paletteMergeDestinationColor !== null &&
-    paletteMergeSelection.includes(paletteMergeDestinationColor);
+    paletteMergeDestinationId !== null &&
+    paletteMergeSelection.includes(paletteMergeDestinationId);
   const paletteMergeReplaceCount = useMemo(() => {
-    if (!paletteMergeDestinationColor) {
+    if (!paletteMergeDestinationId) {
       return 0;
     }
 
-    return paletteMergeSelection.reduce((total, color) => {
-      if (color === paletteMergeDestinationColor) {
+    return selectedPaletteMergeEntries.reduce((total, entry) => {
+      if (entry.id === paletteMergeDestinationId) {
         return total;
       }
-      return total + (paletteUsageByColor[color]?.count ?? 0);
+      return total + (paletteUsageByColor[entry.color]?.count ?? 0);
     }, 0);
-  }, [paletteMergeDestinationColor, paletteMergeSelection, paletteUsageByColor]);
+  }, [paletteMergeDestinationId, paletteUsageByColor, selectedPaletteMergeEntries]);
   const paletteMergeRemovalCount = useMemo(
     () =>
       selectedPaletteMergeEntries.reduce((total, entry) => {
-        if (entry.color === paletteMergeDestinationColor || entry.locked) {
+        if (entry.id === paletteMergeDestinationId || entry.locked) {
           return total;
         }
         return total + 1;
       }, 0),
-    [paletteMergeDestinationColor, selectedPaletteMergeEntries]
+    [paletteMergeDestinationId, selectedPaletteMergeEntries]
   );
   const paletteMergePreservedLockedCount = useMemo(
     () =>
       selectedPaletteMergeEntries.reduce((total, entry) => {
-        if (entry.color === paletteMergeDestinationColor || !entry.locked) {
+        if (entry.id === paletteMergeDestinationId || !entry.locked) {
           return total;
         }
         return total + 1;
       }, 0),
-    [paletteMergeDestinationColor, selectedPaletteMergeEntries]
+    [paletteMergeDestinationId, selectedPaletteMergeEntries]
   );
 
   if (!showPaletteMergeUi) {
@@ -77,17 +77,23 @@ export const EditorPaletteMergeBar = memo(function EditorPaletteMergeBar({
   }
 
   const handleApply = () => {
-    if (!canApplyPaletteMerge || !paletteMergeDestinationColor) {
+    if (!canApplyPaletteMerge || !paletteMergeDestinationId) {
       return;
     }
 
-    if (mergePaletteColors(paletteMergeSelection, paletteMergeDestinationColor)) {
+    const destinationEntry = selectedPaletteMergeEntries.find((entry) => entry.id === paletteMergeDestinationId);
+    if (!destinationEntry) {
+      return;
+    }
+
+    const selectedColors = selectedPaletteMergeEntries.map((entry) => entry.color);
+    if (mergePaletteColors(selectedColors, destinationEntry.color)) {
       clearPaletteMergeSelection();
     }
   };
 
   const handleDelete = () => {
-    void removePaletteColors(paletteMergeSelection);
+    void removePaletteColors(selectedPaletteMergeEntries.map((entry) => entry.color));
   };
 
   return (
@@ -139,16 +145,16 @@ export const EditorPaletteMergeBar = memo(function EditorPaletteMergeBar({
         <div className="sidebar-palette-merge-destination-list" role="list" aria-label="merge destination colors">
           {selectedPaletteMergeEntries.map((entry) => (
             <div
-              key={`merge-destination-${entry.color}`}
+              key={`merge-destination-${entry.id}`}
               className={`sidebar-palette-merge-destination ${
-                paletteMergeDestinationColor === entry.color ? 'active' : ''
+                paletteMergeDestinationId === entry.id ? 'active' : ''
               }`}
             >
               <button
                 type="button"
                 className="sidebar-palette-merge-destination-select"
-                onClick={() => selectPaletteMergeDestination(entry.color)}
-                aria-pressed={paletteMergeDestinationColor === entry.color}
+                onClick={() => selectPaletteMergeDestination(entry.id)}
+                aria-pressed={paletteMergeDestinationId === entry.id}
                 title={`統合先にする: ${entry.color.toUpperCase()}`}
               >
                 <span className="sidebar-palette-merge-destination-swatch" aria-hidden="true">
@@ -158,14 +164,14 @@ export const EditorPaletteMergeBar = memo(function EditorPaletteMergeBar({
                   />
                 </span>
                 <span className="sidebar-palette-merge-destination-label">{entry.color.toUpperCase()}</span>
-                {paletteMergeDestinationColor === entry.color ? (
+                {paletteMergeDestinationId === entry.id ? (
                   <span className="sidebar-palette-merge-destination-badge">残</span>
                 ) : null}
               </button>
               <button
                 type="button"
                 className="sidebar-palette-merge-destination-remove"
-                onClick={() => removePaletteMergeColor(entry.color)}
+                onClick={() => removePaletteMergeColor(entry.id)}
                 title={`選択から外す: ${entry.color.toUpperCase()}`}
                 aria-label={`選択から外す: ${entry.color.toUpperCase()}`}
               >

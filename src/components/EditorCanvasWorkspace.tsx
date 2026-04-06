@@ -60,7 +60,7 @@ type EditorCanvasWorkspaceProps = {
   onReferenceDrop: (event: ReactDragEvent<HTMLDivElement>, targetKey: string) => void;
   openReferencePaletteColorModal: (info: NonNullable<HoveredPixelInfo>) => void;
   copyPixelField: (label: string, value: string) => Promise<void>;
-  removeReferencePixelInfo: (x: number, y: number) => void;
+  removeReferencePixelInfo: (referenceKey: string) => void;
   tool: Tool;
   setTool: (tool: Tool) => void;
   hasCommittedSelection: boolean;
@@ -348,7 +348,7 @@ export function EditorCanvasWorkspace({
                     <button
                       type="button"
                       className="canvas-copy-btn"
-                      onClick={() => removeReferencePixelInfo(info.x, info.y)}
+                      onClick={() => removeReferencePixelInfo(referenceKey)}
                       title="この参照を削除"
                       aria-label="この参照を削除"
                     >

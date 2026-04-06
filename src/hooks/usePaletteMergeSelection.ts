@@ -18,7 +18,7 @@ export function usePaletteMergeSelection({
   setSelectedColor
 }: UsePaletteMergeSelectionOptions) {
   const [paletteMergeSelection, setPaletteMergeSelection] = useState<string[]>([]);
-  const [paletteMergeDestinationColor, setPaletteMergeDestinationColor] = useState<string | null>(null);
+  const [paletteMergeDestinationId, setPaletteMergeDestinationId] = useState<string | null>(null);
 
   const isSelectedColorInPalette = useMemo(
     () => palette.some((entry) => entry.color === selectedColor),
@@ -27,62 +27,73 @@ export function usePaletteMergeSelection({
 
   const clearPaletteMergeSelection = useCallback(() => {
     setPaletteMergeSelection([]);
-    setPaletteMergeDestinationColor(null);
+    setPaletteMergeDestinationId(null);
   }, []);
 
-  const resolvePaletteMergeDestination = useCallback(
-    (nextColors: string[], preferredColor?: string | null) => {
-      if (nextColors.length === 0) {
+  const resolvePaletteEntryById = useCallback(
+    (paletteId: string | null | undefined): PaletteEntry | null => {
+      if (!paletteId) {
         return null;
       }
 
-      const normalizedPreferredColor = preferredColor?.toLowerCase() ?? null;
-      if (normalizedPreferredColor && nextColors.includes(normalizedPreferredColor)) {
-        return normalizedPreferredColor;
-      }
-
-      if (paletteMergeDestinationColor && nextColors.includes(paletteMergeDestinationColor)) {
-        return paletteMergeDestinationColor;
-      }
-
-      const normalizedSelectedColor = selectedColor.toLowerCase();
-      if (nextColors.includes(normalizedSelectedColor)) {
-        return normalizedSelectedColor;
-      }
-
-      return nextColors[nextColors.length - 1] ?? nextColors[0] ?? null;
+      return palette.find((entry) => entry.id === paletteId) ?? null;
     },
-    [paletteMergeDestinationColor, selectedColor]
+    [palette]
+  );
+
+  const resolvePaletteMergeDestination = useCallback(
+    (nextSelectionIds: string[], preferredId?: string | null) => {
+      if (nextSelectionIds.length === 0) {
+        return null;
+      }
+
+      if (preferredId && nextSelectionIds.includes(preferredId)) {
+        return preferredId;
+      }
+
+      if (paletteMergeDestinationId && nextSelectionIds.includes(paletteMergeDestinationId)) {
+        return paletteMergeDestinationId;
+      }
+
+      const selectedEntryId = palette.find((entry) => entry.color === selectedColor)?.id ?? null;
+      if (selectedEntryId && nextSelectionIds.includes(selectedEntryId)) {
+        return selectedEntryId;
+      }
+
+      return nextSelectionIds[nextSelectionIds.length - 1] ?? nextSelectionIds[0] ?? null;
+    },
+    [palette, paletteMergeDestinationId, selectedColor]
   );
 
   const togglePaletteMergeColor = useCallback(
-    (color: string) => {
-      const nextColor = color.toLowerCase();
-      const normalizedSelectedColor = selectedColor.toLowerCase();
+    (entry: PaletteEntry) => {
+      const nextEntryId = entry.id;
+      const selectedEntryId = palette.find((candidate) => candidate.color === selectedColor)?.id ?? null;
       const mergeSelectionBase =
         paletteMergeSelection.length > 0
           ? paletteMergeSelection
-          : isSelectedColorInPalette && normalizedSelectedColor !== nextColor
-            ? [normalizedSelectedColor]
+          : isSelectedColorInPalette && selectedEntryId && selectedEntryId !== nextEntryId
+            ? [selectedEntryId]
             : [];
-      const isSelectedForMerge = mergeSelectionBase.includes(nextColor);
+      const isSelectedForMerge = mergeSelectionBase.includes(nextEntryId);
       const nextMergeSelection = isSelectedForMerge
-        ? mergeSelectionBase.filter((mergeColor) => mergeColor !== nextColor)
-        : [...mergeSelectionBase, nextColor];
+        ? mergeSelectionBase.filter((paletteId) => paletteId !== nextEntryId)
+        : [...mergeSelectionBase, nextEntryId];
 
       if (nextMergeSelection.length < 2) {
         clearPaletteMergeSelection();
-        setSelectedColor(nextColor);
+        setSelectedColor(entry.color);
         return;
       }
 
       setPaletteMergeSelection(nextMergeSelection);
-      setPaletteMergeDestinationColor(resolvePaletteMergeDestination(nextMergeSelection));
-      setSelectedColor(nextColor);
+      setPaletteMergeDestinationId(resolvePaletteMergeDestination(nextMergeSelection));
+      setSelectedColor(entry.color);
     },
     [
       clearPaletteMergeSelection,
       isSelectedColorInPalette,
+      palette,
       paletteMergeSelection,
       resolvePaletteMergeDestination,
       selectedColor,
@@ -91,40 +102,55 @@ export function usePaletteMergeSelection({
   );
 
   const selectPaletteMergeDestination = useCallback(
-    (color: string) => {
-      const nextColor = color.toLowerCase();
-      setPaletteMergeDestinationColor(nextColor);
-      setSelectedColor(nextColor);
+    (paletteId: string) => {
+      const nextEntry = resolvePaletteEntryById(paletteId);
+      if (!nextEntry) {
+        return;
+      }
+
+      setPaletteMergeDestinationId(nextEntry.id);
+      setSelectedColor(nextEntry.color);
     },
-    [setSelectedColor]
+    [resolvePaletteEntryById, setSelectedColor]
   );
 
   const removePaletteMergeColor = useCallback(
-    (color: string) => {
-      const nextColor = color.toLowerCase();
-      const nextMergeSelection = paletteMergeSelection.filter((mergeColor) => mergeColor !== nextColor);
+    (paletteId: string) => {
+      const nextMergeSelection = paletteMergeSelection.filter((mergeId) => mergeId !== paletteId);
       if (nextMergeSelection.length < 2) {
         clearPaletteMergeSelection();
-        const fallbackSelectedColor = nextMergeSelection[0] ?? selectedColor;
-        setSelectedColor(fallbackSelectedColor.toLowerCase());
+        const fallbackSelectedEntry = resolvePaletteEntryById(nextMergeSelection[0] ?? null);
+        setSelectedColor(fallbackSelectedEntry?.color ?? selectedColor.toLowerCase());
         return;
       }
 
       const nextDestinationColor = resolvePaletteMergeDestination(nextMergeSelection);
       setPaletteMergeSelection(nextMergeSelection);
-      setPaletteMergeDestinationColor(nextDestinationColor);
+      setPaletteMergeDestinationId(nextDestinationColor);
 
-      if (!nextMergeSelection.includes(selectedColor.toLowerCase())) {
-        setSelectedColor((nextDestinationColor ?? nextMergeSelection[0] ?? selectedColor).toLowerCase());
+      const selectedEntryId = palette.find((entry) => entry.color === selectedColor)?.id ?? null;
+      if (!selectedEntryId || !nextMergeSelection.includes(selectedEntryId)) {
+        const fallbackSelectedEntry = resolvePaletteEntryById(nextDestinationColor ?? nextMergeSelection[0] ?? null);
+        if (fallbackSelectedEntry) {
+          setSelectedColor(fallbackSelectedEntry.color);
+        }
       }
     },
-    [clearPaletteMergeSelection, paletteMergeSelection, resolvePaletteMergeDestination, selectedColor, setSelectedColor]
+    [
+      clearPaletteMergeSelection,
+      palette,
+      paletteMergeSelection,
+      resolvePaletteEntryById,
+      resolvePaletteMergeDestination,
+      selectedColor,
+      setSelectedColor
+    ]
   );
 
   useEffect(() => {
-    const nextMergeSelection = paletteMergeSelection.filter((color) => palette.some((entry) => entry.color === color));
+    const nextMergeSelection = paletteMergeSelection.filter((paletteId) => palette.some((entry) => entry.id === paletteId));
     if (nextMergeSelection.length < 2) {
-      if (paletteMergeSelection.length > 0 || paletteMergeDestinationColor !== null) {
+      if (paletteMergeSelection.length > 0 || paletteMergeDestinationId !== null) {
         clearPaletteMergeSelection();
       }
       return;
@@ -135,20 +161,20 @@ export function usePaletteMergeSelection({
     }
 
     const nextDestinationColor = resolvePaletteMergeDestination(nextMergeSelection);
-    if (nextDestinationColor !== paletteMergeDestinationColor) {
-      setPaletteMergeDestinationColor(nextDestinationColor);
+    if (nextDestinationColor !== paletteMergeDestinationId) {
+      setPaletteMergeDestinationId(nextDestinationColor);
     }
   }, [
     clearPaletteMergeSelection,
     palette,
-    paletteMergeDestinationColor,
+    paletteMergeDestinationId,
     paletteMergeSelection,
     resolvePaletteMergeDestination
   ]);
 
   return {
     paletteMergeSelection,
-    paletteMergeDestinationColor,
+    paletteMergeDestinationId,
     showPaletteMergeUi: paletteMergeSelection.length >= 2,
     clearPaletteMergeSelection,
     togglePaletteMergeColor,

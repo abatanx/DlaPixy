@@ -37,6 +37,7 @@ export type HoveredPixelInfo = {
   rgba: { r: number; g: number; b: number; a: number };
   hex8: string;
   hsva: { h: number; s: number; v: number; a: number };
+  paletteId: string | null;
   paletteIndex: number | null;
   paletteCaption: string | null;
 } | null;

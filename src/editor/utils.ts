@@ -4,6 +4,8 @@
  **/
 
 import {
+  generatePaletteEntryId,
+  isPaletteEntryId,
   normalizeColorHex,
   normalizePaletteCaption,
   normalizePaletteEntries,
@@ -12,7 +14,7 @@ import {
 import type { FloatingCompositeMode } from '../../shared/floating-composite';
 import type { Selection } from './types';
 
-export { normalizeColorHex, normalizePaletteCaption, normalizePaletteEntries };
+export { generatePaletteEntryId, isPaletteEntryId, normalizeColorHex, normalizePaletteCaption, normalizePaletteEntries };
 
 // RGB値を16進カラー文字列（#rrggbb）に変換する。
 export function rgbaToHex(r: number, g: number, b: number): string {
@@ -28,7 +30,7 @@ export function rgbaToHex8(r: number, g: number, b: number, a: number): string {
 
 // 色配列から空キャプション付きのパレット配列を作る。
 export function createPaletteEntries(colors: string[]): PaletteEntry[] {
-  return normalizePaletteEntries(colors.map((color) => ({ color, caption: '', locked: false })));
+  return normalizePaletteEntries(colors.map((color) => ({ id: generatePaletteEntryId(), color, caption: '', locked: false })));
 }
 
 // パレット配列をディープコピーしてイミュータブル更新に使う。

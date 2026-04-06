@@ -50,13 +50,13 @@ export type EditorSidebarProps = {
   applySelectedColorChange: (value: PaletteEntry) => void;
   palette: PaletteEntry[];
   paletteUsageByColor: Record<string, PaletteUsageEntry>;
-  setHoveredPaletteColor: (value: { hex: string; index: number } | null) => void;
+  setHoveredPaletteColor: (value: { id: string } | null) => void;
   addPaletteColor: (value: PaletteEntry) => void;
   removeSelectedColorFromPalette: () => void;
   jumpToPaletteUsage: (color: string) => boolean;
   paletteMergeSelection: string[];
-  paletteMergeDestinationColor: string | null;
-  togglePaletteMergeColor: (color: string) => void;
+  paletteMergeDestinationId: string | null;
+  togglePaletteMergeColor: (entry: PaletteEntry) => void;
   clearPaletteMergeSelection: () => void;
   paletteColorModalRequest: PaletteColorModalRequest;
 };
@@ -106,7 +106,7 @@ export type SidebarPaletteSectionProps = Pick<
   | 'removeSelectedColorFromPalette'
   | 'jumpToPaletteUsage'
   | 'paletteMergeSelection'
-  | 'paletteMergeDestinationColor'
+  | 'paletteMergeDestinationId'
   | 'togglePaletteMergeColor'
   | 'clearPaletteMergeSelection'
   | 'paletteColorModalRequest'

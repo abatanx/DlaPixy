@@ -4,6 +4,7 @@
  **/
 
 import {
+  generatePaletteEntryId,
   normalizeColorHex,
   normalizePaletteCaption,
   normalizePaletteEntries,
@@ -79,6 +80,7 @@ function parseRgbLine(line: string, lineNo: number, hasAlpha: boolean): PaletteE
   const rawName = hasAlpha ? match[5] : match[4];
 
   return {
+    id: generatePaletteEntryId(),
     color: toHex8(r, g, b, a),
     caption: normalizeImportedCaption(rawName),
     locked: false

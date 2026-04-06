@@ -4,12 +4,22 @@
  **/
 
 export type PaletteEntry = {
+  id: string;
   color: string;
   caption: string;
   locked: boolean;
 };
 
 export const PALETTE_CAPTION_MAX_LENGTH = 4;
+const PALETTE_ENTRY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isPaletteEntryId(value: unknown): value is string {
+  return typeof value === 'string' && PALETTE_ENTRY_ID_PATTERN.test(value);
+}
+
+export function generatePaletteEntryId(): string {
+  return globalThis.crypto.randomUUID().toLowerCase();
+}
 
 export function normalizeColorHex(value: string): string | null {
   const normalized = value.trim().replace(/^#/, '');
@@ -41,6 +51,7 @@ export function normalizePaletteEntries(entries: PaletteEntry[]): PaletteEntry[]
 
     seenColors.add(color);
     normalizedEntries.push({
+      id: isPaletteEntryId(entry?.id) ? entry.id.toLowerCase() : generatePaletteEntryId(),
       color,
       caption: typeof entry.caption === 'string' ? normalizePaletteCaption(entry.caption) : '',
       locked: entry?.locked === true

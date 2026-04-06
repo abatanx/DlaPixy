@@ -488,7 +488,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - https://github.com/abatanx/DlaPixy/issues/33
 - #42 `refactor: スウォッチ整理処理を共通化する`
   - https://github.com/abatanx/DlaPixy/issues/42
-- #46 `feat: パレットの並び替えと削除を追加する`
+- #46 `feat: パレットの並び順モードを追加する（手動並び替え / 自動ソート）`
   - https://github.com/abatanx/DlaPixy/issues/46
 - #47 `feat: パレットで複数スウォッチを選択して1色へ統合するUIを追加する`
   - https://github.com/abatanx/DlaPixy/issues/47
@@ -502,6 +502,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - https://github.com/abatanx/DlaPixy/issues/51
 - #52 `spec: canvas-selection-overlay 上で合成モード（置換 / ブレンド）を切り替え、editor メタへ保存できるようにする`
   - https://github.com/abatanx/DlaPixy/issues/52
+- #56 `refactor: パレットスウォッチに安定IDを導入する`
+  - https://github.com/abatanx/DlaPixy/issues/56
 
 ## 13. Issue #42 仕様メモ（2026-03-24）
 - 目的:
@@ -617,3 +619,149 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - toggle を押しても move / resize が始まらない。
   - 確定結果が最後に見えていたプレビューと一致する。
   - 保存時に `editor.floatingCompositeMode` が書かれ、読込時に復元される。
+
+## 15. Issue #46 仕様メモ（2026-04-06）
+- 目的:
+  - パレットに 2 種類の並び順モードを追加する。
+    - sidecar 保存 / 読込で復元される手動並び替えモード
+    - 画面表示だけを変える自動ソートモード
+  - パレットカード内の新規タブから、モードと自動ソート条件を切り替えられるようにする。
+- 前提:
+  - 先に `#56 refactor: パレットスウォッチに安定IDを導入する` を完了する。
+  - #46 は、stable な swatch identity が入った前提で進める。
+- 現状の実装起点:
+  - `src/components/sidebar/SidebarPaletteSection.tsx`
+    - 現状はパレットグリッド表示と、選択 / 編集 / 追加 / 削除 UI を持っている
+  - `src/hooks/usePaletteManagement.ts`
+    - 追加 / 編集 / 削除 / 統合と、Undo / 未保存化 / toast 更新を持っている
+  - `shared/sidecar.ts`, `src/hooks/useDocumentFileActions.ts`
+    - 現状は `document.palette.entries` と既存 editor UI 状態を保存している
+  - 既存の drag-and-drop 実装例:
+    - `src/hooks/usePixelReferences.ts`
+    - `src/components/sidebar/SidebarPreviewSection.tsx`
+- 実装ブレを防ぐための判断:
+  - React state 上の `palette` は、常に「保存される手動順」を表す canonical order とする。
+  - Save 時は常に、その canonical order を `document.palette.entries` へ保存する。
+  - Load 時は、その手動順をそのまま復元する。
+  - 自動ソートは canonical order から導出する表示専用モードで、sidecar メタには保存しない。
+  - `New` / `Open` 後の初期表示モードは `手動` に戻す。
+  - パレット末尾の `+` 追加ボタンは固定で、手動並び替え対象に含めない。
+  - 手動並び替えで変えるのは `palette` 配列順だけにする。
+    - キャンバスピクセル、`caption`、`locked`、usage 値は変更しない。
+  - `selectedColor` は、対応スウォッチが移動しても、表示モードが変わっても維持する。
+  - 手動並び替えは Undo 1 回で戻せる 1 操作とし、未保存変更にする。
+  - `手動 / 自動` の切り替えや auto sort key の切り替えは view state なので Undo 対象にしない。
+  - 削除は現行フローを維持する。
+    - 未使用色は即削除
+    - 使用中色は確認後に一致ピクセルを透明化してから削除
+    - merge UI 側の複数色削除導線も維持
+  - merge UI 表示中は、手動 drag-and-drop 並び替えを無効にする。
+- 表示モデル:
+  - 手動モード:
+    - `displayPalette === palette`
+  - 自動モード:
+    - `displayPalette = sortPaletteEntries(palette, autoSortKey)`
+  - 追加 / 編集 / 削除 / 統合 / PNG 読込 / K-Means 後同期などの既存更新処理は、canonical な `palette` を更新する。
+  - 自動モードは、その canonical `palette` から表示順だけを再計算する。
+- identity / index の扱い:
+  - `#56` 完了後は、スウォッチの安定 identity に `PaletteEntry.id` を使う。
+  - 並び順モード導入後は、生の配列 index を durable な識別子として持ち回さない。
+  - hover / 参照ラインなどで `paletteIndex` を表示したい場合は、スウォッチ自体は `id` で追い、現在の `displayPalette` から都度 index を解決する方針に寄せる。
+    - 手動モードでは手動順 index
+    - 自動モードでは自動ソート後の表示 index
+- 初版の自動ソート key:
+  - `Hue`
+    - 色相昇順を基本にし、無彩色に近い色は後方へ寄せる
+  - `Saturation`
+    - 高い順
+  - `Value`
+    - 明るい順
+  - `Red`, `Green`, `Blue`
+    - 各チャンネル値が高い順
+  - 同順位になった場合は、canonical な手動順を最終 tie-breaker にして表示を安定させる
+- UI 方針:
+  - パレットカードに新規タブを追加する。
+    - 既存タブ: `Palette`（仮称）
+    - 新規タブ: `Sort` / `Arrange`（名称は実装時に調整）
+  - `Palette` タブ:
+    - 現在どおりスウォッチ grid と追加 / 編集 / 削除 / ジャンプ / merge 操作を置く
+    - 現在の並び順モードに応じた表示順で grid を描画する
+  - 新規タブ:
+    - `手動` / `自動` モード切り替えを置く
+    - `自動` 選択時だけ、ソート key selector を表示する
+    - 現在の表示モードと基準が分かる小さな説明を出す
+  - 手動モードのときだけ palette grid の drag-and-drop を有効にする。
+  - 自動モードでは drag-and-drop を無効にする。
+- 実装分割案:
+  1. 非永続の表示 state として `paletteOrderMode`, `paletteAutoSortKey` を追加する。
+  2. `src/editor/` 配下へ `sortPaletteEntries(...)` helper を追加する。
+  3. `SidebarPaletteSection` をタブ対応にして、`displayPalette` ベース描画へ切り替える。
+  4. 手動モード時だけ使う DnD 並び替え handler を追加する。
+  5. hover / 参照ラインの index 前提を、`id` ベースの identity + display index 解決へ寄せる。
+  6. sidecar 往復、load 時のモード初期化、Undo 範囲を確認する。
+- 確認観点:
+  - 手動モードで drag-and-drop した順が保存され、再読込後も復元される。
+  - 自動モードへ切り替えると、指定 key で見た目だけ並び替わる。
+  - 自動モードのまま保存して再読込しても、復元されるのは手動順である。
+  - 手動モードへ戻すと、最後の canonical 手動順が表示される。
+  - 自動モード中に追加 / 編集 / 削除 / merge しても破綻せず、表示順が再計算される。
+  - `selectedColor` はモード切り替えや並び替え後も維持される。
+  - hover / 参照ラインの palette index 表示が現在の表示順と一致する。
+  - merge UI 表示中は手動 DnD が無効になる。
+  - 手動並び替えだけが Undo 対象になり、表示モード切り替えは Undo を汚さない。
+
+## 16. Issue #56 仕様メモ（2026-04-06）
+- 目的:
+  - #46 の並び順モード追加より先に、パレットスウォッチの stable identity を導入する。
+- 現状の実装起点:
+  - `shared/palette.ts`
+    - `PaletteEntry` は現状 `color`, `caption`, `locked` だけを持つ
+    - normalize は `color` ベースで重複除去している
+  - `src/components/sidebar/SidebarPaletteSection.tsx`
+    - パレット UI の操作は `color` と表示 index への依存がまだ強い
+  - `src/hooks/usePixelReferences.ts`
+    - hovered palette state は現状 `color + index` を持っている
+  - `src/hooks/useDocumentFileActions.ts`, `shared/sidecar.ts`
+    - sidecar は palette entry をそのまま保存している
+- 実装ブレを防ぐための判断:
+  - `PaletteEntry` に `id: string` を追加する。
+  - `id` はハイフン付き UUID 形式の文字列とする。
+  - 生成は `crypto.randomUUID()` を使い、ID 生成のための追加依存は入れない。
+  - 検証では UUID の version / variant までは厳密に固定しない。
+  - `color` はピクセル色 / 使用数 / 置換対象の意味を保つ。
+  - 新規 palette entry を作るすべての経路で `id` を付ける。
+    - 初期パレット
+    - 手動追加
+    - パレット同期での追加
+    - GPL import
+    - 新スキーマ前提の PNG / sidecar 読込生成
+  - 旧 sidecar との後方互換は不要とする。
+  - palette metadata の breaking change として扱ってよい。
+  - 必要なら `SIDECAR_SCHEMA_VERSION` を上げてよい。
+  - 旧 sidecar を開いた場合は、警告して sidecar を無視し、PNG 単体として開ければ十分とする。
+  - 同じスウォッチの色編集では `id` を維持する。
+  - 現状どおり「同じ color を複数スウォッチとして持たない」前提は維持する。
+  - UI identity に関わる処理は `id` ベースへ寄せる。
+    - 選択対象
+    - hover 対象
+    - drag-and-drop 対象
+    - merge 選択対象
+  - 色意味論の処理は `color` ベースのまま維持する。
+    - 使用数集計
+    - ピクセル置換
+    - 使用位置ジャンプ
+- 実装分割案:
+  1. `PaletteEntry` と normalize / clone helper を `id` 対応に拡張する。
+  2. すべての palette entry 生成経路へ ID 生成 helper を入れる。
+  3. sidecar 読込 / 保存を新スキーマ前提へ更新する。
+  4. index 前提の UI を、`id` + display index 解決へ寄せる。
+  5. #46 が追加移行なしで進められることを確認する。
+- 確認観点:
+  - メモリ上の全 palette entry が UUID 形式の `id` を持つ。
+  - 保存し直すと sidecar の palette entry に `id` が書かれる。
+  - 色編集しても同じスウォッチの `id` は変わらない。
+  - パレット UI の主要操作が raw index を durable identity として使わなくなる。
+- 実装メモ:
+  - `SIDECAR_SCHEMA_VERSION` は `2` に上げ、sidecar の palette entry では UUID 形式の `id` を必須にした。
+  - パレット hover / 参照ライン / merge 選択 UI は `id` で追跡し、表示 index は必要時に都度解決する形へ寄せた。
+  - 使用数集計、ピクセル置換、削除、merge 実行のような色意味論の処理は引き続き `color` で解決する。

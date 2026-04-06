@@ -17,7 +17,7 @@ import {
   isFloatingCompositeMode
 } from '../shared/floating-composite';
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
-import type { PaletteEntry } from '../shared/palette';
+import { isPaletteEntryId, type PaletteEntry } from '../shared/palette';
 import { SIDECAR_SCHEMA_VERSION, type EditorSidecar } from '../shared/sidecar';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
@@ -183,8 +183,9 @@ function isPaletteEntry(value: unknown): value is PaletteEntry {
     return false;
   }
 
-  const candidate = value as { color?: unknown; caption?: unknown; locked?: unknown };
+  const candidate = value as { id?: unknown; color?: unknown; caption?: unknown; locked?: unknown };
   return (
+    isPaletteEntryId(candidate.id) &&
     typeof candidate.color === 'string' &&
     typeof candidate.caption === 'string' &&
     typeof candidate.locked === 'boolean'

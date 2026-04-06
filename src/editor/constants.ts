@@ -3,7 +3,12 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { PALETTE_CAPTION_MAX_LENGTH as SHARED_PALETTE_CAPTION_MAX_LENGTH, type PaletteEntry } from '../../shared/palette';
+import {
+  generatePaletteEntryId,
+  normalizePaletteEntries,
+  PALETTE_CAPTION_MAX_LENGTH as SHARED_PALETTE_CAPTION_MAX_LENGTH,
+  type PaletteEntry
+} from '../../shared/palette';
 
 export const PALETTE_CAPTION_MAX_LENGTH = SHARED_PALETTE_CAPTION_MAX_LENGTH;
 
@@ -26,14 +31,17 @@ export const MAX_CANVAS_SIZE = 1024;
 const WEB_SAFE_CHANNELS = ['00', '33', '66', '99', 'CC', 'FF'] as const;
 
 // 初期パレットカラーは Web Safe Color 216 色。
-export const DEFAULT_PALETTE = WEB_SAFE_CHANNELS.flatMap((r) =>
-  WEB_SAFE_CHANNELS.flatMap((g) =>
-    WEB_SAFE_CHANNELS.map(
-      (b): PaletteEntry => ({
-        color: `#${r}${g}${b}`.toLowerCase(),
-        caption: '',
-        locked: false
-      })
+export const DEFAULT_PALETTE = normalizePaletteEntries(
+  WEB_SAFE_CHANNELS.flatMap((r) =>
+    WEB_SAFE_CHANNELS.flatMap((g) =>
+      WEB_SAFE_CHANNELS.map(
+        (b): PaletteEntry => ({
+          id: generatePaletteEntryId(),
+          color: `#${r}${g}${b}`.toLowerCase(),
+          caption: '',
+          locked: false
+        })
+      )
     )
   )
 );

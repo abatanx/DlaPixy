@@ -12,6 +12,7 @@ export function hasSamePaletteEntries(left: PaletteEntry[], right: PaletteEntry[
 
   return left.every(
     (entry, index) =>
+      entry.id === right[index]?.id &&
       entry.color === right[index]?.color &&
       entry.caption === right[index]?.caption &&
       entry.locked === right[index]?.locked

@@ -9,7 +9,7 @@ import { getFileNameFromPath, hasSamePaletteEntries, replaceFileExtension, resol
 import { mergePaletteColorsIntoDestination } from '../editor/palette-merge';
 import { syncPaletteEntriesFromPixels, type PaletteUsageEntry } from '../editor/palette-sync';
 import type { PaletteEntry } from '../editor/types';
-import { clonePaletteEntries, clonePixels, hexToRgba, normalizePaletteEntries } from '../editor/utils';
+import { clonePaletteEntries, clonePixels, generatePaletteEntryId, hexToRgba, normalizePaletteEntries } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -129,7 +129,7 @@ export function usePaletteManagement({
   );
 
   const addPaletteColor = useCallback(
-    ({ color: nextColor, caption: nextCaption, locked: nextLocked }: PaletteEntry) => {
+    ({ id: nextId, color: nextColor, caption: nextCaption, locked: nextLocked }: PaletteEntry) => {
       if (palette.some((entry) => entry.color === nextColor)) {
         setStatusText('同じ色はすでにパレットにあります', 'warning');
         return;
@@ -137,7 +137,15 @@ export function usePaletteManagement({
 
       pushUndo();
       setSelectedColor(nextColor);
-      setPalette((prev) => [...prev, { color: nextColor, caption: nextCaption, locked: nextLocked }]);
+      setPalette((prev) => [
+        ...prev,
+        {
+          id: nextId || generatePaletteEntryId(),
+          color: nextColor,
+          caption: nextCaption,
+          locked: nextLocked
+        }
+      ]);
       setHasUnsavedChanges(true);
       setStatusText(`パレットに追加しました: ${nextColor.toUpperCase()}`, 'success');
     },
@@ -264,7 +272,14 @@ export function usePaletteManagement({
       }
 
       const nextPalette = palette.map((entry, index) =>
-        index === selectedPaletteIndex ? { color: nextColor, caption: nextCaption, locked: nextLocked } : entry
+        index === selectedPaletteIndex
+          ? {
+              ...entry,
+              color: nextColor,
+              caption: nextCaption,
+              locked: nextLocked
+            }
+          : entry
       );
 
       pushUndo();

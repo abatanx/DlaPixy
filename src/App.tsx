@@ -236,7 +236,7 @@ export function App() {
   });
   const {
     paletteMergeSelection,
-    paletteMergeDestinationColor,
+    paletteMergeDestinationId,
     showPaletteMergeUi,
     clearPaletteMergeSelection,
     togglePaletteMergeColor,
@@ -541,7 +541,7 @@ export function App() {
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
             jumpToPaletteUsage={jumpToPaletteUsage}
             paletteMergeSelection={paletteMergeSelection}
-            paletteMergeDestinationColor={paletteMergeDestinationColor}
+            paletteMergeDestinationId={paletteMergeDestinationId}
             togglePaletteMergeColor={togglePaletteMergeColor}
             clearPaletteMergeSelection={clearPaletteMergeSelection}
             paletteColorModalRequest={paletteColorModalRequest}
@@ -552,7 +552,7 @@ export function App() {
                 palette={palette}
                 paletteUsageByColor={paletteUsage.byColor}
                 paletteMergeSelection={paletteMergeSelection}
-                paletteMergeDestinationColor={paletteMergeDestinationColor}
+                paletteMergeDestinationId={paletteMergeDestinationId}
                 selectPaletteMergeDestination={selectPaletteMergeDestination}
                 removePaletteMergeColor={removePaletteMergeColor}
                 clearPaletteMergeSelection={clearPaletteMergeSelection}
