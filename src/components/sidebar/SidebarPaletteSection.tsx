@@ -3,11 +3,13 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
+import Dropdown from 'bootstrap/js/dist/dropdown';
+import { PALETTE_AUTO_SORT_KEY_LABELS } from '../../editor/palette-order';
 import type { PaletteEntry } from '../../editor/types';
 import { formatPaletteUsageLabel } from '../../editor/palette-sync';
-import { generatePaletteEntryId } from '../../editor/utils';
+import { generatePaletteEntryId, hexToRgba } from '../../editor/utils';
 import { PaletteColorModal } from '../modals/PaletteColorModal';
 import type { SidebarPaletteSectionProps } from './types';
 
@@ -17,11 +19,18 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   setSelectedColor,
   applySelectedColorChange,
   palette,
+  displayPalette,
   paletteUsageByColor,
   setHoveredPaletteColor,
   addPaletteColor,
   removeSelectedColorFromPalette,
   jumpToPaletteUsage,
+  paletteOrderMode,
+  setPaletteOrderMode,
+  paletteAutoSortKey,
+  setPaletteAutoSortKey,
+  canManualPaletteReorder,
+  reorderPaletteEntries,
   paletteMergeSelection,
   paletteMergeDestinationId,
   togglePaletteMergeColor,
@@ -42,7 +51,10 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     locked: false
   }));
   const [isUsageModifierPressed, setIsUsageModifierPressed] = useState<boolean>(false);
+  const [draggingPaletteEntryId, setDraggingPaletteEntryId] = useState<string | null>(null);
   const showPaletteMergeUi = paletteMergeSelection.length >= 2;
+  const paletteOrderToggleRef = useRef<HTMLButtonElement | null>(null);
+  const paletteOrderDropdownRef = useRef<Dropdown | null>(null);
 
   const openPaletteColorModal = useCallback(
     (mode: 'edit' | 'create', entry: PaletteEntry) => {
@@ -144,6 +156,79 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     jumpToPaletteUsage(selectedColor);
   }, [jumpToPaletteUsage, selectedColor]);
 
+  const handlePaletteDragStart = useCallback(
+    (event: ReactDragEvent<HTMLButtonElement>) => {
+      const sourceId = event.currentTarget.dataset.id;
+      if (!canManualPaletteReorder || !sourceId) {
+        event.preventDefault();
+        return;
+      }
+
+      setDraggingPaletteEntryId(sourceId);
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', sourceId);
+    },
+    [canManualPaletteReorder]
+  );
+
+  const handlePaletteDragEnd = useCallback(() => {
+    setDraggingPaletteEntryId(null);
+  }, []);
+
+  const handlePaletteDragOver = useCallback(
+    (event: ReactDragEvent<HTMLButtonElement>) => {
+      if (!canManualPaletteReorder) {
+        return;
+      }
+
+      const targetId = event.currentTarget.dataset.id;
+      const sourceId = draggingPaletteEntryId ?? event.dataTransfer.getData('text/plain');
+      if (!targetId || !sourceId || sourceId === targetId) {
+        return;
+      }
+
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    },
+    [canManualPaletteReorder, draggingPaletteEntryId]
+  );
+
+  const handlePaletteDrop = useCallback(
+    (event: ReactDragEvent<HTMLButtonElement>) => {
+      if (!canManualPaletteReorder) {
+        return;
+      }
+
+      event.preventDefault();
+      const targetId = event.currentTarget.dataset.id;
+      const sourceId = draggingPaletteEntryId ?? event.dataTransfer.getData('text/plain');
+      setDraggingPaletteEntryId(null);
+      if (!targetId || !sourceId || sourceId === targetId) {
+        return;
+      }
+
+      const targetBounds = event.currentTarget.getBoundingClientRect();
+      const insertAfter = event.clientX >= targetBounds.left + targetBounds.width / 2;
+      reorderPaletteEntries(sourceId, targetId, insertAfter);
+    },
+    [canManualPaletteReorder, draggingPaletteEntryId, reorderPaletteEntries]
+  );
+
+  const activePaletteTab = paletteOrderMode === 'manual' ? 'palette' : paletteAutoSortKey;
+
+  const selectPaletteTab = useCallback(
+    (tab: 'palette' | keyof typeof PALETTE_AUTO_SORT_KEY_LABELS) => {
+      if (tab === 'palette') {
+        setPaletteOrderMode('manual');
+      } else {
+        setPaletteAutoSortKey(tab);
+        setPaletteOrderMode('auto');
+      }
+      paletteOrderDropdownRef.current?.hide();
+    },
+    [setPaletteAutoSortKey, setPaletteOrderMode]
+  );
+
   useEffect(() => {
     if (!paletteColorModalRequest) {
       return;
@@ -169,6 +254,30 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
       window.removeEventListener('keydown', updateModifierState);
       window.removeEventListener('keyup', updateModifierState);
       window.removeEventListener('blur', resetModifierState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (canManualPaletteReorder) {
+      return;
+    }
+    setDraggingPaletteEntryId(null);
+  }, [canManualPaletteReorder]);
+
+  useEffect(() => {
+    const toggleElement = paletteOrderToggleRef.current;
+    if (!toggleElement) {
+      return;
+    }
+
+    const instance = new Dropdown(toggleElement, {
+      autoClose: true
+    });
+    paletteOrderDropdownRef.current = instance;
+
+    return () => {
+      instance.dispose();
+      paletteOrderDropdownRef.current = null;
     };
   }, []);
 
@@ -213,72 +322,140 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
           </button>
         ) : null}
       </div>
-      <div className="palette-grid-wrap flex-grow-1">
-        <div className="palette-grid" role="list" aria-label="palette colors">
-          {palette.map((entry) => (
-            (() => {
-              const isMergeSelected = paletteMergeSelection.includes(entry.id);
-              const isMergeDestination = paletteMergeDestinationId === entry.id;
-              const usageCount = paletteUsageByColor[entry.color]?.count ?? 0;
-              const usageLabel = formatPaletteUsageLabel(usageCount);
-              const titleParts = [entry.color.toUpperCase()];
-              if (entry.caption) {
-                titleParts.push(`caption: ${entry.caption}`);
-              }
-              if (entry.locked) {
-                titleParts.push('ロック');
-              }
-              if (isMergeDestination) {
-                titleParts.push('統合先');
-              } else if (isMergeSelected) {
-                titleParts.push('統合対象');
-              }
-
-              return (
-                <button
-                  key={entry.id}
-                  type="button"
-                  className={`palette-item ${selectedColor === entry.color ? 'active' : ''} ${isMergeSelected ? 'is-multi-selected' : ''} ${
-                    isMergeDestination ? 'is-merge-destination' : ''
-                  }`}
-                  data-id={entry.id}
-                  data-color={entry.color}
-                  onClick={handlePaletteClick}
-                  onDoubleClick={handlePaletteDoubleClick}
-                  onMouseEnter={handlePaletteMouseEnter}
-                  onMouseLeave={handlePaletteMouseLeave}
-                  title={titleParts.join(' / ')}
-                  aria-label={`palette color ${entry.color}`}
-                >
-                  <span className="palette-item-swatch" aria-hidden="true">
-                    <span className="palette-item-swatch-fill" style={{ backgroundColor: entry.color }} />
-                    {isMergeDestination ? <span className="palette-item-merge-badge">残</span> : null}
-                    {entry.locked ? (
-                      <span className="palette-item-lock">
-                        <i className="fa-solid fa-lock" aria-hidden="true" />
-                      </span>
-                    ) : null}
-                    {isUsageModifierPressed ? (
-                      <span className="palette-item-usage">{usageLabel}</span>
-                    ) : null}
-                  </span>
-                  <span className="palette-item-caption">{entry.caption || '\u00A0'}</span>
-                </button>
-              );
-            })()
-          ))}
+      <div className="sidebar-palette-order-toolbar">
+        <button
+          type="button"
+          className="btn btn-sm sidebar-palette-order-home-btn"
+          onClick={() => selectPaletteTab('palette')}
+          title="Palette に戻る"
+          aria-label="Palette に戻る"
+          disabled={activePaletteTab === 'palette'}
+        >
+          <i className="fa-solid fa-house" aria-hidden="true" />
+        </button>
+        <div className="dropdown w-100">
           <button
+            ref={paletteOrderToggleRef}
             type="button"
-            className="palette-item palette-item-add"
-            onClick={openCreatePaletteColorModal}
-            title="新しいパレット色を追加"
-            aria-label="新しいパレット色を追加"
+            className="btn btn-sm btn-outline-secondary dropdown-toggle sidebar-palette-order-toggle w-100"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            aria-label="パレット並び順を選択"
+            title="パレット並び順を選択"
           >
-            <span className="palette-item-swatch" aria-hidden="true">
-              <i className="fa-solid fa-plus" aria-hidden="true" />
+            <span className="sidebar-palette-order-toggle-label">
+              {activePaletteTab === 'palette' ? 'Palette' : PALETTE_AUTO_SORT_KEY_LABELS[activePaletteTab]}
             </span>
-            <span className="palette-item-caption">{'\u00A0'}</span>
           </button>
+          <ul className="dropdown-menu w-100">
+            <li>
+              <button
+                type="button"
+                className={`dropdown-item ${activePaletteTab === 'palette' ? 'active' : ''}`}
+                onClick={() => selectPaletteTab('palette')}
+              >
+                Palette
+              </button>
+            </li>
+            {Object.entries(PALETTE_AUTO_SORT_KEY_LABELS).map(([key, label]) => (
+              <li key={key}>
+                <button
+                  type="button"
+                  className={`dropdown-item ${activePaletteTab === key ? 'active' : ''}`}
+                  onClick={() => selectPaletteTab(key as keyof typeof PALETTE_AUTO_SORT_KEY_LABELS)}
+                >
+                  {label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="sidebar-palette-pane flex-grow-1">
+        <div className="palette-grid-wrap flex-grow-1">
+          <div className="palette-grid" role="list" aria-label="palette colors">
+            {displayPalette.map((entry) => (
+              (() => {
+                const isMergeSelected = paletteMergeSelection.includes(entry.id);
+                const isMergeDestination = paletteMergeDestinationId === entry.id;
+                const isDragging = draggingPaletteEntryId === entry.id;
+                const isTranslucent = hexToRgba(entry.color).a < 255;
+                const usageCount = paletteUsageByColor[entry.color]?.count ?? 0;
+                const usageLabel = formatPaletteUsageLabel(usageCount);
+                const titleParts = [entry.color.toUpperCase()];
+                if (entry.caption) {
+                  titleParts.push(`caption: ${entry.caption}`);
+                }
+                if (entry.locked) {
+                  titleParts.push('ロック');
+                }
+                if (isTranslucent) {
+                  titleParts.push('透過あり');
+                }
+                if (isMergeDestination) {
+                  titleParts.push('統合先');
+                } else if (isMergeSelected) {
+                  titleParts.push('統合対象');
+                }
+                if (canManualPaletteReorder) {
+                  titleParts.push('ドラッグで並び替え');
+                }
+
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className={`palette-item ${selectedColor === entry.color ? 'active' : ''} ${
+                      isMergeSelected ? 'is-multi-selected' : ''
+                    } ${isMergeDestination ? 'is-merge-destination' : ''} ${
+                      canManualPaletteReorder ? 'is-draggable' : ''
+                    } ${isDragging ? 'is-dragging' : ''}`}
+                    data-id={entry.id}
+                    data-color={entry.color}
+                    draggable={canManualPaletteReorder}
+                    onClick={handlePaletteClick}
+                    onDoubleClick={handlePaletteDoubleClick}
+                    onMouseEnter={handlePaletteMouseEnter}
+                    onMouseLeave={handlePaletteMouseLeave}
+                    onDragStart={handlePaletteDragStart}
+                    onDragEnd={handlePaletteDragEnd}
+                    onDragOver={handlePaletteDragOver}
+                    onDrop={handlePaletteDrop}
+                    title={titleParts.join(' / ')}
+                    aria-label={`palette color ${entry.color}`}
+                    aria-grabbed={canManualPaletteReorder ? isDragging : undefined}
+                  >
+                    <span className="palette-item-swatch" aria-hidden="true">
+                      <span className="palette-item-swatch-fill" style={{ backgroundColor: entry.color }} />
+                      {isMergeDestination ? <span className="palette-item-merge-badge">残</span> : null}
+                      {isTranslucent ? <span className="palette-item-alpha-badge">透</span> : null}
+                      {entry.locked ? (
+                        <span className="palette-item-lock">
+                          <i className="fa-solid fa-lock" aria-hidden="true" />
+                        </span>
+                      ) : null}
+                      {isUsageModifierPressed ? (
+                        <span className="palette-item-usage">{usageLabel}</span>
+                      ) : null}
+                    </span>
+                    <span className="palette-item-caption">{entry.caption || '\u00A0'}</span>
+                  </button>
+                );
+              })()
+            ))}
+            <button
+              type="button"
+              className="palette-item palette-item-add"
+              onClick={openCreatePaletteColorModal}
+              title="新しいパレット色を追加"
+              aria-label="新しいパレット色を追加"
+            >
+              <span className="palette-item-swatch" aria-hidden="true">
+                <i className="fa-solid fa-plus" aria-hidden="true" />
+              </span>
+              <span className="palette-item-caption">{'\u00A0'}</span>
+            </button>
+          </div>
         </div>
       </div>
       <PaletteColorModal

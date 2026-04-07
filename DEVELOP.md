@@ -660,21 +660,44 @@ Current metadata shape:
   - Avoid treating raw array index as a durable identifier across order modes.
   - Hover / reference UI that needs a palette index should resolve it from the current `displayPalette`, while tracking the swatch itself by `id`.
 - Auto-sort keys for the first version:
-  - `Hue`
-    - hue ascending, with near-achromatic colors pushed later
-  - `Saturation`
-    - higher first
-  - `Value`
-    - brighter first
-  - `Red`, `Green`, `Blue`
-    - higher channel first
-  - Final tie-breaker should be the canonical manual order to keep display stable.
+  - `Hue①`
+    - `hue -> saturation -> value`
+    - achromatic colors are grouped first
+  - `Hue②`
+    - `hue -> value -> saturation`
+    - achromatic colors are grouped first
+  - `Saturation①`
+    - `saturation -> value -> hue`
+    - achromatic colors are grouped first
+  - `Saturation②`
+    - `saturation -> hue -> value`
+    - achromatic colors are grouped first
+  - `Value①`
+    - `value -> saturation -> hue`
+    - achromatic colors are grouped first
+  - `Value②`
+    - `value -> hue -> saturation`
+    - achromatic colors are grouped first
+  - Shared alpha rule for all six auto tabs:
+    - fully transparent (`alpha = 0`) swatches are pinned to the top
+    - among `alpha > 0` swatches, alpha descending is used as the last sort key
+  - Do not add `Red` / `Green` / `Blue` in the first version.
+    - `Hue` already covers the main “color family” browsing use case
+    - keeping only HSV-based keys keeps the UI smaller and the first release sharper
+  - Final tie-breaker after alpha should be the canonical manual order to keep display stable.
 - UI direction:
-  - Add a new tab inside the palette card (name TBD, e.g. `Sort` / `Arrange`).
-  - Keep the existing palette grid in the palette tab.
-  - The new tab controls:
-    - manual vs auto mode
-    - auto sort key when auto mode is active
+  - Replace the palette card tabs with a Bootstrap dropdown order picker:
+    - `Palette`
+    - `Hue①`
+    - `Hue②`
+    - `Saturation①`
+    - `Saturation②`
+    - `Value①`
+    - `Value②`
+  - The palette grid stays visible while the dropdown only changes the active order mode.
+  - Conceptually:
+    - `Palette` == manual mode
+    - every other tab == auto mode with the matching sort key
   - In manual mode, enable drag-and-drop reorder on the palette grid.
   - In auto mode, disable drag-and-drop and redraw the grid from the derived sort result.
 - Suggested implementation split:
@@ -693,6 +716,22 @@ Current metadata shape:
   - Hover / reference palette index output matches the current display order.
   - Existing delete behavior remains unchanged.
   - Manual reorder is undoable; mode/key switches are not.
+- 2026-04-06 implementation memo:
+  - Added `src/editor/palette-order.ts` for HSV-based display sorting (`Hue①` / `Hue②` / `Saturation①` / `Saturation②` / `Value①` / `Value②`).
+  - Added `src/hooks/usePaletteOrdering.ts` to own non-persistent UI state:
+    - `paletteOrderMode`
+    - `paletteAutoSortKey`
+    - derived `displayPalette`
+  - `SidebarPaletteSection` now uses a Bootstrap dropdown order picker.
+    - `Palette` shows the manual order and enables drag-and-drop
+    - `Hue①` / `Hue②` / `Saturation①` / `Saturation②` / `Value①` / `Value②` switch to auto mode with the matching sort key
+    - the toggle is initialized with `bootstrap/js/dist/dropdown`
+    - a `fa-house` button to the right returns directly to `Palette` and stays disabled while `Palette` is active
+    - the palette grid stays visible while the dropdown only changes the active order
+    - swatches with `alpha < 255` render a compact `透` badge on the swatch
+  - `usePixelReferences.ts` now resolves palette identity by `PaletteEntry.id` but always computes `paletteIndex` from `displayPalette`.
+  - `useDocumentFileActions.ts` resets the palette order view mode to manual after `Open`.
+  - `EditorPaletteMergeBar` now receives `displayPalette` so merge candidates follow the current visible order.
 
 ## 16. Issue #56 Spec Notes (2026-04-06)
 - Goal:

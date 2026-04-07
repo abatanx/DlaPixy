@@ -61,6 +61,7 @@ type UseDocumentFileActionsOptions = {
   setHasUnsavedChanges: Dispatch<SetStateAction<boolean>>;
   resetTilePreviewLayers: () => void;
   resetAnimationFrames: () => void;
+  resetPaletteOrderViewState: () => void;
   clearFloatingPaste: () => void;
   setStatusText: (text: string, type: StatusType) => void;
 };
@@ -97,6 +98,7 @@ export function useDocumentFileActions({
   setHasUnsavedChanges,
   resetTilePreviewLayers,
   resetAnimationFrames,
+  resetPaletteOrderViewState,
   clearFloatingPaste,
   setStatusText
 }: UseDocumentFileActionsOptions) {
@@ -269,6 +271,7 @@ export function useDocumentFileActions({
         setLastTilePreviewSelection(null);
         resetTilePreviewLayers();
         resetAnimationFrames();
+        resetPaletteOrderViewState();
         clearFloatingPaste();
         undoStackRef.current = [];
         pendingZoomAnchorRef.current = null;
@@ -328,6 +331,7 @@ export function useDocumentFileActions({
       pendingViewportRestoreRef,
       pendingZoomAnchorRef,
       resetAnimationFrames,
+      resetPaletteOrderViewState,
       resetTilePreviewLayers,
       selectedColor,
       setCanvasSize,

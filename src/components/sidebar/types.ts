@@ -5,6 +5,7 @@
 
 import type { AnimationFrame, PaletteEntry, Selection, TilePreviewLayer } from '../../editor/types';
 import type { PaletteUsageEntry } from '../../editor/palette-sync';
+import type { PaletteAutoSortKey, PaletteOrderMode } from '../../editor/palette-order';
 import type { TransparentBackgroundMode } from '../../../shared/transparent-background';
 
 export type PaletteColorModalRequest = {
@@ -49,11 +50,18 @@ export type EditorSidebarProps = {
   setSelectedColor: (value: string) => void;
   applySelectedColorChange: (value: PaletteEntry) => void;
   palette: PaletteEntry[];
+  displayPalette: PaletteEntry[];
   paletteUsageByColor: Record<string, PaletteUsageEntry>;
   setHoveredPaletteColor: (value: { id: string } | null) => void;
   addPaletteColor: (value: PaletteEntry) => void;
   removeSelectedColorFromPalette: () => void;
   jumpToPaletteUsage: (color: string) => boolean;
+  paletteOrderMode: PaletteOrderMode;
+  setPaletteOrderMode: (mode: PaletteOrderMode) => void;
+  paletteAutoSortKey: PaletteAutoSortKey;
+  setPaletteAutoSortKey: (key: PaletteAutoSortKey) => void;
+  canManualPaletteReorder: boolean;
+  reorderPaletteEntries: (sourceId: string, targetId: string, insertAfter: boolean) => boolean;
   paletteMergeSelection: string[];
   paletteMergeDestinationId: string | null;
   togglePaletteMergeColor: (entry: PaletteEntry) => void;
@@ -100,11 +108,18 @@ export type SidebarPaletteSectionProps = Pick<
   | 'setSelectedColor'
   | 'applySelectedColorChange'
   | 'palette'
+  | 'displayPalette'
   | 'paletteUsageByColor'
   | 'setHoveredPaletteColor'
   | 'addPaletteColor'
   | 'removeSelectedColorFromPalette'
   | 'jumpToPaletteUsage'
+  | 'paletteOrderMode'
+  | 'setPaletteOrderMode'
+  | 'paletteAutoSortKey'
+  | 'setPaletteAutoSortKey'
+  | 'canManualPaletteReorder'
+  | 'reorderPaletteEntries'
   | 'paletteMergeSelection'
   | 'paletteMergeDestinationId'
   | 'togglePaletteMergeColor'

@@ -670,26 +670,44 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
     - 手動モードでは手動順 index
     - 自動モードでは自動ソート後の表示 index
 - 初版の自動ソート key:
-  - `Hue`
-    - 色相昇順を基本にし、無彩色に近い色は後方へ寄せる
-  - `Saturation`
-    - 高い順
-  - `Value`
-    - 明るい順
-  - `Red`, `Green`, `Blue`
-    - 各チャンネル値が高い順
-  - 同順位になった場合は、canonical な手動順を最終 tie-breaker にして表示を安定させる
+  - `Hue①`
+    - `hue -> saturation -> value`
+    - 無彩色は先頭へまとめる
+  - `Hue②`
+    - `hue -> value -> saturation`
+    - 無彩色は先頭へまとめる
+  - `Saturation①`
+    - `saturation -> value -> hue`
+    - 無彩色は先頭へまとめる
+  - `Saturation②`
+    - `saturation -> hue -> value`
+    - 無彩色は先頭へまとめる
+  - `Value①`
+    - `value -> saturation -> hue`
+    - 無彩色は先頭へまとめる
+  - `Value②`
+    - `value -> hue -> saturation`
+    - 無彩色は先頭へまとめる
+  - 6タブ共通の alpha ルール:
+    - 完全透明 (`alpha = 0`) は先頭固定
+    - `alpha > 0` 同士では、最後のソートキーとして alpha 降順を使う
+  - 初版では `Red` / `Green` / `Blue` は入れない。
+    - 系統を見る用途は `Hue` で十分カバーできる
+    - 初版 UI と実装判断を増やしすぎないため
+  - alpha 比較まで同じなら、canonical な手動順を最終 tie-breaker にして表示を安定させる
 - UI 方針:
-  - パレットカードに新規タブを追加する。
-    - 既存タブ: `Palette`（仮称）
-    - 新規タブ: `Sort` / `Arrange`（名称は実装時に調整）
-  - `Palette` タブ:
-    - 現在どおりスウォッチ grid と追加 / 編集 / 削除 / ジャンプ / merge 操作を置く
-    - 現在の並び順モードに応じた表示順で grid を描画する
-  - 新規タブ:
-    - `手動` / `自動` モード切り替えを置く
-    - `自動` 選択時だけ、ソート key selector を表示する
-    - 現在の表示モードと基準が分かる小さな説明を出す
+  - パレットカードの並び順切り替えは、Bootstrap dropdown にする。
+    - `Palette`
+    - `Hue①`
+    - `Hue②`
+    - `Saturation①`
+    - `Saturation②`
+    - `Value①`
+    - `Value②`
+  - スウォッチ grid は表示したままにして、ドロップダウンだけで並び順モードを切り替える。
+  - 概念上は:
+    - `Palette` が手動モード
+    - それ以外の各タブが、それぞれ対応 key の自動モード
   - 手動モードのときだけ palette grid の drag-and-drop を有効にする。
   - 自動モードでは drag-and-drop を無効にする。
 - 実装分割案:
@@ -709,6 +727,22 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - hover / 参照ラインの palette index 表示が現在の表示順と一致する。
   - merge UI 表示中は手動 DnD が無効になる。
   - 手動並び替えだけが Undo 対象になり、表示モード切り替えは Undo を汚さない。
+- 2026-04-06 実装メモ:
+  - `src/editor/palette-order.ts` を追加して、HSV ベースの表示ソート（`Hue①` / `Hue②` / `Saturation①` / `Saturation②` / `Value①` / `Value②`）をまとめた。
+  - `src/hooks/usePaletteOrdering.ts` を追加して、非永続 UI state を持たせた。
+    - `paletteOrderMode`
+    - `paletteAutoSortKey`
+    - 派生表示用の `displayPalette`
+  - `SidebarPaletteSection` は、Bootstrap dropdown で並び順モードを切り替えるようにした。
+    - `Palette` は手動順を表示して drag-and-drop を有効にする
+    - `Hue①` / `Hue②` / `Saturation①` / `Saturation②` / `Value①` / `Value②` は対応 key の自動ソート表示に切り替える
+    - トグルは `bootstrap/js/dist/dropdown` で初期化する
+    - 右側に `fa-house` ボタンを置き、`Palette` へ直接戻せるようにする（`Palette` 中は disable）
+    - スウォッチ grid は表示したままにする
+    - `alpha < 255` のスウォッチには、スウォッチ内に小さい `透` バッジを重ねて表示する
+  - `usePixelReferences.ts` は、identity を `PaletteEntry.id` で追いながら、`paletteIndex` は常に `displayPalette` から解決するようにした。
+  - `useDocumentFileActions.ts` は、`Open` 後にパレット並び順 view mode を `手動` に戻す。
+  - `EditorPaletteMergeBar` は `displayPalette` を受けるようにして、統合候補の並びも現在の表示順へ合わせた。
 
 ## 16. Issue #56 仕様メモ（2026-04-06）
 - 目的:

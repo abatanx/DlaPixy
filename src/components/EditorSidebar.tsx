@@ -42,11 +42,18 @@ export const EditorSidebar = memo(function EditorSidebar({
   setSelectedColor,
   applySelectedColorChange,
   palette,
+  displayPalette,
   paletteUsageByColor,
   setHoveredPaletteColor,
   addPaletteColor,
   removeSelectedColorFromPalette,
   jumpToPaletteUsage,
+  paletteOrderMode,
+  setPaletteOrderMode,
+  paletteAutoSortKey,
+  setPaletteAutoSortKey,
+  canManualPaletteReorder,
+  reorderPaletteEntries,
   paletteMergeSelection,
   paletteMergeDestinationId,
   togglePaletteMergeColor,
@@ -97,11 +104,18 @@ export const EditorSidebar = memo(function EditorSidebar({
             setSelectedColor={setSelectedColor}
             applySelectedColorChange={applySelectedColorChange}
             palette={palette}
+            displayPalette={displayPalette}
             paletteUsageByColor={paletteUsageByColor}
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
             jumpToPaletteUsage={jumpToPaletteUsage}
+            paletteOrderMode={paletteOrderMode}
+            setPaletteOrderMode={setPaletteOrderMode}
+            paletteAutoSortKey={paletteAutoSortKey}
+            setPaletteAutoSortKey={setPaletteAutoSortKey}
+            canManualPaletteReorder={canManualPaletteReorder}
+            reorderPaletteEntries={reorderPaletteEntries}
             paletteMergeSelection={paletteMergeSelection}
             paletteMergeDestinationId={paletteMergeDestinationId}
             togglePaletteMergeColor={togglePaletteMergeColor}

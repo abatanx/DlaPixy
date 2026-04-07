@@ -26,6 +26,7 @@ type UsePixelReferencesOptions = {
   pixels: Uint8ClampedArray;
   zoom: number;
   palette: PaletteEntry[];
+  displayPalette: PaletteEntry[];
   paletteUsageByColor: Record<string, PaletteUsageEntry>;
   floatingPasteRef: { current: unknown };
   canvasStageRef: MutableRefObject<HTMLDivElement | null>;
@@ -70,6 +71,7 @@ export function usePixelReferences({
   pixels,
   zoom,
   palette,
+  displayPalette,
   paletteUsageByColor,
   floatingPasteRef,
   canvasStageRef,
@@ -87,18 +89,19 @@ export function usePixelReferences({
 
   const resolvePaletteMatch = useCallback(
     (hex8: string): { paletteId: string | null; paletteIndex: number | null; paletteCaption: string | null } => {
-      const paletteIndex = palette.findIndex((entry) => entry.color === hex8.toLowerCase());
-      if (paletteIndex < 0) {
+      const matchedEntry = palette.find((entry) => entry.color === hex8.toLowerCase()) ?? null;
+      if (!matchedEntry) {
         return { paletteId: null, paletteIndex: null, paletteCaption: null };
       }
 
+      const displayPaletteIndex = displayPalette.findIndex((entry) => entry.id === matchedEntry.id);
       return {
-        paletteId: palette[paletteIndex]?.id ?? null,
-        paletteIndex,
-        paletteCaption: palette[paletteIndex]?.caption || null
+        paletteId: matchedEntry.id,
+        paletteIndex: displayPaletteIndex >= 0 ? displayPaletteIndex : null,
+        paletteCaption: matchedEntry.caption || null
       };
     },
-    [palette]
+    [displayPalette, palette]
   );
 
   const resolvePaletteEntryById = useCallback(
@@ -112,12 +115,18 @@ export function usePixelReferences({
         return { entry: null, index: null };
       }
 
+      const entry = palette[paletteIndex] ?? null;
+      if (!entry) {
+        return { entry: null, index: null };
+      }
+
+      const displayPaletteIndex = displayPalette.findIndex((candidate) => candidate.id === paletteId);
       return {
-        entry: palette[paletteIndex] ?? null,
-        index: paletteIndex
+        entry,
+        index: displayPaletteIndex >= 0 ? displayPaletteIndex : null
       };
     },
-    [palette]
+    [displayPalette, palette]
   );
 
   const syncReferencePixelInfo = useCallback(
@@ -349,7 +358,7 @@ export function usePixelReferences({
         return null;
       }
 
-      const paletteIndex = palette.findIndex((entry) => entry.id === hoveredEntry.id);
+      const paletteIndex = displayPalette.findIndex((entry) => entry.id === hoveredEntry.id);
       const { r, g, b, a } = hexToRgba(hoveredEntry.color);
       return {
         x: -1,
@@ -408,6 +417,7 @@ export function usePixelReferences({
     setStatusText(`参照更新: ${formatReferenceSourceLabel(syncedActiveInfo)} -> ${syncedActiveInfo.hex8}`, 'success');
   }, [
     formatReferenceSourceLabel,
+    displayPalette,
     hoveredPaletteColor,
     hoveredPixelInfo,
     palette,

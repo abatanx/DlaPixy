@@ -19,6 +19,7 @@ import { useEditorShellUi } from './hooks/useEditorShellUi';
 import { useFloatingSelectionState } from './hooks/useFloatingSelectionState';
 import { usePaletteManagement } from './hooks/usePaletteManagement';
 import { usePaletteMergeSelection } from './hooks/usePaletteMergeSelection';
+import { usePaletteOrdering } from './hooks/usePaletteOrdering';
 import { useEditorPreviews } from './hooks/useEditorPreviews';
 import { useSelectionOperations } from './hooks/useSelectionOperations';
 import { useSelectionOverlay } from './hooks/useSelectionOverlay';
@@ -247,6 +248,23 @@ export function App() {
     selectedColor,
     setSelectedColor
   });
+  const {
+    paletteOrderMode,
+    setPaletteOrderMode,
+    paletteAutoSortKey,
+    setPaletteAutoSortKey,
+    displayPalette,
+    canManualPaletteReorder,
+    reorderPaletteEntries,
+    resetPaletteOrderViewState
+  } = usePaletteOrdering({
+    palette,
+    paletteMergeSelection,
+    pushUndo,
+    setPalette,
+    setHasUnsavedChanges,
+    setStatusText
+  });
 
   const {
     applyFloatingPasteBlock,
@@ -304,6 +322,7 @@ export function App() {
     pixels,
     zoom,
     palette,
+    displayPalette,
     paletteUsageByColor: paletteUsage.byColor,
     floatingPasteRef,
     canvasStageRef,
@@ -455,6 +474,7 @@ export function App() {
     setHasUnsavedChanges,
     resetTilePreviewLayers,
     resetAnimationFrames,
+    resetPaletteOrderViewState,
     clearFloatingPaste,
     setStatusText
   });
@@ -535,11 +555,18 @@ export function App() {
             setSelectedColor={setSelectedColor}
             applySelectedColorChange={applySelectedColorChange}
             palette={palette}
+            displayPalette={displayPalette}
             paletteUsageByColor={paletteUsage.byColor}
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
             jumpToPaletteUsage={jumpToPaletteUsage}
+            paletteOrderMode={paletteOrderMode}
+            setPaletteOrderMode={setPaletteOrderMode}
+            paletteAutoSortKey={paletteAutoSortKey}
+            setPaletteAutoSortKey={setPaletteAutoSortKey}
+            canManualPaletteReorder={canManualPaletteReorder}
+            reorderPaletteEntries={reorderPaletteEntries}
             paletteMergeSelection={paletteMergeSelection}
             paletteMergeDestinationId={paletteMergeDestinationId}
             togglePaletteMergeColor={togglePaletteMergeColor}
@@ -549,7 +576,7 @@ export function App() {
           <div className="col-12 col-lg-8 col-xl-9 d-flex flex-column gap-3 editor-workspace-column">
             {showPaletteMergeUi ? (
               <EditorPaletteMergeBar
-                palette={palette}
+                palette={displayPalette}
                 paletteUsageByColor={paletteUsage.byColor}
                 paletteMergeSelection={paletteMergeSelection}
                 paletteMergeDestinationId={paletteMergeDestinationId}
