@@ -47,6 +47,14 @@ function reorderPaletteEntryList(
   return nextEntries;
 }
 
+function hasSamePaletteEntryOrder(left: PaletteEntry[], right: PaletteEntry[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((entry, index) => entry.id === right[index]?.id);
+}
+
 export function usePaletteOrdering({
   palette,
   paletteMergeSelection,
@@ -63,6 +71,10 @@ export function usePaletteOrdering({
     [palette, paletteAutoSortKey, paletteOrderMode]
   );
   const canManualPaletteReorder = paletteOrderMode === 'manual' && paletteMergeSelection.length < 2;
+  const canApplyDisplayPaletteOrder =
+    paletteOrderMode === 'auto' &&
+    paletteMergeSelection.length < 2 &&
+    !hasSamePaletteEntryOrder(displayPalette, palette);
 
   const reorderPaletteEntries = useCallback(
     (sourceId: string, targetId: string, insertAfter: boolean): boolean => {
@@ -84,6 +96,27 @@ export function usePaletteOrdering({
     [canManualPaletteReorder, palette, pushUndo, setHasUnsavedChanges, setPalette, setStatusText]
   );
 
+  const applyDisplayPaletteOrder = useCallback((): boolean => {
+    if (!canApplyDisplayPaletteOrder) {
+      return false;
+    }
+
+    pushUndo();
+    setPalette(displayPalette);
+    setHasUnsavedChanges(true);
+    setPaletteOrderMode('manual');
+    setStatusText('プレビュー順をパレットへ反映しました', 'success');
+    return true;
+  }, [
+    canApplyDisplayPaletteOrder,
+    displayPalette,
+    pushUndo,
+    setHasUnsavedChanges,
+    setPalette,
+    setPaletteOrderMode,
+    setStatusText
+  ]);
+
   const resetPaletteOrderViewState = useCallback(() => {
     setPaletteOrderMode(DEFAULT_PALETTE_ORDER_MODE);
   }, []);
@@ -95,7 +128,9 @@ export function usePaletteOrdering({
     setPaletteAutoSortKey,
     displayPalette,
     canManualPaletteReorder,
+    canApplyDisplayPaletteOrder,
     reorderPaletteEntries,
+    applyDisplayPaletteOrder,
     resetPaletteOrderViewState
   };
 }

@@ -52,7 +52,7 @@ npm run dist
   - Canvas: default `256x256` (change from native `Canvas` menu modal)
   - Grid overlay spacing: numeric input `0..canvasSize` (`0` = none)
 - Initial palette uses the 216 Web Safe Colors
-- Palette entries can store a short caption (up to 4 characters), shown under each swatch
+- Palette entries can store a caption (up to 100 characters), shown under each swatch
   - Double-clicking an existing palette swatch selects it and opens the color edit modal
 - Palette entries now also carry a `locked` flag
   - Lock / unlock is controlled from the palette color modal
@@ -423,7 +423,7 @@ Current metadata shape:
 - The palette color modal preview shows both the original color and the current editing color side by side, with a nearby `Delta HSV` diff.
 - Palette entries are stored as `{ color, caption }[]`.
 - Palette entries are now stored as `{ color, caption, locked }[]`.
-- Palette caption max length is managed by `PALETTE_CAPTION_MAX_LENGTH` in `src/editor/constants.ts`.
+- Palette caption max length is managed by `PALETTE_CAPTION_MAX_LENGTH` in `shared/palette.ts`.
 - `src/editor/palette-sync.ts` is the canonical home for:
   - per-color pixel usage scanning
   - swatch sync options (`removeUnusedColors`, `addUsedColors`)
@@ -727,6 +727,7 @@ Current metadata shape:
     - `Hue①` / `Hue②` / `Saturation①` / `Saturation②` / `Value①` / `Value②` switch to auto mode with the matching sort key
     - the toggle is initialized with `bootstrap/js/dist/dropdown`
     - a `fa-house` button to the right returns directly to `Palette` and stays disabled while `Palette` is active
+    - auto preview mode shows an `Apply` button that writes the current `displayPalette` order back into canonical `palette`
     - the palette grid stays visible while the dropdown only changes the active order
     - swatches with `alpha < 255` render a compact `透` badge on the swatch
   - `usePixelReferences.ts` now resolves palette identity by `PaletteEntry.id` but always computes `paletteIndex` from `displayPalette`.

@@ -10,7 +10,7 @@ export type PaletteEntry = {
   locked: boolean;
 };
 
-export const PALETTE_CAPTION_MAX_LENGTH = 4;
+export const PALETTE_CAPTION_MAX_LENGTH = 100;
 const PALETTE_ENTRY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isPaletteEntryId(value: unknown): value is string {

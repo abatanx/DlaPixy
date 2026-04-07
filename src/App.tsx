@@ -255,7 +255,9 @@ export function App() {
     setPaletteAutoSortKey,
     displayPalette,
     canManualPaletteReorder,
+    canApplyDisplayPaletteOrder,
     reorderPaletteEntries,
+    applyDisplayPaletteOrder,
     resetPaletteOrderViewState
   } = usePaletteOrdering({
     palette,
@@ -566,7 +568,9 @@ export function App() {
             paletteAutoSortKey={paletteAutoSortKey}
             setPaletteAutoSortKey={setPaletteAutoSortKey}
             canManualPaletteReorder={canManualPaletteReorder}
+            canApplyDisplayPaletteOrder={canApplyDisplayPaletteOrder}
             reorderPaletteEntries={reorderPaletteEntries}
+            applyDisplayPaletteOrder={applyDisplayPaletteOrder}
             paletteMergeSelection={paletteMergeSelection}
             paletteMergeDestinationId={paletteMergeDestinationId}
             togglePaletteMergeColor={togglePaletteMergeColor}

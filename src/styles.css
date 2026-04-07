@@ -969,8 +969,14 @@ body {
 .sidebar-palette-order-toggle-label {
   min-width: 0;
   flex: 1 1 auto;
-  font-size: 0.74rem;
   line-height: 1.1;
+}
+
+.sidebar-palette-order-apply-btn {
+  flex: 0 0 auto;
+  align-self: stretch;
+  padding: 0 0.8rem;
+  white-space: nowrap;
 }
 
 .sidebar-palette-order-toolbar .dropdown-menu {

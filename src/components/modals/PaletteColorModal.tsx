@@ -361,20 +361,24 @@ export function PaletteColorModal({
             <div className="modal-body py-4">
               <div className="row g-3 mb-4">
                 <div className="col-12">
-                  <label htmlFor="palette-color-caption-input" className="form-label">Caption</label>
-                  <input
-                    id="palette-color-caption-input"
-                    type="text"
-                    inputMode="text"
-                    autoCapitalize="characters"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    className="form-control font-monospace"
-                    value={pendingCaptionInput}
-                    onChange={handleCaptionInputChange}
-                    placeholder={`${PALETTE_CAPTION_MAX_LENGTH}文字まで`}
-                    maxLength={PALETTE_CAPTION_MAX_LENGTH}
-                  />
+                  <div className="input-group">
+                    <span id="palette-color-caption-prefix" className="input-group-text">
+                      名前
+                    </span>
+                    <input
+                      id="palette-color-caption-input"
+                      type="text"
+                      inputMode="text"
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className="form-control font-monospace"
+                      value={pendingCaptionInput}
+                      onChange={handleCaptionInputChange}
+                      maxLength={PALETTE_CAPTION_MAX_LENGTH}
+                      aria-describedby="palette-color-caption-prefix"
+                    />
+                  </div>
                 </div>
                 <div className="col-12">
                   <div className="form-check form-switch palette-color-modal-lock-switch">
@@ -395,12 +399,15 @@ export function PaletteColorModal({
               <div className="palette-color-modal-preview mb-4">
                 <div className="palette-color-modal-preview-item">
                   <div className={`palette-color-modal-preview-swatch ${transparentBackgroundClassName}`} aria-hidden="true">
-                    <div className="palette-color-modal-preview-swatch-fill" style={{ backgroundColor: originalColorHex }} />
+                    <div className="palette-color-modal-preview-swatch-fill" style={{ backgroundColor: currentColorHex }} />
                   </div>
                   <div className="palette-color-modal-preview-meta">
-                    <div className="small text-uppercase text-secondary fw-semibold">Before</div>
-                    <div className="font-monospace fs-5">{originalColorHex}</div>
+                    <div className="small text-uppercase text-secondary fw-semibold">Current Color</div>
+                    <div className="font-monospace fs-5">{currentColorHex}</div>
                   </div>
+                </div>
+                <div className="palette-color-modal-preview-arrow text-secondary" aria-hidden="true">
+                  <i className="fa-solid fa-arrow-left" />
                 </div>
                 <div className="palette-color-modal-preview-delta">
                   <div className="small text-uppercase text-secondary fw-semibold">Delta HSV</div>
@@ -410,16 +417,13 @@ export function PaletteColorModal({
                     <span>V {formatSignedDelta(hsvDelta.v)}</span>
                   </div>
                 </div>
-                <div className="palette-color-modal-preview-arrow text-secondary" aria-hidden="true">
-                  <i className="fa-solid fa-arrow-right" />
-                </div>
                 <div className="palette-color-modal-preview-item">
                   <div className={`palette-color-modal-preview-swatch ${transparentBackgroundClassName}`} aria-hidden="true">
-                    <div className="palette-color-modal-preview-swatch-fill" style={{ backgroundColor: currentColorHex }} />
+                    <div className="palette-color-modal-preview-swatch-fill" style={{ backgroundColor: originalColorHex }} />
                   </div>
                   <div className="palette-color-modal-preview-meta">
-                    <div className="small text-uppercase text-secondary fw-semibold">Current Color</div>
-                    <div className="font-monospace fs-5">{currentColorHex}</div>
+                    <div className="small text-uppercase text-secondary fw-semibold">Before</div>
+                    <div className="font-monospace fs-5">{originalColorHex}</div>
                   </div>
                 </div>
               </div>

@@ -30,7 +30,9 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   paletteAutoSortKey,
   setPaletteAutoSortKey,
   canManualPaletteReorder,
+  canApplyDisplayPaletteOrder,
   reorderPaletteEntries,
+  applyDisplayPaletteOrder,
   paletteMergeSelection,
   paletteMergeDestinationId,
   togglePaletteMergeColor,
@@ -343,15 +345,15 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
             aria-label="パレット並び順を選択"
             title="パレット並び順を選択"
           >
-            <span className="sidebar-palette-order-toggle-label">
+            <span className="sidebar-palette-order-toggle-label small">
               {activePaletteTab === 'palette' ? 'Palette' : PALETTE_AUTO_SORT_KEY_LABELS[activePaletteTab]}
             </span>
           </button>
-          <ul className="dropdown-menu w-100">
+          <ul className="dropdown-menu w-100 small">
             <li>
               <button
                 type="button"
-                className={`dropdown-item ${activePaletteTab === 'palette' ? 'active' : ''}`}
+                className={`dropdown-item small ${activePaletteTab === 'palette' ? 'active' : ''}`}
                 onClick={() => selectPaletteTab('palette')}
               >
                 Palette
@@ -361,7 +363,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
               <li key={key}>
                 <button
                   type="button"
-                  className={`dropdown-item ${activePaletteTab === key ? 'active' : ''}`}
+                  className={`dropdown-item small ${activePaletteTab === key ? 'active' : ''}`}
                   onClick={() => selectPaletteTab(key as keyof typeof PALETTE_AUTO_SORT_KEY_LABELS)}
                 >
                   {label}
@@ -370,6 +372,18 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
             ))}
           </ul>
         </div>
+        {paletteOrderMode === 'auto' ? (
+          <button
+            type="button"
+            className="btn btn-sm btn-primary sidebar-palette-order-apply-btn"
+            onClick={applyDisplayPaletteOrder}
+            title="現在のプレビュー順をパレットへ反映"
+            aria-label="現在のプレビュー順をパレットへ反映"
+            disabled={!canApplyDisplayPaletteOrder}
+          >
+            適用
+          </button>
+        ) : null}
       </div>
       <div className="sidebar-palette-pane flex-grow-1">
         <div className="palette-grid-wrap flex-grow-1">

@@ -416,7 +416,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - パレット色モーダルのプレビューは、変更前の色と現在編集中の色を横並びで表示し、近くに `Delta HSV` 差分を出す。
 - パレット項目は `{ color, caption }[]` で保持する。
 - パレット項目は `{ color, caption, locked }[]` で保持する。
-- パレットキャプションの最大文字数は `src/editor/constants.ts` の `PALETTE_CAPTION_MAX_LENGTH` で管理する。
+- パレットキャプションの最大文字数は `shared/palette.ts` の `PALETTE_CAPTION_MAX_LENGTH` で管理する。
 - `src/editor/palette-sync.ts` を、以下の共通責務の置き場にした。
   - 色ごとの使用ピクセル数集計
   - スウォッチ同期オプション（`removeUnusedColors`, `addUsedColors`）
@@ -738,6 +738,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
     - `Hue①` / `Hue②` / `Saturation①` / `Saturation②` / `Value①` / `Value②` は対応 key の自動ソート表示に切り替える
     - トグルは `bootstrap/js/dist/dropdown` で初期化する
     - 右側に `fa-house` ボタンを置き、`Palette` へ直接戻せるようにする（`Palette` 中は disable）
+    - 自動 preview 中は `適用` ボタンを出し、現在の `displayPalette` 順を canonical な `palette` へ反映できるようにする
     - スウォッチ grid は表示したままにする
     - `alpha < 255` のスウォッチには、スウォッチ内に小さい `透` バッジを重ねて表示する
   - `usePixelReferences.ts` は、identity を `PaletteEntry.id` で追いながら、`paletteIndex` は常に `displayPalette` から解決するようにした。

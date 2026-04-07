@@ -61,7 +61,9 @@ export type EditorSidebarProps = {
   paletteAutoSortKey: PaletteAutoSortKey;
   setPaletteAutoSortKey: (key: PaletteAutoSortKey) => void;
   canManualPaletteReorder: boolean;
+  canApplyDisplayPaletteOrder: boolean;
   reorderPaletteEntries: (sourceId: string, targetId: string, insertAfter: boolean) => boolean;
+  applyDisplayPaletteOrder: () => boolean;
   paletteMergeSelection: string[];
   paletteMergeDestinationId: string | null;
   togglePaletteMergeColor: (entry: PaletteEntry) => void;
@@ -119,7 +121,9 @@ export type SidebarPaletteSectionProps = Pick<
   | 'paletteAutoSortKey'
   | 'setPaletteAutoSortKey'
   | 'canManualPaletteReorder'
+  | 'canApplyDisplayPaletteOrder'
   | 'reorderPaletteEntries'
+  | 'applyDisplayPaletteOrder'
   | 'paletteMergeSelection'
   | 'paletteMergeDestinationId'
   | 'togglePaletteMergeColor'
