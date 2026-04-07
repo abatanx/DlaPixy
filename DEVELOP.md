@@ -479,6 +479,8 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/3
 - #33 `fix: Edited image disappears when changing canvas size`
   - https://github.com/abatanx/DlaPixy/issues/33
+- #38 `spec: Unity / iOS / Android 向けスライス機能を整理する`
+  - https://github.com/abatanx/DlaPixy/issues/38
 - #42 `refactor: スウォッチ整理処理を共通化する`
   - https://github.com/abatanx/DlaPixy/issues/42
 - #46 `feat: パレットの並び順モードを追加する（手動並び替え / 自動ソート）`
@@ -789,3 +791,60 @@ Current metadata shape:
   - `SIDECAR_SCHEMA_VERSION` was bumped to `2`, and sidecar palette entries now require UUID-format `id`.
   - Palette hover / reference lines and merge-selection UI now track swatches by `id`, resolving display index only when needed.
   - Color-semantic operations such as usage counts, pixel replacement, delete, and merge execution still resolve through `color`.
+
+## 17. Issue #38 Spec Notes (2026-04-07)
+- Goal:
+  - Reframe slices in a Fireworks-like way for DlaPixy:
+    - not as temporary selection
+    - but as persistent rectangular metadata for Unity / iOS / Android asset export
+- Proposed meaning split:
+  - `selection`
+    - temporary editing target
+  - `slice`
+    - saved rectangular asset definition / export unit
+- Proposed first version:
+  - support `user slice` only
+  - add a dedicated `slice` button to the right toolbar
+  - create one slice by dragging directly on the canvas
+  - generate multiple slices from a fixed grid over `Canvas`
+  - show slices as both canvas overlay and a persistent list
+  - render slice overlays as semi-transparent green rectangles
+  - allow add / select / move / resize / delete interactions while slice mode is active
+  - support slice multi-selection:
+    - `Cmd/Ctrl + A` selects all slices
+    - `Cmd/Ctrl + click` toggles individual slices into the selection
+    - `Cmd/Ctrl + D` duplicates the selected slices
+    - `Cmd/Ctrl + C` copies the selected slices
+    - `Cmd/Ctrl + V` pastes copied slices
+  - clicking a slice can push its rectangle into current selection
+  - while slice mode is active, replace the normal left `Preview` / `Palette` cards with a dedicated slice info panel
+  - save slices in sidecar metadata from the first version
+- Explicitly defer from the first version:
+  - auto slices
+  - per-slice export settings
+  - atlas / spritesheet auto layout
+  - Fireworks-style HTML / URL / alt metadata
+  - selection-driven slice creation
+- Proposed minimal shape:
+  - `EditorSlice = { id, name, x, y, w, h }`
+- Design direction:
+  - treat fixed-grid split as a slice-generation helper, not as the slice model itself
+  - store every slice as a `1x` logical base rect
+  - keep density / naming expansion in future export profiles
+  - target export compatibility such as:
+    - generic `name.png`, `name@2x.png`, `name@4x.png`
+    - Apple-style `name.png`, `name@2x.png`, `name@3x.png`
+    - Android drawable directory variants
+  - use a toolbar-driven `slice mode` for canvas interactions
+  - switch the left sidebar to a slice-only info panel during slice mode
+  - keep modal-based bulk generation for grid creation
+  - resize should be direct-manipulation via 8 always-visible handles (`TL / TC / TR / ML / MR / BL / BC / BR`) on the active slice
+  - treat slice selection as:
+    - `selectedSliceIds` for the full set
+    - `activeSliceId` for the last-focused slice
+  - allow group move / group delete for multi-selection
+  - allow group duplicate / group copy / group paste for multi-selection
+  - treat slice copy as metadata copy into an internal slice clipboard
+  - pasted slices must receive new `id` values
+  - keep resize available only for single selection
+  - completely disable `selection`, `Tile Preview`, and `Animation Preview` while slice mode is active

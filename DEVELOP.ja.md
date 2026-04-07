@@ -486,6 +486,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - https://github.com/abatanx/DlaPixy/issues/3
 - #33 `fix: キャンバスサイズ変更で編集中の画像が消える`
   - https://github.com/abatanx/DlaPixy/issues/33
+- #38 `spec: Unity / iOS / Android 向けスライス機能を整理する`
+  - https://github.com/abatanx/DlaPixy/issues/38
 - #42 `refactor: スウォッチ整理処理を共通化する`
   - https://github.com/abatanx/DlaPixy/issues/42
 - #46 `feat: パレットの並び順モードを追加する（手動並び替え / 自動ソート）`
@@ -800,3 +802,58 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - `SIDECAR_SCHEMA_VERSION` は `2` に上げ、sidecar の palette entry では UUID 形式の `id` を必須にした。
   - パレット hover / 参照ライン / merge 選択 UI は `id` で追跡し、表示 index は必要時に都度解決する形へ寄せた。
   - 使用数集計、ピクセル置換、削除、merge 実行のような色意味論の処理は引き続き `color` で解決する。
+
+## 17. Issue #38 仕様メモ（2026-04-07）
+- 目的:
+  - Fireworks ライクな slice を DlaPixy 向けに再定義する。
+    - 一時的な selection ではなく
+    - Unity / iOS / Android 向けアセット export の基準になる persistent な矩形メタデータとして扱う
+- 意味の切り分け案:
+  - `selection`
+    - 一時的な編集対象
+  - `slice`
+    - 保存されるアセット矩形定義 / export 単位
+- 初版の提案:
+  - `user slice` のみ対応
+  - 右側ツールバーに専用の `slice` ボタンを追加する
+  - canvas 上のドラッグで 1 件作成できる
+  - `Canvas` を対象に固定グリッドから複数 slice を生成できる
+  - canvas overlay と常設一覧の両方で slice を確認できる
+  - slice overlay は緑の半透明矩形で表示する
+  - slice モード中に追加 / 選択 / 移動 / サイズ変更 / 削除できる
+  - slice の複数選択に対応する
+    - `Cmd/Ctrl + A` で全 slice を選択
+    - `Cmd/Ctrl + click` で個別 slice の選択追加 / 解除
+    - `Cmd/Ctrl + D` で選択中 slice を複製
+    - `Cmd/Ctrl + C` で選択中 slice をコピー
+    - `Cmd/Ctrl + V` でコピー済み slice を貼り付け
+  - slice をクリックすると current selection へ反映できる
+  - slice モード中は通常の左 `Preview / Palette` カードを隠し、slice 専用情報パネルへ切り替える
+  - sidecar metadata に保存する
+- 初版で見送るもの:
+  - auto slice
+  - slice ごとの export 設定
+  - atlas / spritesheet 自動配置
+  - Fireworks の HTML / URL / alt 系メタ
+  - selection 起点の slice 生成
+- 最小 shape 案:
+  - `EditorSlice = { id, name, x, y, w, h }`
+- 設計方針:
+  - fixed grid 分割は slice 本体ではなく、slice を量産する生成 helper として扱う
+  - すべての slice は `1x` 基準の logical rect として保存する
+  - density や命名規則の展開は将来の export profile 側で扱う
+  - 想定する export 相性:
+    - 汎用 `name.png`, `name@2x.png`, `name@4x.png`
+    - Apple 系 `name.png`, `name@2x.png`, `name@3x.png`
+    - Android の drawable directory 系
+  - canvas 操作は toolbar の `slice` モードへ寄せる
+  - slice モード中の左 sidebar は slice 専用情報パネルへ切り替える
+  - grid 生成のような一括処理は modal に寄せる
+  - resize は active slice の 4辺+4角、計 8 個の handle（`TL / TC / TR / ML / MR / BL / BC / BR`）を常時表示し、直接ドラッグして行う
+  - slice 選択は `selectedSliceIds` と `activeSliceId` を分けて扱う
+  - 複数選択時は group move / group delete を有効にする
+  - 複数選択時は group duplicate / group copy / group paste も有効にする
+  - slice の copy は、矩形定義を内部 slice clipboard へ保持する扱いにする
+  - paste で作る slice には新しい `id` を採番する
+  - resize は単一選択時だけ有効にする
+  - slice モード中は `selection` / `Tile Preview` / `Animation Preview` を完全に無効化する
