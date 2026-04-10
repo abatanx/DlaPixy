@@ -4,6 +4,8 @@
  **/
 
 import {
+  useCallback,
+  useState,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
   type MutableRefObject,
@@ -15,7 +17,13 @@ import {
 } from '../../shared/floating-composite';
 import { EditorToolbar } from './EditorToolbar';
 import type { FloatingResizeHandle } from '../editor/floating-interaction';
-import type { FloatingCompositeMode, HoveredPixelInfo, Selection, Tool } from '../editor/types';
+import {
+  SLICE_CANVAS_EDGE_HIT_PADDING_PX,
+  SLICE_RESIZE_HANDLE_ORDER,
+  getSliceHandleStyle,
+  type SliceResizeHandle
+} from '../editor/slices';
+import type { EditorSlice, FloatingCompositeMode, HoveredPixelInfo, Selection, Tool } from '../editor/types';
 
 type PixelInfoFields = {
   rgba: string;
@@ -38,6 +46,13 @@ type EditorCanvasWorkspaceProps = {
   onMouseMove: (event: ReactMouseEvent<HTMLCanvasElement>) => void;
   onMouseUp: () => void;
   onMouseLeaveCanvas: () => void;
+  slices: EditorSlice[];
+  draftSlice: Omit<EditorSlice, 'id' | 'name'> | null;
+  selectionMarquee: Omit<EditorSlice, 'id' | 'name'> | null;
+  selectedSliceIds: string[];
+  activeSliceId: string | null;
+  onSliceMouseDown: (event: ReactMouseEvent<HTMLDivElement>, sliceId: string) => void;
+  onSliceHandleMouseDown: (event: ReactMouseEvent<HTMLButtonElement>, sliceId: string, handle: SliceResizeHandle) => void;
   selectionOverlaySelection: Selection;
   selectionOverlayBaseStyle?: CSSProperties;
   isFloatingPasteActive: boolean;
@@ -64,6 +79,7 @@ type EditorCanvasWorkspaceProps = {
   tool: Tool;
   setTool: (tool: Tool) => void;
   hasCommittedSelection: boolean;
+  canDeleteAction: boolean;
   addAnimationFrame: () => void;
   openSelectionRotateModal: () => void;
   zoomIn: () => void;
@@ -87,6 +103,13 @@ export function EditorCanvasWorkspace({
   onMouseMove,
   onMouseUp,
   onMouseLeaveCanvas,
+  slices,
+  draftSlice,
+  selectionMarquee,
+  selectedSliceIds,
+  activeSliceId,
+  onSliceMouseDown,
+  onSliceHandleMouseDown,
   selectionOverlaySelection,
   selectionOverlayBaseStyle,
   isFloatingPasteActive,
@@ -113,6 +136,7 @@ export function EditorCanvasWorkspace({
   tool,
   setTool,
   hasCommittedSelection,
+  canDeleteAction,
   addAnimationFrame,
   openSelectionRotateModal,
   zoomIn,
@@ -122,19 +146,58 @@ export function EditorCanvasWorkspace({
   pasteSelection,
   deleteSelection
 }: EditorCanvasWorkspaceProps) {
+  const [isSliceCreateHotzoneHovered, setIsSliceCreateHotzoneHovered] = useState(false);
   const stopFloatingCompositePointerDown = (event: ReactMouseEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
   };
+  const selectedSliceIdSet = new Set(selectedSliceIds);
+  const isSlicePanPassThrough = tool === 'slice' && (isSpacePressed || isPanning);
+  const updateSliceCreateHotzoneHover = useCallback(
+    (clientX: number, clientY: number) => {
+      if (tool !== 'slice' || isSpacePressed || isPanning || !canvasRef.current) {
+        setIsSliceCreateHotzoneHovered(false);
+        return;
+      }
+
+      const rect = canvasRef.current.getBoundingClientRect();
+      const isWithinExpandedCanvas =
+        clientX >= rect.left - SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
+        clientX <= rect.right + SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
+        clientY >= rect.top - SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
+        clientY <= rect.bottom + SLICE_CANVAS_EDGE_HIT_PADDING_PX;
+      const isInsideVisibleCanvas =
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom;
+
+      setIsSliceCreateHotzoneHovered(isWithinExpandedCanvas && !isInsideVisibleCanvas);
+    },
+    [canvasRef, isPanning, isSpacePressed, tool]
+  );
+  const onCanvasStageMouseMove = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      updateSliceCreateHotzoneHover(event.clientX, event.clientY);
+    },
+    [updateSliceCreateHotzoneHover]
+  );
+  const onCanvasStageMouseLeave = useCallback(() => {
+    setIsSliceCreateHotzoneHovered(false);
+  }, []);
 
   return (
     <main className="editor-workspace d-flex flex-column flex-grow-1">
       <div className="card shadow-sm editor-card flex-grow-1">
         <div
           ref={canvasStageRef}
-          className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''}`}
+          className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''} ${
+            isSliceCreateHotzoneHovered ? 'is-slice-create-hotzone' : ''
+          }`}
           style={{ '--floating-stage-padding': `${floatingStagePaddingPx}px` } as CSSProperties}
           onMouseDown={onCanvasStageMouseDown}
+          onMouseMove={onCanvasStageMouseMove}
+          onMouseLeave={onCanvasStageMouseLeave}
         >
           <div className="canvas-surface">
             <canvas
@@ -147,6 +210,75 @@ export function EditorCanvasWorkspace({
               onMouseUp={onMouseUp}
               onMouseLeave={onMouseLeaveCanvas}
             />
+            {tool === 'slice'
+              ? slices.map((slice) => {
+                  const isSelected = selectedSliceIdSet.has(slice.id);
+                  const isActive = activeSliceId === slice.id;
+                  return (
+                    <div
+                      key={slice.id}
+                      className={`canvas-slice-overlay ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''} ${
+                        isSlicePanPassThrough ? 'is-pan-pass-through' : ''
+                      }`}
+                      style={{
+                        left: `${slice.x * zoom + 1}px`,
+                        top: `${slice.y * zoom + 1}px`,
+                        width: `${slice.w * zoom}px`,
+                        height: `${slice.h * zoom}px`
+                      }}
+                      onMouseDown={(event) => onSliceMouseDown(event, slice.id)}
+                    >
+                      <div
+                        className="canvas-slice-hit-area"
+                        aria-hidden="true"
+                      />
+                      <span className="canvas-slice-label corner">
+                        {slice.name || 'slice'}
+                      </span>
+                      <span className="canvas-slice-label top">{slice.w}</span>
+                      <span className="canvas-slice-label left">{slice.h}</span>
+                      {isActive && selectedSliceIds.length === 1
+                        ? SLICE_RESIZE_HANDLE_ORDER.map((handle) => (
+                            <button
+                              key={handle}
+                              type="button"
+                              className="canvas-slice-handle"
+                              data-handle={handle}
+                              aria-label={`slice-resize-${handle}`}
+                              style={getSliceHandleStyle(handle)}
+                              onMouseDown={(event) => onSliceHandleMouseDown(event, slice.id, handle)}
+                              tabIndex={-1}
+                            />
+                          ))
+                        : null}
+                    </div>
+                  );
+                })
+              : null}
+            {tool === 'slice' && draftSlice ? (
+              <div
+                className={`canvas-slice-overlay is-draft ${isSlicePanPassThrough ? 'is-pan-pass-through' : ''}`}
+                style={{
+                  left: `${draftSlice.x * zoom + 1}px`,
+                  top: `${draftSlice.y * zoom + 1}px`,
+                  width: `${draftSlice.w * zoom}px`,
+                  height: `${draftSlice.h * zoom}px`
+                }}
+                aria-hidden="true"
+              />
+            ) : null}
+            {tool === 'slice' && selectionMarquee ? (
+              <div
+                className={`canvas-slice-selection-marquee ${isSlicePanPassThrough ? 'is-pan-pass-through' : ''}`}
+                style={{
+                  left: `${selectionMarquee.x * zoom + 1}px`,
+                  top: `${selectionMarquee.y * zoom + 1}px`,
+                  width: `${selectionMarquee.w * zoom}px`,
+                  height: `${selectionMarquee.h * zoom}px`
+                }}
+                aria-hidden="true"
+              />
+            ) : null}
             {selectionOverlaySelection ? (
               <>
                 <div
@@ -367,7 +499,7 @@ export function EditorCanvasWorkspace({
           tool={tool}
           setTool={setTool}
           canAddAnimationFrame={hasCommittedSelection}
-          canDeleteSelection={hasCommittedSelection}
+          canDeleteSelection={canDeleteAction}
           addAnimationFrame={addAnimationFrame}
           canRotateSelection={hasCommittedSelection}
           openSelectionRotateModal={openSelectionRotateModal}

@@ -20,6 +20,7 @@ type UseEditorPreviewsOptions = {
   pixels: Uint8ClampedArray;
   selection: Selection;
   isFloatingPasteActive: boolean;
+  disabled?: boolean;
   setStatusText: (text: string, type: StatusType) => void;
 };
 
@@ -28,6 +29,7 @@ export function useEditorPreviews({
   pixels,
   selection,
   isFloatingPasteActive,
+  disabled = false,
   setStatusText
 }: UseEditorPreviewsOptions) {
   const [lastTilePreviewSelection, setLastTilePreviewSelection] = useState<Selection>(null);
@@ -70,13 +72,19 @@ export function useEditorPreviews({
   );
 
   useEffect(() => {
+    if (disabled) {
+      return;
+    }
     if (!selection || isFloatingPasteActive) {
       return;
     }
     setLastTilePreviewSelection(selection);
-  }, [isFloatingPasteActive, selection]);
+  }, [disabled, isFloatingPasteActive, selection]);
 
   const tilePreviewCandidateLayer = useMemo(() => {
+    if (disabled) {
+      return null;
+    }
     if (!selection || isFloatingPasteActive) {
       return null;
     }
@@ -86,7 +94,7 @@ export function useEditorPreviews({
       height: block.height,
       pixels: block.pixels
     };
-  }, [canvasSize, isFloatingPasteActive, pixels, selection]);
+  }, [canvasSize, disabled, isFloatingPasteActive, pixels, selection]);
 
   const tilePreviewRenderLayers = useMemo(
     () =>
@@ -114,11 +122,15 @@ export function useEditorPreviews({
     ? { width: tilePreviewLayers[0].width, height: tilePreviewLayers[0].height }
     : null;
   const hasTilePreviewCandidate =
+    !disabled &&
     selection !== null &&
     !isFloatingPasteActive &&
     (tilePreviewLayers.length === 0 || selectionChangeSequence !== lastRegisteredTilePreviewSelectionSequence);
 
   const tilePreviewDataUrl = useMemo(() => {
+    if (disabled) {
+      return '';
+    }
     if (tilePreviewRenderLayers.length > 0) {
       return createTilePreviewLayerDataUrl(
         tilePreviewRenderLayers,
@@ -131,6 +143,7 @@ export function useEditorPreviews({
     return createRegionPreviewDataUrl(pixels, canvasSize, tilePreviewSelection, 3, 3);
   }, [
     canvasSize,
+    disabled,
     hasTilePreviewCandidate,
     pixels,
     tilePreviewCandidateLayer,
@@ -155,11 +168,18 @@ export function useEditorPreviews({
 
   const animationPreviewFrame = animationFrames[animationPreviewIndex] ?? null;
   const animationPreviewDataUrl = useMemo(() => {
-    if (!animationPreviewFrame) {
+    if (disabled || !animationPreviewFrame) {
       return '';
     }
     return createRegionPreviewDataUrl(pixels, canvasSize, animationPreviewFrame);
-  }, [animationPreviewFrame, canvasSize, pixels]);
+  }, [animationPreviewFrame, canvasSize, disabled, pixels]);
+
+  useEffect(() => {
+    if (!disabled || !isAnimationPreviewPlaying) {
+      return;
+    }
+    setIsAnimationPreviewPlaying(false);
+  }, [disabled, isAnimationPreviewPlaying]);
 
   const resetTilePreviewLayers = useCallback(() => {
     setTilePreviewLayers([]);

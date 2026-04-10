@@ -821,14 +821,18 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - canvas overlay と常設一覧の両方で slice を確認できる
   - slice overlay は緑の半透明矩形で表示する
   - slice モード中に追加 / 選択 / 移動 / サイズ変更 / 削除できる
+  - 新規 slice のドラッグ作成は、キャンバス端の少し外側から始めても、開始点を最寄りの端セルへ clamp して受け付ける
   - slice の複数選択に対応する
     - `Cmd/Ctrl + A` で全 slice を選択
     - `Cmd/Ctrl + click` で個別 slice の選択追加 / 解除
+    - `Shift + click` では、最後に focus された slice からクリックした slice までを、リスト順で連続選択する
+    - `Shift + drag` では新規 slice を作らず、矩形で複数 slice を選択する
     - `Cmd/Ctrl + D` で選択中 slice を複製
     - `Cmd/Ctrl + C` で選択中 slice をコピー
     - `Cmd/Ctrl + V` でコピー済み slice を貼り付け
-  - slice をクリックすると current selection へ反映できる
+  - カーソルキーで選択中 slice を `1px` ずつ移動できる
   - slice モード中は通常の左 `Preview / Palette` カードを隠し、slice 専用情報パネルへ切り替える
+  - slice モード中でも `Space + drag` の viewport pan は通常編集と同じように有効にする
   - sidecar metadata に保存する
 - 初版で見送るもの:
   - auto slice
@@ -848,12 +852,17 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
     - Android の drawable directory 系
   - canvas 操作は toolbar の `slice` モードへ寄せる
   - slice モード中の左 sidebar は slice 専用情報パネルへ切り替える
+  - slice sidebar 自体には操作ボタンを置かず、情報表示と active slice 編集だけに寄せる
   - grid 生成のような一括処理は modal に寄せる
   - resize は active slice の 4辺+4角、計 8 個の handle（`TL / TC / TR / ML / MR / BL / BC / BR`）を常時表示し、直接ドラッグして行う
+  - 端にある slice でも操作しやすいよう、slice のヒット領域は見えている矩形より少し外側まで広げる
   - slice 選択は `selectedSliceIds` と `activeSliceId` を分けて扱う
+  - `Shift + drag` は選択矩形として扱い、現在の slice 選択をその矩形に交差したものへ置き換える
   - 複数選択時は group move / group delete を有効にする
   - 複数選択時は group duplicate / group copy / group paste も有効にする
   - slice の copy は、矩形定義を内部 slice clipboard へ保持する扱いにする
   - paste で作る slice には新しい `id` を採番する
   - resize は単一選択時だけ有効にする
+  - カーソルキーで現在の slice 選択を `1px` ずつ移動できるようにする
+  - `Space + drag` による viewport pan は slice overlay / handle 上からでも通常編集と同じように有効にする
   - slice モード中は `selection` / `Tile Preview` / `Animation Preview` を完全に無効化する

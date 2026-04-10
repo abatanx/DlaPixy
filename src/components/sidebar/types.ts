@@ -3,7 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import type { AnimationFrame, PaletteEntry, Selection, TilePreviewLayer } from '../../editor/types';
+import type { AnimationFrame, EditorSlice, PaletteEntry, Selection, TilePreviewLayer, Tool } from '../../editor/types';
 import type { PaletteUsageEntry } from '../../editor/palette-sync';
 import type { PaletteAutoSortKey, PaletteOrderMode } from '../../editor/palette-order';
 import type { TransparentBackgroundMode } from '../../../shared/transparent-background';
@@ -18,6 +18,7 @@ export type TilePreviewLayerSummary = Pick<TilePreviewLayer, 'id' | 'width' | 'h
 };
 
 export type EditorSidebarProps = {
+  tool: Tool;
   canvasSize: number;
   transparentBackgroundMode: TransparentBackgroundMode;
   previewDataUrl: string;
@@ -46,6 +47,12 @@ export type EditorSidebarProps = {
   toggleAnimationPreviewPlayback: () => void;
   setAnimationPreviewFps: (fps: number) => void;
   setAnimationPreviewLoop: (value: boolean) => void;
+  slices: EditorSlice[];
+  selectedSliceIds: string[];
+  activeSlice: EditorSlice | null;
+  selectSliceFromList: (sliceId: string, selectionMode: 'replace' | 'toggle' | 'range') => void;
+  updateActiveSliceName: (value: string) => boolean;
+  updateActiveSliceBounds: (partial: Partial<Pick<EditorSlice, 'x' | 'y' | 'w' | 'h'>>) => boolean;
   selectedColor: string;
   setSelectedColor: (value: string) => void;
   applySelectedColorChange: (value: PaletteEntry) => void;
@@ -101,6 +108,17 @@ export type SidebarPreviewSectionProps = Pick<
   | 'toggleAnimationPreviewPlayback'
   | 'setAnimationPreviewFps'
   | 'setAnimationPreviewLoop'
+>;
+
+export type SidebarSliceSectionProps = Pick<
+  EditorSidebarProps,
+  | 'canvasSize'
+  | 'slices'
+  | 'selectedSliceIds'
+  | 'activeSlice'
+  | 'selectSliceFromList'
+  | 'updateActiveSliceName'
+  | 'updateActiveSliceBounds'
 >;
 
 export type SidebarPaletteSectionProps = Pick<

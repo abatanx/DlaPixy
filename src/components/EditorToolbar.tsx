@@ -159,6 +159,20 @@ export function EditorToolbar({
 
       <button
         type="button"
+        className={`btn btn-sm editor-tool-btn ${tool === 'slice' ? 'active' : ''}`}
+        onClick={() => setTool('slice')}
+        title="Slice ツール (R)"
+      >
+        <span className="editor-btn-inner">
+          <i className="fa-solid fa-vector-square" aria-hidden="true" />
+          <span className="editor-shortcut">R</span>
+        </span>
+      </button>
+
+      <div className="editor-toolbar-separator" />
+
+      <button
+        type="button"
         className="btn btn-sm editor-tool-btn"
         onClick={zoomIn}
         disabled={zoom >= MAX_ZOOM}

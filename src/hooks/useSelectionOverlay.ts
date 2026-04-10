@@ -11,16 +11,18 @@ type UseSelectionOverlayOptions = {
   zoom: number;
   isFloatingPasteActive: boolean;
   canvasFramePx: number;
+  disabled?: boolean;
 };
 
 export function useSelectionOverlay({
   selection,
   zoom,
   isFloatingPasteActive,
-  canvasFramePx
+  canvasFramePx,
+  disabled = false
 }: UseSelectionOverlayOptions) {
-  const hasCommittedSelection = selection !== null && !isFloatingPasteActive;
-  const selectionOverlaySelection = selection;
+  const hasCommittedSelection = !disabled && selection !== null && !isFloatingPasteActive;
+  const selectionOverlaySelection = disabled ? null : selection;
 
   const selectionOverlayBaseStyle = useMemo(() => {
     if (!selectionOverlaySelection) {

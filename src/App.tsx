@@ -3,7 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { EditorCanvasWorkspace } from './components/EditorCanvasWorkspace';
 import { EditorModalLayer } from './components/EditorModalLayer';
 import { EditorPaletteMergeBar } from './components/EditorPaletteMergeBar';
@@ -26,6 +26,7 @@ import { useSelectionOverlay } from './hooks/useSelectionOverlay';
 import { useEditorShortcuts } from './hooks/useEditorShortcuts';
 import { useFloatingPaste } from './hooks/useFloatingPaste';
 import { usePixelReferences } from './hooks/usePixelReferences';
+import { useSliceMode } from './hooks/useSliceMode';
 import { useUndoHistory } from './hooks/useUndoHistory';
 import {
   DEFAULT_FLOATING_COMPOSITE_MODE,
@@ -44,6 +45,7 @@ import {
   MIN_CANVAS_SIZE
 } from './editor/constants';
 import type {
+  EditorSlice,
   PaletteEntry,
   Selection,
   Tool
@@ -54,6 +56,7 @@ import {
   FLOATING_STAGE_PADDING_PX,
   getFloatingHandleStyle
 } from './editor/floating-interaction';
+import { SLICE_CANVAS_EDGE_HIT_PADDING_PX, SLICE_RESIZE_HANDLE_ORDER } from './editor/slices';
 import { collectPaletteUsageFromPixels, type PaletteUsageAnalysis } from './editor/palette-sync';
 import { clonePaletteEntries, createEmptyPixels, normalizePaletteEntries } from './editor/utils';
 
@@ -75,6 +78,9 @@ export function App() {
   );
   const [pixels, setPixels] = useState<Uint8ClampedArray>(() => createEmptyPixels(DEFAULT_CANVAS_SIZE));
   const [palette, setPalette] = useState<PaletteEntry[]>(INITIAL_PALETTE);
+  const [slices, setSlices] = useState<EditorSlice[]>([]);
+  const [selectedSliceIds, setSelectedSliceIds] = useState<string[]>([]);
+  const [activeSliceId, setActiveSliceId] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string>(INITIAL_SELECTED_COLOR);
   const [tool, setTool] = useState<Tool>('select');
   const [selection, setSelection] = useState<Selection>(null);
@@ -174,11 +180,13 @@ export function App() {
     pixels,
     selection,
     isFloatingPasteActive,
+    disabled: tool === 'slice',
     setStatusText
   });
   const {
     resolveCanvasPointFromClient,
     resolveCanvasCellFromClient,
+    resolveCanvasClampedCellFromClient,
     applyStrokeSegment,
     createFloodFillResult
   } = useCanvasEditingCore({
@@ -197,6 +205,9 @@ export function App() {
     pixels,
     selection,
     palette,
+    slices,
+    selectedSliceIds,
+    activeSliceId,
     selectedColor,
     clearFloatingPaste,
     resetAnimationFrames,
@@ -205,9 +216,54 @@ export function App() {
     setSelection,
     setLastTilePreviewSelection,
     setPalette,
+    setSlices,
+    setSelectedSliceIds,
+    setActiveSliceId,
     setSelectedColor,
     setHasUnsavedChanges,
     setStatusText
+  });
+  const {
+    isSliceMode,
+    orderedSlices,
+    draftSlice,
+    selectionMarquee,
+    activeSlice,
+    canDeleteSlices,
+    resetSliceUiState,
+    clearSliceSelection,
+    nudgeSelectedSlices,
+    selectAllSlices,
+    selectSliceFromList,
+    deleteSelectedSlices,
+    copySelectedSlices,
+    pasteSlices,
+    duplicateSelectedSlices,
+    updateActiveSliceName,
+    updateActiveSliceBounds,
+    beginCanvasInteractionFromClient,
+    onCanvasMouseDown: onSliceCanvasMouseDown,
+    onSliceMouseDown,
+    onSliceHandleMouseDown,
+    onMouseMoveCanvas: onSliceMouseMoveCanvas,
+    onMouseUpCanvas: onSliceMouseUpCanvas,
+    onMouseLeaveCanvas: onSliceMouseLeaveCanvas
+  } = useSliceMode({
+    canvasSize,
+    tool,
+    slices,
+    selectedSliceIds,
+    activeSliceId,
+    pushUndo,
+    clearFloatingPaste,
+    setSlices,
+    setSelectedSliceIds,
+    setActiveSliceId,
+    setSelection,
+    setHasUnsavedChanges,
+    setStatusText,
+    resolveCanvasCellFromClient,
+    resolveCanvasClampedCellFromClient
   });
   const {
     paletteRemovalRequest,
@@ -421,12 +477,15 @@ export function App() {
     closeZoomModal
   } = useCanvasSettings({
     canvasSize,
+    slices,
     pushUndo,
     clearFloatingPaste,
     resetTilePreviewLayers,
     resetAnimationFrames,
+    resetSliceUiState,
     setCanvasSize,
     setPixels,
+    setSlices,
     setSelection,
     setLastTilePreviewSelection,
     setGridSpacing,
@@ -441,7 +500,8 @@ export function App() {
     selection,
     zoom,
     isFloatingPasteActive,
-    canvasFramePx: CANVAS_FRAME_PX
+    canvasFramePx: CANVAS_FRAME_PX,
+    disabled: isSliceMode
   });
 
   const { savePng, saveAsPng, loadPng } = useDocumentFileActions({
@@ -451,6 +511,7 @@ export function App() {
     gridSpacing,
     hasUnsavedChanges,
     palette,
+    slices,
     pixels,
     selectedColor,
     tool,
@@ -467,6 +528,7 @@ export function App() {
     setCurrentFilePath,
     setFloatingCompositeMode,
     setPalette,
+    setSlices,
     setSelectedColor,
     setTool,
     setGridSpacing,
@@ -477,6 +539,7 @@ export function App() {
     resetTilePreviewLayers,
     resetAnimationFrames,
     resetPaletteOrderViewState,
+    resetSliceUiState,
     clearFloatingPaste,
     setStatusText
   });
@@ -484,20 +547,29 @@ export function App() {
   useEditorShortcuts({
     selectionRotateRequestActive: selectionRotateRequest !== null,
     hasSelection: selection !== null,
+    hasSelectedSlices: selectedSliceIds.length > 0,
     floatingPasteRef,
+    tool,
     setTool,
     setTransparentBackgroundMode,
     setStatusText,
     clearSelection,
+    clearSliceSelection,
     doUndo,
     copySelection,
+    copySelectedSlices,
     pasteSelection,
+    pasteSlices,
     selectEntireCanvas,
+    selectAllSlices,
     deleteSelection,
+    deleteSelectedSlices,
+    duplicateSelectedSlices,
     selectReferenceByNumber,
     finalizeFloatingPaste,
     cancelFloatingPaste,
     nudgeFloatingPaste,
+    nudgeSelectedSlices,
     addAnimationFrame,
     addTilePreviewLayer,
     openSelectionRotateModal,
@@ -520,11 +592,93 @@ export function App() {
     setStatusText(message, 'warning');
   };
 
+  const handleCanvasMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLCanvasElement>) => {
+      if (!isSliceMode || (!isSpacePressed && !isPanning)) {
+        onSliceCanvasMouseDown(event);
+      }
+      onMouseDown(event);
+    },
+    [isPanning, isSliceMode, isSpacePressed, onMouseDown, onSliceCanvasMouseDown]
+  );
+
+  const handleCanvasStageMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (
+        isSliceMode &&
+        !isSpacePressed &&
+        !isPanning &&
+        event.target === event.currentTarget &&
+        canvasRef.current
+      ) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const isWithinExpandedCanvas =
+          event.clientX >= rect.left - SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
+          event.clientX <= rect.right + SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
+          event.clientY >= rect.top - SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
+          event.clientY <= rect.bottom + SLICE_CANVAS_EDGE_HIT_PADDING_PX;
+
+        if (isWithinExpandedCanvas) {
+          beginCanvasInteractionFromClient(event.clientX, event.clientY, {
+            shiftKey: event.shiftKey,
+            preserveSelection: event.metaKey || event.ctrlKey
+          });
+        }
+      }
+
+      onCanvasStageMouseDown(event);
+    },
+    [beginCanvasInteractionFromClient, isPanning, isSliceMode, isSpacePressed, onCanvasStageMouseDown]
+  );
+
+  const handleCanvasMouseMove = useCallback(
+    (event: ReactMouseEvent<HTMLCanvasElement>) => {
+      onSliceMouseMoveCanvas(event.clientX, event.clientY);
+      onMouseMove(event);
+    },
+    [onMouseMove, onSliceMouseMoveCanvas]
+  );
+
+  const handleCanvasMouseUp = useCallback(() => {
+    onSliceMouseUpCanvas();
+    onMouseUp();
+  }, [onMouseUp, onSliceMouseUpCanvas]);
+
+  const handleCanvasMouseLeave = useCallback(() => {
+    onSliceMouseLeaveCanvas();
+    onMouseLeaveCanvas();
+  }, [onMouseLeaveCanvas, onSliceMouseLeaveCanvas]);
+
+  const handleContextualCopy = useCallback(async () => {
+    if (isSliceMode) {
+      copySelectedSlices();
+      return;
+    }
+    await copySelection();
+  }, [copySelectedSlices, copySelection, isSliceMode]);
+
+  const handleContextualPaste = useCallback(() => {
+    if (isSliceMode) {
+      pasteSlices();
+      return;
+    }
+    pasteSelection();
+  }, [isSliceMode, pasteSelection, pasteSlices]);
+
+  const handleContextualDelete = useCallback(() => {
+    if (isSliceMode) {
+      deleteSelectedSlices();
+      return;
+    }
+    deleteSelection();
+  }, [deleteSelectedSlices, deleteSelection, isSliceMode]);
+
   return (
     <div className="app-layout">
       <div className="container-fluid pt-3 pb-0 mb-0 app-shell">
         <div className="row g-3 app-main-row">
           <EditorSidebar
+            tool={tool}
             canvasSize={canvasSize}
             transparentBackgroundMode={transparentBackgroundMode}
             previewDataUrl={previewDataUrl}
@@ -553,6 +707,12 @@ export function App() {
             toggleAnimationPreviewPlayback={toggleAnimationPreviewPlayback}
             setAnimationPreviewFps={updateAnimationPreviewFps}
             setAnimationPreviewLoop={setAnimationPreviewLoop}
+            slices={orderedSlices}
+            selectedSliceIds={selectedSliceIds}
+            activeSlice={activeSlice}
+            selectSliceFromList={selectSliceFromList}
+            updateActiveSliceName={updateActiveSliceName}
+            updateActiveSliceBounds={updateActiveSliceBounds}
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
             applySelectedColorChange={applySelectedColorChange}
@@ -578,7 +738,7 @@ export function App() {
             paletteColorModalRequest={paletteColorModalRequest}
           />
           <div className="col-12 col-lg-8 col-xl-9 d-flex flex-column gap-3 editor-workspace-column">
-            {showPaletteMergeUi ? (
+            {!isSliceMode && showPaletteMergeUi ? (
               <EditorPaletteMergeBar
                 palette={displayPalette}
                 paletteUsageByColor={paletteUsage.byColor}
@@ -599,11 +759,18 @@ export function App() {
               transparentBackgroundClassName={transparentBackgroundClassName}
               isPanning={isPanning}
               isSpacePressed={isSpacePressed}
-              onCanvasStageMouseDown={onCanvasStageMouseDown}
-              onMouseDown={onMouseDown}
-              onMouseMove={onMouseMove}
-              onMouseUp={onMouseUp}
-              onMouseLeaveCanvas={onMouseLeaveCanvas}
+              onCanvasStageMouseDown={handleCanvasStageMouseDown}
+              onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+              onMouseLeaveCanvas={handleCanvasMouseLeave}
+              slices={slices}
+              draftSlice={draftSlice}
+              selectionMarquee={selectionMarquee}
+              selectedSliceIds={selectedSliceIds}
+              activeSliceId={activeSliceId}
+              onSliceMouseDown={onSliceMouseDown}
+              onSliceHandleMouseDown={onSliceHandleMouseDown}
               selectionOverlaySelection={selectionOverlaySelection}
               selectionOverlayBaseStyle={selectionOverlayBaseStyle}
               isFloatingPasteActive={isFloatingPasteActive}
@@ -629,15 +796,16 @@ export function App() {
               removeReferencePixelInfo={removeReferencePixelInfo}
               tool={tool}
               setTool={setTool}
-              hasCommittedSelection={hasCommittedSelection}
+              hasCommittedSelection={!isSliceMode && hasCommittedSelection}
+              canDeleteAction={isSliceMode ? canDeleteSlices : hasCommittedSelection}
               addAnimationFrame={addAnimationFrame}
               openSelectionRotateModal={openSelectionRotateModal}
               zoomIn={zoomIn}
               zoomOut={zoomOut}
               doUndo={doUndo}
-              copySelection={copySelection}
-              pasteSelection={pasteSelection}
-              deleteSelection={deleteSelection}
+              copySelection={handleContextualCopy}
+              pasteSelection={handleContextualPaste}
+              deleteSelection={handleContextualDelete}
             />
           </div>
         </div>

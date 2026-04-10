@@ -4,12 +4,13 @@
  **/
 
 import type { PaletteEntry } from './palette';
+import type { EditorSlice } from './slice';
 import type { FloatingCompositeMode } from './floating-composite';
 import type { TransparentBackgroundMode } from './transparent-background';
 
 export const SIDECAR_SCHEMA_VERSION = 2;
 
-export type EditorTool = 'pencil' | 'eraser' | 'fill' | 'select';
+export type EditorTool = 'pencil' | 'eraser' | 'fill' | 'select' | 'slice';
 
 export type EditorSidecar = {
   dlaPixy: {
@@ -18,6 +19,7 @@ export type EditorSidecar = {
       palette: {
         entries: PaletteEntry[];
       };
+      slices: EditorSlice[];
     };
     editor: {
       floatingCompositeMode: FloatingCompositeMode;

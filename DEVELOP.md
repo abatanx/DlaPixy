@@ -810,14 +810,18 @@ Current metadata shape:
   - show slices as both canvas overlay and a persistent list
   - render slice overlays as semi-transparent green rectangles
   - allow add / select / move / resize / delete interactions while slice mode is active
+  - allow new-slice drag creation to start slightly outside the canvas edge, clamping the start point to the nearest edge cell
   - support slice multi-selection:
     - `Cmd/Ctrl + A` selects all slices
     - `Cmd/Ctrl + click` toggles individual slices into the selection
-    - `Cmd/Ctrl + D` duplicates the selected slices
-    - `Cmd/Ctrl + C` copies the selected slices
-    - `Cmd/Ctrl + V` pastes copied slices
-  - clicking a slice can push its rectangle into current selection
+    - `Shift + click` selects a contiguous range on the slice list from the last-focused slice to the clicked slice
+    - `Shift + drag` performs marquee selection instead of creating a new slice
+  - `Cmd/Ctrl + D` duplicates the selected slices
+  - `Cmd/Ctrl + C` copies the selected slices
+  - `Cmd/Ctrl + V` pastes copied slices
+  - arrow keys move the selected slices by `1px`
   - while slice mode is active, replace the normal left `Preview` / `Palette` cards with a dedicated slice info panel
+  - keep `Space + drag` viewport pan behavior available in slice mode as well, matching the normal editing flow
   - save slices in sidecar metadata from the first version
 - Explicitly defer from the first version:
   - auto slices
@@ -837,14 +841,19 @@ Current metadata shape:
     - Android drawable directory variants
   - use a toolbar-driven `slice mode` for canvas interactions
   - switch the left sidebar to a slice-only info panel during slice mode
+  - keep the slice sidebar informational: no action buttons in the panel itself
   - keep modal-based bulk generation for grid creation
   - resize should be direct-manipulation via 8 always-visible handles (`TL / TC / TR / ML / MR / BL / BC / BR`) on the active slice
+  - expand the slice hit area slightly outside the visible rectangle so edge slices remain easy to drag and resize
   - treat slice selection as:
     - `selectedSliceIds` for the full set
     - `activeSliceId` for the last-focused slice
+    - `Shift + drag` uses a marquee rectangle to replace the current slice selection
   - allow group move / group delete for multi-selection
   - allow group duplicate / group copy / group paste for multi-selection
   - treat slice copy as metadata copy into an internal slice clipboard
   - pasted slices must receive new `id` values
   - keep resize available only for single selection
+  - allow arrow-key nudging for the current slice selection by `1px` per key press
+  - keep `Space + drag` viewport pan active in slice mode too, even when the pointer starts on a slice overlay
   - completely disable `selection`, `Tile Preview`, and `Animation Preview` while slice mode is active

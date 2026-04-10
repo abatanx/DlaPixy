@@ -158,6 +158,10 @@ export function useCanvasPointerInteractions({
         return;
       }
 
+      if (tool === 'slice') {
+        return;
+      }
+
       const floatingHandle =
         tool === 'select' && floatingPasteRef.current && selection
           ? resolveFloatingResizeHandleFromClientPoint(event.clientX, event.clientY)
@@ -259,6 +263,10 @@ export function useCanvasPointerInteractions({
       const hoveredCell = resolveCanvasCellFromClient(event.clientX, event.clientY);
       updateHoveredPixelInfo(hoveredCell);
 
+      if (tool === 'slice') {
+        return;
+      }
+
       if (panStateRef.current.active) {
         updatePan(event.clientX, event.clientY);
         return;
@@ -310,6 +318,13 @@ export function useCanvasPointerInteractions({
   );
 
   const onMouseUp = useCallback(() => {
+    if (tool === 'slice') {
+      if (panStateRef.current.active) {
+        endPan();
+      }
+      return;
+    }
+
     if (panStateRef.current.active) {
       endPan();
       return;

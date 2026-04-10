@@ -4,19 +4,23 @@
  **/
 
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
-import type { Selection } from '../editor/types';
+import { normalizeEditorSlices } from '../editor/slices';
+import type { EditorSlice, Selection } from '../editor/types';
 import { resizeCanvasPixels } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
 type UseCanvasSettingsOptions = {
   canvasSize: number;
+  slices: EditorSlice[];
   pushUndo: () => void;
   clearFloatingPaste: () => void;
   resetTilePreviewLayers: () => void;
   resetAnimationFrames: () => void;
+  resetSliceUiState: () => void;
   setCanvasSize: Dispatch<SetStateAction<number>>;
   setPixels: Dispatch<SetStateAction<Uint8ClampedArray>>;
+  setSlices: Dispatch<SetStateAction<EditorSlice[]>>;
   setSelection: Dispatch<SetStateAction<Selection>>;
   setLastTilePreviewSelection: Dispatch<SetStateAction<Selection>>;
   setGridSpacing: Dispatch<SetStateAction<number>>;
@@ -26,12 +30,15 @@ type UseCanvasSettingsOptions = {
 
 export function useCanvasSettings({
   canvasSize,
+  slices,
   pushUndo,
   clearFloatingPaste,
   resetTilePreviewLayers,
   resetAnimationFrames,
+  resetSliceUiState,
   setCanvasSize,
   setPixels,
+  setSlices,
   setSelection,
   setLastTilePreviewSelection,
   setGridSpacing,
@@ -52,10 +59,12 @@ export function useCanvasSettings({
       pushUndo();
       setCanvasSize(normalized);
       setPixels((prev) => resizeCanvasPixels(prev, canvasSize, normalized));
+      setSlices(normalizeEditorSlices(slices, normalized));
       setSelection(null);
       setLastTilePreviewSelection(null);
       resetTilePreviewLayers();
       resetAnimationFrames();
+      resetSliceUiState();
       clearFloatingPaste();
       setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
       setHasUnsavedChanges(true);
@@ -66,7 +75,10 @@ export function useCanvasSettings({
       clearFloatingPaste,
       pushUndo,
       resetAnimationFrames,
+      resetSliceUiState,
       resetTilePreviewLayers,
+      slices,
+      setSlices,
       setCanvasSize,
       setHasUnsavedChanges,
       setLastTilePreviewSelection,

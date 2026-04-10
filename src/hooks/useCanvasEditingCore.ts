@@ -138,6 +138,20 @@ export function useCanvasEditingCore({
     [canvasSize, resolveCanvasPointFromClient]
   );
 
+  const resolveCanvasClampedCellFromClient = useCallback(
+    (clientX: number, clientY: number) => {
+      const point = resolveCanvasPointFromClient(clientX, clientY);
+      if (!point) {
+        return null;
+      }
+
+      const x = Math.max(0, Math.min(canvasSize - 1, Math.floor(point.x)));
+      const y = Math.max(0, Math.min(canvasSize - 1, Math.floor(point.y)));
+      return { x, y };
+    },
+    [canvasSize, resolveCanvasPointFromClient]
+  );
+
   const applyStrokeSegment = useCallback(
     (from: { x: number; y: number }, to: { x: number; y: number }, erase = false) => {
       // Interpolate pointer movement so fast drags don't leave gaps.
@@ -269,6 +283,7 @@ export function useCanvasEditingCore({
   return {
     resolveCanvasPointFromClient,
     resolveCanvasCellFromClient,
+    resolveCanvasClampedCellFromClient,
     applyStrokeSegment,
     createFloodFillResult
   };

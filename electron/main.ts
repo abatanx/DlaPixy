@@ -18,6 +18,7 @@ import {
 } from '../shared/floating-composite';
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import { isPaletteEntryId, type PaletteEntry } from '../shared/palette';
+import { isEditorSliceId, type EditorSlice } from '../shared/slice';
 import { SIDECAR_SCHEMA_VERSION, type EditorSidecar } from '../shared/sidecar';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
@@ -192,6 +193,22 @@ function isPaletteEntry(value: unknown): value is PaletteEntry {
   );
 }
 
+function isEditorSlice(value: unknown): value is EditorSlice {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as { id?: unknown; name?: unknown; x?: unknown; y?: unknown; w?: unknown; h?: unknown };
+  return (
+    isEditorSliceId(candidate.id) &&
+    typeof candidate.name === 'string' &&
+    isFiniteNumber(candidate.x) &&
+    isFiniteNumber(candidate.y) &&
+    isFiniteNumber(candidate.w) &&
+    isFiniteNumber(candidate.h)
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -201,7 +218,7 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 function isTool(value: unknown): value is EditorMeta['dlaPixy']['editor']['lastTool'] {
-  return value === 'pencil' || value === 'eraser' || value === 'fill' || value === 'select';
+  return value === 'pencil' || value === 'eraser' || value === 'fill' || value === 'select' || value === 'slice';
 }
 
 function parseEditorMeta(rawText: string): EditorMeta | null {
@@ -236,6 +253,10 @@ function parseEditorMeta(rawText: string): EditorMeta | null {
   if (!candidateDocument.palette.entries.every(isPaletteEntry)) {
     return null;
   }
+  const candidateSlices = Array.isArray(candidateDocument.slices) ? candidateDocument.slices : [];
+  if (!candidateSlices.every(isEditorSlice)) {
+    return null;
+  }
   if (
     !isFiniteNumber(candidateEditor.gridSpacing) ||
     !isTransparentBackgroundMode(candidateEditor.transparentBackgroundMode) ||
@@ -257,7 +278,8 @@ function parseEditorMeta(rawText: string): EditorMeta | null {
       document: {
         palette: {
           entries: candidateDocument.palette.entries
-        }
+        },
+        slices: candidateSlices
       },
       editor: {
         floatingCompositeMode: isFloatingCompositeMode(candidateEditor.floatingCompositeMode)

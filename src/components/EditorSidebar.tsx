@@ -6,10 +6,12 @@
 import { memo } from 'react';
 import { SidebarPaletteSection } from './sidebar/SidebarPaletteSection';
 import { SidebarPreviewSection } from './sidebar/SidebarPreviewSection';
+import { SidebarSliceSection } from './sidebar/SidebarSliceSection';
 import type { EditorSidebarProps } from './sidebar/types';
 
 // プレビューと編集設定をまとめた左サイドパネル。
 export const EditorSidebar = memo(function EditorSidebar({
+  tool,
   canvasSize,
   transparentBackgroundMode,
   previewDataUrl,
@@ -38,6 +40,12 @@ export const EditorSidebar = memo(function EditorSidebar({
   toggleAnimationPreviewPlayback,
   setAnimationPreviewFps,
   setAnimationPreviewLoop,
+  slices,
+  selectedSliceIds,
+  activeSlice,
+  selectSliceFromList,
+  updateActiveSliceName,
+  updateActiveSliceBounds,
   selectedColor,
   setSelectedColor,
   applySelectedColorChange,
@@ -62,6 +70,26 @@ export const EditorSidebar = memo(function EditorSidebar({
   clearPaletteMergeSelection,
   paletteColorModalRequest
 }: EditorSidebarProps) {
+  if (tool === 'slice') {
+    return (
+      <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar d-flex flex-column h-100">
+        <div className="card shadow-sm editor-sidebar-card editor-sidebar-palette-card w-100 d-flex flex-column h-100">
+          <div className="card-body editor-sidebar-body d-flex flex-column overflow-hidden">
+            <SidebarSliceSection
+              canvasSize={canvasSize}
+              slices={slices}
+              selectedSliceIds={selectedSliceIds}
+              activeSlice={activeSlice}
+              selectSliceFromList={selectSliceFromList}
+              updateActiveSliceName={updateActiveSliceName}
+              updateActiveSliceBounds={updateActiveSliceBounds}
+            />
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar d-flex flex-column h-100">
       <div className="card shadow-sm editor-sidebar-card editor-sidebar-preview-card w-100">
