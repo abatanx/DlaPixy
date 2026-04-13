@@ -74,7 +74,7 @@ export const EditorSidebar = memo(function EditorSidebar({
     return (
       <aside className="col-12 col-lg-4 col-xl-3 editor-sidebar d-flex flex-column h-100">
         <div className="card shadow-sm editor-sidebar-card editor-sidebar-palette-card w-100 d-flex flex-column h-100">
-          <div className="card-body editor-sidebar-body d-flex flex-column overflow-hidden">
+          <div className="card-body editor-sidebar-body d-flex flex-column overflow-auto">
             <SidebarSliceSection
               canvasSize={canvasSize}
               slices={slices}

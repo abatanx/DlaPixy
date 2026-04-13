@@ -1075,6 +1075,28 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
+.slice-sidebar-export-target {
+  background: transparent;
+}
+
+.slice-sidebar-export-table td {
+  padding-block: 0.32rem;
+  vertical-align: middle;
+}
+
+.slice-sidebar-export-table .form-check-input {
+  margin-top: 0;
+}
+
+.sidebar-slice-export-tabs .nav-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sidebar-slice-export-tab-label {
+  line-height: 1;
+}
+
 .sidebar-palette-header {
   display: flex;
   align-items: baseline;

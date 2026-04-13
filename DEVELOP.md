@@ -836,9 +836,50 @@ Current metadata shape:
   - store every slice as a `1x` logical base rect
   - keep density / naming expansion in future export profiles
   - target export compatibility such as:
-    - generic `name.png`, `name@2x.png`, `name@4x.png`
-    - Apple-style `name.png`, `name@2x.png`, `name@3x.png`
-    - Android drawable directory variants
+    - generic `name.png`, `name@2x.png`, `name@3x.png`, `name@4x.png`
+    - iOS / Apple `name.png`, `name@2x.png`, `name@3x.png`, `name@4x.png`
+    - Android drawable directories such as `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`
+  - there should be no global preset/profile library; export settings belong directly to each slice
+  - slices should evolve from `id / name / x / y / w / h` to something like:
+    - `id / name / x / y / w / h / exportSettings`
+  - `exportSettings` should own per-target export settings for `generic`, `apple`, and `android`
+    - each target settings block owns:
+      - base variant (`1x`, `@2x`, `@3x`, `@4x`, `ldpi`, `mdpi`, `hdpi`, ...)
+      - base axis (`width` or `height`)
+      - base size (integer px value for that base variant and axis)
+      - enabled variants for export
+    - android target settings additionally own output directory templates such as `mipmap-{density}` / `drawable-{density}`
+  - there should be no separate `enabledTargets`; the checked variants themselves determine what gets exported
+  - multiple selected slices should support batch-editing the same export settings, so the workflow still feels efficient without presets
+  - if the selected slices have different export settings, the UI should show a mixed state until the user applies common values
+  - `slice.name` should be the export basename, so duplicate names need validation before export
+  - the opposite axis should be auto-derived from the slice's original aspect ratio
+  - integer scales should use nearest-neighbor exact expansion
+  - non-integer Android densities (`1.5x`, `0.75x`) should be handled as part of the per-slice export settings, not as part of the base slice rect itself
+  - export UI should present target sections for `generic`, `apple`, and `android`
+  - each target section should present variant rows like:
+    - enabled checkbox
+    - variant label
+    - width / height fields
+    - computed `-> WxH` preview
+  - each target section should also have a slice-level `Dirs` field
+    - accepts a comma-separated list
+    - the same template list applies to every enabled variant within that target
+    - expanded directories are created under the selected export root
+  - Android `Dirs` may use `{density}` placeholders such as `mipmap-{density}, drawable-{density}`
+    - `{density}` expands per variant to `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`
+  - add a `File > Export Slices...` command for slice export
+    - choose an output directory first
+    - if no slices are selected, export all slices
+    - if one or more slices are selected, export only the selected slices
+    - each target slice should be written as individual files into the chosen directory
+  - only the base row should accept direct size input on the selected base axis; non-base rows should be derived displays
+  - the base row should be visually marked in the variant list
+  - generic / iOS rows should be fixed to `1x`, `@2x`, `@3x`, `@4x`
+  - the `1x` row exports without any filename suffix
+  - android rows should be fixed to `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`
+  - Android export should allow slice-level directory templates like `mipmap-{density}, drawable-{density}`, shared across the enabled Android variants
+  - a single slice may export to generic / iOS / android simultaneously, as long as those sections have checked variants
   - use a toolbar-driven `slice mode` for canvas interactions
   - switch the left sidebar to a slice-only info panel during slice mode
   - keep the slice sidebar informational: no action buttons in the panel itself
@@ -857,3 +898,7 @@ Current metadata shape:
   - allow arrow-key nudging for the current slice selection by `1px` per key press
   - keep `Space + drag` viewport pan active in slice mode too, even when the pointer starts on a slice overlay
   - completely disable `selection`, `Tile Preview`, and `Animation Preview` while slice mode is active
+- UI prototype memo:
+  - slice sidebar now includes a transient export-settings UI prototype for `generic` / `apple` / `android`
+  - the prototype is keyed by active slice in renderer memory only
+  - no sidecar persistence, file-menu wiring, or actual export execution is connected yet

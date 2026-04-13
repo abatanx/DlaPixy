@@ -847,9 +847,50 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - すべての slice は `1x` 基準の logical rect として保存する
   - density や命名規則の展開は将来の export profile 側で扱う
   - 想定する export 相性:
-    - 汎用 `name.png`, `name@2x.png`, `name@4x.png`
-    - Apple 系 `name.png`, `name@2x.png`, `name@3x.png`
-    - Android の drawable directory 系
+    - generic `name.png`, `name@2x.png`, `name@3x.png`, `name@4x.png`
+    - iOS / Apple `name.png`, `name@2x.png`, `name@3x.png`, `name@4x.png`
+    - Android の `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` directory 系
+  - global な preset / profile ライブラリは持たず、export 設定は slice ごとに直接持つ
+  - slice 自体は将来的に `id / name / x / y / w / h / exportSettings` のような shape へ拡張する
+  - `exportSettings` 側で、`generic` / `apple` / `android` それぞれの target 別 export 設定を管理する
+    - 各 target 設定は:
+      - 基準 variant (`1x`, `@2x`, `@3x`, `@4x`, `ldpi`, `mdpi`, `hdpi`, ...)
+      - 基準軸 (`width` / `height`)
+      - 基準サイズ（その基準 variant と基準軸に対する整数 px 値）
+      - export 対象にする有効 variant 一覧
+    - Android target 設定は追加で、出力先ディレクトリテンプレート（`mipmap-{density}` / `drawable-{density}` など）
+    を管理する
+  - 別途 `enabledTargets` のような target 有効化 state は持たず、チェックされた variant がそのまま export 対象になるようにする
+  - 複数選択した slice へ同じ export 設定を一括適用できるようにして、preset がなくても面倒にならない操作感を担保する
+  - 選択中 slice に異なる export 設定が混在している場合、UI は mixed state を表示し、適用時にまとめて上書きできるようにする
+  - `slice.name` は export basename としても使う前提なので、export 前に重複名 validation が必要
+  - 反対側の軸サイズは、元の slice 矩形のアスペクト比から自動算出する
+  - 整数倍率は nearest-neighbor の厳密拡大を基本にする
+  - Android の非整数 density (`1.5x`, `0.75x`) は基準矩形とは切り分け、slice ごとの export 設定側の論点として扱う
+  - export UI は `generic` / `apple` / `android` の target セクション単位で見せる
+  - 各 target セクションでは variant 行一覧を表示する
+    - 有効/無効 checkbox
+    - variant label
+    - width / height 欄
+    - `-> WxH` の自動計算プレビュー
+  - 各 target セクションは、slice 単位の `Dirs` 入力欄も持つ
+    - カンマ区切りで複数指定できる
+    - このテンプレート一覧は、その target の有効 variant 全体で共通設定とする
+    - 展開後のディレクトリは、選択した export 先の直下に作成する
+  - Android の `Dirs` では `mipmap-{density}, drawable-{density}` のように `{density}` を使える
+    - `{density}` は variant ごとに `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` へ展開する
+  - slice export 用に `ファイル > スライスして保存...` を追加する
+    - まず保存先ディレクトリを選ぶ
+    - slice が未選択なら全 slice を export する
+    - 1 件以上選択されているなら、選択中 slice のみを export する
+    - 対象 slice は選んだディレクトリへ個別ファイルとして書き出す
+  - 直接サイズを入力できるのは基準行の基準軸だけにし、それ以外の行は自動計算結果の表示に寄せる
+  - 基準行は一覧内で明示的に分かる見た目にする
+  - generic / iOS の variant 行は `1x`, `@2x`, `@3x`, `@4x` で固定する
+  - `1x` 行は export 時にファイル名 suffix を付与しない
+  - android の variant 行は `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` で固定する
+  - Android export では、`mipmap-{density}, drawable-{density}` のような slice 単位ディレクトリテンプレートを、有効な Android variant 共通で使えるようにする
+  - 1 つの slice で `generic / iOS / android` の checked variant を併用して、まとめて export できるようにする
   - canvas 操作は toolbar の `slice` モードへ寄せる
   - slice モード中の左 sidebar は slice 専用情報パネルへ切り替える
   - slice sidebar 自体には操作ボタンを置かず、情報表示と active slice 編集だけに寄せる
@@ -866,3 +907,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - カーソルキーで現在の slice 選択を `1px` ずつ移動できるようにする
   - `Space + drag` による viewport pan は slice overlay / handle 上からでも通常編集と同じように有効にする
   - slice モード中は `selection` / `Tile Preview` / `Animation Preview` を完全に無効化する
+- UI プロトタイプメモ:
+  - slice sidebar に `generic` / `apple` / `android` の export 設定 UI プロトタイプを追加した
+  - このプロトタイプは renderer メモリ上で active slice ごとにだけ保持する
+  - sidecar 保存、ファイルメニュー連携、実際の export 実行とはまだ未接続
