@@ -843,7 +843,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
 - 最小 shape 案:
   - `EditorSlice = { id, name, x, y, w, h }`
 - 設計方針:
-  - fixed grid 分割は slice 本体ではなく、slice を量産する生成 helper として扱う
+  - 固定サイズの自動スライスは slice 本体ではなく、現在の slice 一式を置き換えて量産する helper として扱う
   - すべての slice は `1x` 基準の logical rect として保存する
   - density や命名規則の展開は将来の export profile 側で扱う
   - 想定する export 相性:
@@ -879,7 +879,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
     - 展開後のディレクトリは、選択した export 先の直下に作成する
   - Android の `Dirs` では `mipmap-{density}, drawable-{density}` のように `{density}` を使える
     - `{density}` は variant ごとに `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` へ展開する
-  - slice export 用に `ファイル > スライスして保存...` を追加する
+  - slice export 用に `キャンバス > スライス > 保存...` を追加する
     - まず保存先ディレクトリを選ぶ
     - slice が未選択なら全 slice を export する
     - 1 件以上選択されているなら、選択中 slice のみを export する
@@ -894,7 +894,14 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - canvas 操作は toolbar の `slice` モードへ寄せる
   - slice モード中の左 sidebar は slice 専用情報パネルへ切り替える
   - slice sidebar 自体には操作ボタンを置かず、情報表示と active slice 編集だけに寄せる
-  - grid 生成のような一括処理は modal に寄せる
+  - 一括生成は `キャンバス > スライス > 自動スライス...` に寄せる
+    - ダイアログ項目は `スライス名`, `w`, `h`
+    - 実行時は既存 slice を全削除して置き換える
+    - 指定サイズに収まらない右端 / 下端の端数は無視する
+    - 左上から右下へ `{スライス名}-{index}` で連番採番する
+    - ゼロ埋め桁数は、生成件数を固定長で表現できる必要十分最小の桁数にする
+      - 例: `256` 個なら `000` .. `255`
+      - 例: `4096` 個なら `0000` .. `4095`
   - resize は active slice の 4辺+4角、計 8 個の handle（`TL / TC / TR / ML / MR / BL / BC / BR`）を常時表示し、直接ドラッグして行う
   - 端にある slice でも操作しやすいよう、slice のヒット領域は見えている矩形より少し外側まで広げる
   - slice 選択は `selectedSliceIds` と `activeSliceId` を分けて扱う

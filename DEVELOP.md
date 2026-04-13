@@ -832,7 +832,7 @@ Current metadata shape:
 - Proposed minimal shape:
   - `EditorSlice = { id, name, x, y, w, h }`
 - Design direction:
-  - treat fixed-grid split as a slice-generation helper, not as the slice model itself
+  - treat fixed-size auto slicing as a slice-generation helper that replaces the current slice set, not as the slice model itself
   - store every slice as a `1x` logical base rect
   - keep density / naming expansion in future export profiles
   - target export compatibility such as:
@@ -868,7 +868,7 @@ Current metadata shape:
     - expanded directories are created under the selected export root
   - Android `Dirs` may use `{density}` placeholders such as `mipmap-{density}, drawable-{density}`
     - `{density}` expands per variant to `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`
-  - add a `File > Export Slices...` command for slice export
+  - add a `Canvas > Slice > Save...` command for slice export
     - choose an output directory first
     - if no slices are selected, export all slices
     - if one or more slices are selected, export only the selected slices
@@ -883,7 +883,14 @@ Current metadata shape:
   - use a toolbar-driven `slice mode` for canvas interactions
   - switch the left sidebar to a slice-only info panel during slice mode
   - keep the slice sidebar informational: no action buttons in the panel itself
-  - keep modal-based bulk generation for grid creation
+  - add `Canvas > Slice > Auto Slice...` for bulk generation
+    - dialog fields are `slice name`, `w`, `h`
+    - applying it replaces all existing slices
+    - ignore right / bottom remainder regions that do not fit the requested size
+    - generate names from top-left to bottom-right as `{sliceName}-{index}`
+    - zero-padding width is the minimum fixed width needed to represent the generated slice count
+      - e.g. `256` slices -> `000` .. `255`
+      - e.g. `4096` slices -> `0000` .. `4095`
   - resize should be direct-manipulation via 8 always-visible handles (`TL / TC / TR / ML / MR / BL / BC / BR`) on the active slice
   - expand the slice hit area slightly outside the visible rectangle so edge slices remain easy to drag and resize
   - treat slice selection as:
