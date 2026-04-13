@@ -403,6 +403,51 @@ export function useSliceMode({
     [updateActiveSlice]
   );
 
+  const updateSelectedSliceSize = useCallback(
+    (partial: Partial<Pick<EditorSlice, 'w' | 'h'>>) => {
+      if (selectedSliceIds.length === 0) {
+        return updateActiveSliceBounds(partial);
+      }
+
+      const selectedIdSet = new Set(selectedSliceIds);
+      let changed = false;
+      const nextSlices = slices.map((slice) => {
+        if (!selectedIdSet.has(slice.id)) {
+          return slice;
+        }
+
+        const nextSlice = normalizeSliceBounds(
+          {
+            ...slice,
+            ...partial
+          },
+          canvasSize
+        );
+
+        if (
+          nextSlice.x !== slice.x ||
+          nextSlice.y !== slice.y ||
+          nextSlice.w !== slice.w ||
+          nextSlice.h !== slice.h
+        ) {
+          changed = true;
+        }
+
+        return nextSlice;
+      });
+
+      if (!changed) {
+        return false;
+      }
+
+      pushUndo();
+      setSlices(nextSlices);
+      setHasUnsavedChanges(true);
+      return true;
+    },
+    [canvasSize, pushUndo, selectedSliceIds, setHasUnsavedChanges, setSlices, slices, updateActiveSliceBounds]
+  );
+
   const commitCreatedSlice = useCallback(
     (rect: Omit<EditorSlice, 'id' | 'name'>) => {
       pushUndo();
@@ -772,6 +817,7 @@ export function useSliceMode({
     duplicateSelectedSlices,
     updateActiveSliceName,
     updateActiveSliceBounds,
+    updateSelectedSliceSize,
     beginCanvasInteractionFromClient,
     onCanvasMouseDown,
     onSliceMouseDown,

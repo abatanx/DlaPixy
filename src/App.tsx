@@ -241,6 +241,7 @@ export function App() {
     duplicateSelectedSlices,
     updateActiveSliceName,
     updateActiveSliceBounds,
+    updateSelectedSliceSize,
     beginCanvasInteractionFromClient,
     onCanvasMouseDown: onSliceCanvasMouseDown,
     onSliceMouseDown,
@@ -713,6 +714,7 @@ export function App() {
             selectSliceFromList={selectSliceFromList}
             updateActiveSliceName={updateActiveSliceName}
             updateActiveSliceBounds={updateActiveSliceBounds}
+            updateSelectedSliceSize={updateSelectedSliceSize}
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
             applySelectedColorChange={applySelectedColorChange}

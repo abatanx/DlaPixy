@@ -46,6 +46,7 @@ export const EditorSidebar = memo(function EditorSidebar({
   selectSliceFromList,
   updateActiveSliceName,
   updateActiveSliceBounds,
+  updateSelectedSliceSize,
   selectedColor,
   setSelectedColor,
   applySelectedColorChange,
@@ -83,6 +84,7 @@ export const EditorSidebar = memo(function EditorSidebar({
               selectSliceFromList={selectSliceFromList}
               updateActiveSliceName={updateActiveSliceName}
               updateActiveSliceBounds={updateActiveSliceBounds}
+              updateSelectedSliceSize={updateSelectedSliceSize}
             />
           </div>
         </div>

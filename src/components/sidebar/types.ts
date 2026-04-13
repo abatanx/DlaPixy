@@ -53,6 +53,7 @@ export type EditorSidebarProps = {
   selectSliceFromList: (sliceId: string, selectionMode: 'replace' | 'toggle' | 'range') => void;
   updateActiveSliceName: (value: string) => boolean;
   updateActiveSliceBounds: (partial: Partial<Pick<EditorSlice, 'x' | 'y' | 'w' | 'h'>>) => boolean;
+  updateSelectedSliceSize: (partial: Partial<Pick<EditorSlice, 'w' | 'h'>>) => boolean;
   selectedColor: string;
   setSelectedColor: (value: string) => void;
   applySelectedColorChange: (value: PaletteEntry) => void;
@@ -119,6 +120,7 @@ export type SidebarSliceSectionProps = Pick<
   | 'selectSliceFromList'
   | 'updateActiveSliceName'
   | 'updateActiveSliceBounds'
+  | 'updateSelectedSliceSize'
 >;
 
 export type SidebarPaletteSectionProps = Pick<

@@ -909,5 +909,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - slice モード中は `selection` / `Tile Preview` / `Animation Preview` を完全に無効化する
 - UI プロトタイプメモ:
   - slice sidebar に `generic` / `apple` / `android` の export 設定 UI プロトタイプを追加した
-  - このプロトタイプは renderer メモリ上で active slice ごとにだけ保持する
+  - このプロトタイプは renderer メモリ上で slice ごとに保持する
+  - 複数 slice を選択しているときは mixed state を表示しつつ、編集は選択中すべてへ一括適用する
+  - slice sidebar の `W/H` 入力も現在の slice 選択へ一括適用し、`X/Y` は引き続き active slice のみ編集する
+  - target の base size がまだ slice 軸サイズ由来の未編集値なら、slice サイズ変更時も stale な mixed を残さず追従させる
   - sidecar 保存、ファイルメニュー連携、実際の export 実行とはまだ未接続

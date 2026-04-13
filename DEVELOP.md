@@ -900,5 +900,8 @@ Current metadata shape:
   - completely disable `selection`, `Tile Preview`, and `Animation Preview` while slice mode is active
 - UI prototype memo:
   - slice sidebar now includes a transient export-settings UI prototype for `generic` / `apple` / `android`
-  - the prototype is keyed by active slice in renderer memory only
+  - the prototype is kept per slice in renderer memory only
+  - when multiple slices are selected, the prototype shows mixed values where needed and applies edits to all selected slices at once
+  - slice sidebar `W/H` inputs also batch-apply to the current slice selection, while `X/Y` still edits only the active slice
+  - if a target's base size is still untouched from the slice axis size, resizing the slice keeps that base size in sync instead of leaving stale mixed values
   - no sidecar persistence, file-menu wiring, or actual export execution is connected yet

@@ -3,7 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { memo, useEffect, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { SidebarSliceSectionProps } from './types';
 
 type SliceExportTargetKey = 'generic' | 'apple' | 'android';
@@ -24,6 +24,27 @@ type SliceExportTargetUiState = {
 };
 
 type SliceExportUiState = Record<SliceExportTargetKey, SliceExportTargetUiState>;
+
+type SliceExportVariantDisplayState = {
+  checked: boolean;
+  someChecked: boolean;
+  mixed: boolean;
+};
+
+type SliceExportTargetDisplayState = {
+  baseVariant: string | null;
+  baseAxis: SliceExportAxis | null;
+  baseSizeInput: string;
+  directoryTemplates: string;
+  variants: Record<string, SliceExportVariantDisplayState>;
+  mixed: {
+    baseVariant: boolean;
+    baseAxis: boolean;
+    baseSizeInput: boolean;
+    directoryTemplates: boolean;
+    anyVariant: boolean;
+  };
+};
 
 const GENERIC_AND_APPLE_VARIANTS: SliceExportVariantDefinition[] = [
   { key: '1x', label: '1x', scale: 1 },
@@ -109,6 +130,60 @@ function createDefaultSliceExportUiState(slice: { w: number }): SliceExportUiSta
   };
 }
 
+function resolveSharedValue<T>(values: T[]): { value: T | null; mixed: boolean } {
+  if (values.length === 0) {
+    return { value: null, mixed: false };
+  }
+
+  const [firstValue] = values;
+  const isSame = values.every((value) => value === firstValue);
+  return {
+    value: isSame ? firstValue : null,
+    mixed: !isSame
+  };
+}
+
+function resolveDisplayTargetUiState(
+  states: SliceExportTargetUiState[],
+  variants: SliceExportVariantDefinition[]
+): SliceExportTargetDisplayState {
+  const baseVariant = resolveSharedValue(states.map((state) => state.baseVariant));
+  const baseAxis = resolveSharedValue(states.map((state) => state.baseAxis));
+  const baseSizeInput = resolveSharedValue(states.map((state) => state.baseSizeInput));
+  const directoryTemplates = resolveSharedValue(states.map((state) => state.directoryTemplates));
+
+  const variantStates = Object.fromEntries(
+    variants.map((variant) => {
+      const values = states.map((state) => Boolean(state.variants[variant.key]));
+      const checked = values.every(Boolean);
+      const someChecked = values.some(Boolean);
+      return [
+        variant.key,
+        {
+          checked,
+          someChecked,
+          mixed: someChecked && !checked
+        } satisfies SliceExportVariantDisplayState
+      ];
+    })
+  );
+
+  return {
+    baseVariant: baseVariant.value,
+    baseAxis: baseAxis.value,
+    baseSizeInput: baseSizeInput.value ?? '',
+    directoryTemplates: directoryTemplates.value ?? '',
+    variants: variantStates,
+    mixed: {
+      baseVariant: baseVariant.mixed,
+      baseAxis: baseAxis.mixed,
+      baseSizeInput: baseSizeInput.mixed,
+      directoryTemplates: directoryTemplates.mixed,
+      anyVariant: variants.some((variant) => variantStates[variant.key]?.mixed)
+    }
+  };
+}
+
 function resolveComputedVariantSize(
   slice: { w: number; h: number },
   state: SliceExportTargetUiState,
@@ -142,7 +217,8 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
   activeSlice,
   selectSliceFromList,
   updateActiveSliceName,
-  updateActiveSliceBounds
+  updateActiveSliceBounds,
+  updateSelectedSliceSize
 }: SidebarSliceSectionProps) {
   const [nameInput, setNameInput] = useState<string>('');
   const [xInput, setXInput] = useState<string>('0');
@@ -151,27 +227,12 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
   const [hInput, setHInput] = useState<string>('1');
   const [activeExportTab, setActiveExportTab] = useState<SliceExportTargetKey>('generic');
   const [exportUiBySliceId, setExportUiBySliceId] = useState<Record<string, SliceExportUiState>>({});
-
-  useEffect(() => {
-    if (!activeSlice) {
-      setNameInput('');
-      setXInput('0');
-      setYInput('0');
-      setWInput('1');
-      setHInput('1');
-      return;
-    }
-
-    setNameInput(activeSlice.name);
-    setXInput(String(activeSlice.x));
-    setYInput(String(activeSlice.y));
-    setWInput(String(activeSlice.w));
-    setHInput(String(activeSlice.h));
-  }, [activeSlice]);
+  const previousSlicesRef = useRef<Record<string, { w: number; h: number }>>({});
 
   useEffect(() => {
     setExportUiBySliceId((current) => {
       const next: Record<string, SliceExportUiState> = { ...current };
+      const previousSlices = previousSlicesRef.current;
       const sliceIds = new Set(slices.map((slice) => slice.id));
       let changed = false;
 
@@ -184,24 +245,116 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
       }
 
       for (const slice of slices) {
-        if (next[slice.id]) {
+        const previousSlice = previousSlices[slice.id];
+        const currentState = next[slice.id];
+        if (!currentState) {
+          next[slice.id] = createDefaultSliceExportUiState(slice);
+          changed = true;
           continue;
         }
-        next[slice.id] = createDefaultSliceExportUiState(slice);
-        changed = true;
+
+        if (!previousSlice) {
+          continue;
+        }
+
+        let targetChanged = false;
+        const syncedState: SliceExportUiState = { ...currentState };
+        for (const target of ['generic', 'apple', 'android'] as SliceExportTargetKey[]) {
+          const targetState = currentState[target];
+          const previousAxisSize = targetState.baseAxis === 'width' ? previousSlice.w : previousSlice.h;
+          const nextAxisSize = targetState.baseAxis === 'width' ? slice.w : slice.h;
+          if (targetState.baseSizeInput !== String(previousAxisSize)) {
+            continue;
+          }
+
+          syncedState[target] = {
+            ...targetState,
+            baseSizeInput: String(nextAxisSize)
+          };
+          targetChanged = true;
+        }
+
+        if (targetChanged) {
+          next[slice.id] = syncedState;
+          changed = true;
+        }
       }
 
+      previousSlicesRef.current = Object.fromEntries(slices.map((slice) => [slice.id, { w: slice.w, h: slice.h }]));
       return changed ? next : current;
     });
   }, [slices]);
 
-  const activeExportUi = activeSlice ? exportUiBySliceId[activeSlice.id] ?? createDefaultSliceExportUiState(activeSlice) : null;
-
-  const getCheckedVariantCount = (target: SliceExportTargetKey, variants: SliceExportVariantDefinition[]): number => {
-    if (!activeExportUi) {
-      return 0;
+  const exportScopeSlices = useMemo(() => {
+    if (selectedSliceIds.length > 0) {
+      const selectedIdSet = new Set(selectedSliceIds);
+      return slices.filter((slice) => selectedIdSet.has(slice.id));
     }
-    return variants.filter((variant) => activeExportUi[target].variants[variant.key]).length;
+    return activeSlice ? [activeSlice] : [];
+  }, [activeSlice, selectedSliceIds, slices]);
+
+  const selectedSizeDisplay = useMemo(() => {
+    if (exportScopeSlices.length === 0) {
+      return {
+        width: '1',
+        height: '1',
+        mixedWidth: false,
+        mixedHeight: false
+      };
+    }
+
+    const width = resolveSharedValue(exportScopeSlices.map((slice) => String(slice.w)));
+    const height = resolveSharedValue(exportScopeSlices.map((slice) => String(slice.h)));
+    return {
+      width: width.value ?? '',
+      height: height.value ?? '',
+      mixedWidth: width.mixed,
+      mixedHeight: height.mixed
+    };
+  }, [exportScopeSlices]);
+
+  useEffect(() => {
+    if (!activeSlice) {
+      setNameInput('');
+      setXInput('0');
+      setYInput('0');
+      return;
+    }
+
+    setNameInput(activeSlice.name);
+    setXInput(String(activeSlice.x));
+    setYInput(String(activeSlice.y));
+  }, [activeSlice]);
+
+  useEffect(() => {
+    setWInput(selectedSizeDisplay.width);
+    setHInput(selectedSizeDisplay.height);
+  }, [selectedSizeDisplay.height, selectedSizeDisplay.width]);
+
+  const exportDisplayState = useMemo(() => {
+    if (exportScopeSlices.length === 0) {
+      return null;
+    }
+
+    const targetStates = exportScopeSlices.map((slice) => exportUiBySliceId[slice.id] ?? createDefaultSliceExportUiState(slice));
+    return {
+      generic: resolveDisplayTargetUiState(targetStates.map((state) => state.generic), GENERIC_AND_APPLE_VARIANTS),
+      apple: resolveDisplayTargetUiState(targetStates.map((state) => state.apple), GENERIC_AND_APPLE_VARIANTS),
+      android: resolveDisplayTargetUiState(targetStates.map((state) => state.android), ANDROID_VARIANTS)
+    } satisfies Record<SliceExportTargetKey, SliceExportTargetDisplayState>;
+  }, [exportScopeSlices, exportUiBySliceId]);
+
+  const getCheckedVariantCountLabel = (target: SliceExportTargetKey, variants: SliceExportVariantDefinition[]): string => {
+    if (!exportDisplayState) {
+      return '0';
+    }
+
+    const targetDisplay = exportDisplayState[target];
+    if (targetDisplay.mixed.anyVariant) {
+      return '-';
+    }
+
+    return String(variants.filter((variant) => targetDisplay.variants[variant.key]?.checked).length);
   };
 
   const handleSliceClick = (event: ReactMouseEvent<HTMLElement>, sliceId: string) => {
@@ -261,6 +414,21 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     }
   };
 
+  const commitSizeBound = (key: 'w' | 'h', rawValue: string) => {
+    const parsed = Number.parseInt(rawValue, 10);
+    if (!Number.isFinite(parsed)) {
+      setWInput(selectedSizeDisplay.width);
+      setHInput(selectedSizeDisplay.height);
+      return;
+    }
+
+    const accepted = updateSelectedSliceSize({ [key]: parsed });
+    if (!accepted) {
+      setWInput(selectedSizeDisplay.width);
+      setHInput(selectedSizeDisplay.height);
+    }
+  };
+
   const handleFieldKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>, onCommit: () => void) => {
     if (event.key !== 'Enter') {
       return;
@@ -270,21 +438,26 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     event.currentTarget.blur();
   };
 
-  const updateActiveExportUi = (updater: (current: SliceExportUiState) => SliceExportUiState) => {
-    if (!activeSlice) {
+  const updateSelectedExportUi = (updater: (current: SliceExportUiState) => SliceExportUiState) => {
+    if (exportScopeSlices.length === 0) {
       return;
     }
 
     setExportUiBySliceId((current) => {
-      const currentState = current[activeSlice.id] ?? createDefaultSliceExportUiState(activeSlice);
-      const nextState = updater(currentState);
-      if (nextState === currentState) {
-        return current;
+      let changed = false;
+      const next: Record<string, SliceExportUiState> = { ...current };
+
+      for (const slice of exportScopeSlices) {
+        const currentState = next[slice.id] ?? createDefaultSliceExportUiState(slice);
+        const nextState = updater(currentState);
+        if (nextState === currentState) {
+          continue;
+        }
+        next[slice.id] = nextState;
+        changed = true;
       }
-      return {
-        ...current,
-        [activeSlice.id]: nextState
-      };
+
+      return changed ? next : current;
     });
   };
 
@@ -292,7 +465,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     target: SliceExportTargetKey,
     updater: (current: SliceExportTargetUiState) => SliceExportTargetUiState
   ) => {
-    updateActiveExportUi((current) => ({
+    updateSelectedExportUi((current) => ({
       ...current,
       [target]: updater(current[target])
     }));
@@ -302,23 +475,25 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     target: SliceExportTargetKey,
     variants: SliceExportVariantDefinition[]
   ) => {
-    if (!activeSlice || !activeExportUi) {
+    if (exportScopeSlices.length === 0 || !exportDisplayState) {
       return null;
     }
 
-    const targetState = activeExportUi[target];
-    const hasBaseSize = targetState.baseSizeInput.trim() !== '';
-    const isWidthDisabled = hasBaseSize && targetState.baseAxis === 'height';
-    const isHeightDisabled = hasBaseSize && targetState.baseAxis === 'width';
+    const targetState = exportDisplayState[target];
+    const isWidthDisabled = targetState.baseSizeInput.trim() !== '' && targetState.baseAxis === 'height';
+    const isHeightDisabled = targetState.baseSizeInput.trim() !== '' && targetState.baseAxis === 'width';
     const widthValue = targetState.baseAxis === 'width' ? targetState.baseSizeInput : '';
     const heightValue = targetState.baseAxis === 'height' ? targetState.baseSizeInput : '';
-    const baseVariantLabel = variants.find((variant) => variant.key === targetState.baseVariant)?.label ?? targetState.baseVariant;
-    const simulatedPaths = buildSimulatedExportPaths({
-      target,
-      slice: activeSlice,
-      variants,
-      state: targetState,
-      baseName: (nameInput.trim() || activeSlice.name || 'slice').trim() || 'slice'
+    const baseVariantLabel = variants.find((variant) => variant.key === targetState.baseVariant)?.label ?? 'Base';
+    const simulatedPaths = exportScopeSlices.flatMap((slice) => {
+      const sliceTargetState = (exportUiBySliceId[slice.id] ?? createDefaultSliceExportUiState(slice))[target];
+      return buildSimulatedExportPaths({
+        target,
+        slice,
+        variants,
+        state: sliceTargetState,
+        baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
+      });
     });
 
     return (
@@ -368,18 +543,38 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
           <table className="table table-sm align-middle mb-0 slice-sidebar-export-table">
             <tbody>
               {variants.map((variant) => {
-                const computed = resolveComputedVariantSize(activeSlice, targetState, variant, variants);
+                const computedSizes = exportScopeSlices.map((slice) =>
+                  resolveComputedVariantSize(
+                    slice,
+                    (exportUiBySliceId[slice.id] ?? createDefaultSliceExportUiState(slice))[target],
+                    variant,
+                    variants
+                  )
+                );
+                const [firstComputed] = computedSizes;
+                const isConsistentSize =
+                  computedSizes.length === 0 ||
+                  computedSizes.every(
+                    (computed) => computed.width === firstComputed?.width && computed.height === firstComputed?.height
+                  );
+                const variantDisplay = targetState.variants[variant.key];
+                const isBase = targetState.baseVariant === variant.key && !targetState.mixed.baseVariant;
                 return (
                   <tr
                     key={variant.key}
-                    className={targetState.variants[variant.key] ? 'table-success-subtle' : undefined}
+                    className={variantDisplay.checked || variantDisplay.mixed ? 'table-success-subtle' : undefined}
                   >
                     <td className="text-nowrap">
                       <label className="d-inline-flex align-items-center gap-2 small fw-semibold mb-0">
                         <input
                           className="form-check-input"
                           type="checkbox"
-                          checked={targetState.variants[variant.key] ?? false}
+                          checked={variantDisplay.checked}
+                          ref={(element) => {
+                            if (element) {
+                              element.indeterminate = variantDisplay.mixed;
+                            }
+                          }}
                           onChange={(event) =>
                             updateTargetExportUi(target, (current) => ({
                               ...current,
@@ -395,18 +590,22 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                     </td>
                     <td
                       className={`text-end font-monospace small ${
-                        computed.isBase ? 'fw-semibold text-body-emphasis' : 'text-body-secondary'
+                        isBase ? 'fw-semibold text-body-emphasis' : 'text-body-secondary'
                       }`}
                     >
-                      {computed.width}×{computed.height}
+                      {isConsistentSize && firstComputed ? (
+                        `${firstComputed.width}×${firstComputed.height}`
+                      ) : (
+                        <span className="fst-italic">mixed</span>
+                      )}
                     </td>
                     <td className="text-end">
                       <label className="d-inline-flex align-items-center gap-1 small text-body-secondary">
                         <input
                           className="form-check-input"
                           type="radio"
-                          name={`slice-export-base-${activeSlice.id}-${target}`}
-                          checked={computed.isBase}
+                          name={`slice-export-base-${target}`}
+                          checked={isBase}
                           onChange={() =>
                             updateTargetExportUi(target, (current) => ({
                               ...current,
@@ -431,6 +630,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
             type="text"
             className="form-control"
             value={targetState.directoryTemplates}
+            placeholder={targetState.mixed.directoryTemplates ? 'mixed' : undefined}
             onChange={(event) =>
               updateTargetExportUi(target, (current) => ({
                 ...current,
@@ -444,8 +644,8 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
           <div className="small text-body-secondary">Files</div>
           <div className="small font-monospace text-body-secondary d-flex flex-column gap-1">
             {simulatedPaths.length > 0 ? (
-              simulatedPaths.map(({ relativePath, width, height }) => (
-                <div key={`${relativePath}-${width}x${height}`}>
+              simulatedPaths.map(({ relativePath, width, height }, index) => (
+                <div key={`${index}:${relativePath}-${width}x${height}`}>
                   {relativePath} ({width}x{height})
                 </div>
               ))
@@ -556,10 +756,11 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               min={1}
               max={canvasSize}
               value={wInput}
-              disabled={!activeSlice}
+              disabled={exportScopeSlices.length === 0}
+              placeholder={selectedSizeDisplay.mixedWidth ? 'mixed' : undefined}
               onChange={(event) => setWInput(event.target.value)}
-              onBlur={() => commitBound('w', wInput)}
-              onKeyDown={(event) => handleFieldKeyDown(event, () => commitBound('w', wInput))}
+              onBlur={() => commitSizeBound('w', wInput)}
+              onKeyDown={(event) => handleFieldKeyDown(event, () => commitSizeBound('w', wInput))}
             />
             <span className="input-group-text" aria-hidden="true">
               <i className="fa-solid fa-xmark" />
@@ -570,16 +771,17 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               min={1}
               max={canvasSize}
               value={hInput}
-              disabled={!activeSlice}
+              disabled={exportScopeSlices.length === 0}
+              placeholder={selectedSizeDisplay.mixedHeight ? 'mixed' : undefined}
               onChange={(event) => setHInput(event.target.value)}
-              onBlur={() => commitBound('h', hInput)}
-              onKeyDown={(event) => handleFieldKeyDown(event, () => commitBound('h', hInput))}
+              onBlur={() => commitSizeBound('h', hInput)}
+              onKeyDown={(event) => handleFieldKeyDown(event, () => commitSizeBound('h', hInput))}
             />
           </div>
         </div>
       </div>
 
-      {activeSlice ? (
+      {exportScopeSlices.length > 0 ? (
         <div className="d-flex flex-column gap-2">
           <ul className="nav nav-tabs sidebar-slice-export-tabs small" role="tablist">
             {([
@@ -597,7 +799,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                   onClick={() => setActiveExportTab(target)}
                 >
                   <span className="sidebar-slice-export-tab-label">{SLICE_EXPORT_TARGET_LABELS[target]}</span>
-                  <span className="badge text-bg-light border text-body-secondary">{getCheckedVariantCount(target, variants)}</span>
+                  <span className="badge text-bg-light border text-body-secondary">{getCheckedVariantCountLabel(target, variants)}</span>
                 </button>
               </li>
             ))}
