@@ -24,8 +24,14 @@ import {
 } from '../editor/constants';
 import { resolveNextSelectedColor } from '../editor/app-utils';
 import { collectPaletteUsageFromPixels, syncPaletteEntriesWithUsage } from '../editor/palette-sync';
-import type { EditorMeta, PaletteEntry, Selection, Tool } from '../editor/types';
-import { clampCanvasSize, clonePaletteEntries, normalizePaletteEntries } from '../editor/utils';
+import {
+  buildSliceExportPlans,
+  getSliceExportScopeSlices,
+  renderSliceExportFiles
+} from '../editor/slice-export';
+import { normalizeEditorSlices } from '../editor/slices';
+import type { EditorMeta, EditorSlice, PaletteEntry, Selection, Tool } from '../editor/types';
+import { clampCanvasSize, clonePaletteEntries, cloneSlices, normalizePaletteEntries } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -36,6 +42,8 @@ type UseDocumentFileActionsOptions = {
   hasUnsavedChanges: boolean;
   floatingCompositeMode: FloatingCompositeMode;
   palette: PaletteEntry[];
+  slices: EditorSlice[];
+  selectedSliceIds: string[];
   pixels: Uint8ClampedArray;
   selectedColor: string;
   tool: Tool;
@@ -52,6 +60,7 @@ type UseDocumentFileActionsOptions = {
   setCurrentFilePath: Dispatch<SetStateAction<string | undefined>>;
   setFloatingCompositeMode: Dispatch<SetStateAction<FloatingCompositeMode>>;
   setPalette: Dispatch<SetStateAction<PaletteEntry[]>>;
+  setSlices: Dispatch<SetStateAction<EditorSlice[]>>;
   setSelectedColor: Dispatch<SetStateAction<string>>;
   setTool: Dispatch<SetStateAction<Tool>>;
   setGridSpacing: Dispatch<SetStateAction<number>>;
@@ -62,6 +71,7 @@ type UseDocumentFileActionsOptions = {
   resetTilePreviewLayers: () => void;
   resetAnimationFrames: () => void;
   resetPaletteOrderViewState: () => void;
+  resetSliceUiState: () => void;
   clearFloatingPaste: () => void;
   setStatusText: (text: string, type: StatusType) => void;
 };
@@ -73,6 +83,8 @@ export function useDocumentFileActions({
   hasUnsavedChanges,
   floatingCompositeMode,
   palette,
+  slices,
+  selectedSliceIds,
   pixels,
   selectedColor,
   tool,
@@ -89,6 +101,7 @@ export function useDocumentFileActions({
   setCurrentFilePath,
   setFloatingCompositeMode,
   setPalette,
+  setSlices,
   setSelectedColor,
   setTool,
   setGridSpacing,
@@ -99,6 +112,7 @@ export function useDocumentFileActions({
   resetTilePreviewLayers,
   resetAnimationFrames,
   resetPaletteOrderViewState,
+  resetSliceUiState,
   clearFloatingPaste,
   setStatusText
 }: UseDocumentFileActionsOptions) {
@@ -123,7 +137,8 @@ export function useDocumentFileActions({
         document: {
           palette: {
             entries: clonePaletteEntries(palette)
-          }
+          },
+          slices: cloneSlices(slices)
         },
         editor: {
           floatingCompositeMode,
@@ -140,7 +155,7 @@ export function useDocumentFileActions({
     };
 
     return { base64Png, metadata };
-  }, [canvasSize, canvasStageRef, floatingCompositeMode, gridSpacing, palette, pixels, tool, transparentBackgroundMode, zoom]);
+  }, [canvasSize, canvasStageRef, floatingCompositeMode, gridSpacing, palette, pixels, slices, tool, transparentBackgroundMode, zoom]);
 
   const performSave = useCallback(
     async (options: { saveAs: boolean; suppressCancelToast?: boolean }): Promise<'saved' | 'canceled' | 'failed'> => {
@@ -272,6 +287,7 @@ export function useDocumentFileActions({
         resetTilePreviewLayers();
         resetAnimationFrames();
         resetPaletteOrderViewState();
+        resetSliceUiState();
         clearFloatingPaste();
         undoStackRef.current = [];
         pendingZoomAnchorRef.current = null;
@@ -284,8 +300,10 @@ export function useDocumentFileActions({
           removeUnusedColors: false,
           addUsedColors: true
         });
+        const nextSlices = normalizeEditorSlices(result.metadata?.dlaPixy.document.slices ?? [], targetCanvasSize);
 
         setPalette(nextPalette);
+        setSlices(nextSlices);
         setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
         setTool(editorState?.lastTool ?? 'select');
         setFloatingCompositeMode(editorState?.floatingCompositeMode ?? DEFAULT_FLOATING_COMPOSITE_MODE);
@@ -332,6 +350,7 @@ export function useDocumentFileActions({
       pendingZoomAnchorRef,
       resetAnimationFrames,
       resetPaletteOrderViewState,
+      resetSliceUiState,
       resetTilePreviewLayers,
       selectedColor,
       setCanvasSize,
@@ -341,6 +360,7 @@ export function useDocumentFileActions({
       setHasUnsavedChanges,
       setLastTilePreviewSelection,
       setPalette,
+      setSlices,
       setPixels,
       setSelectedColor,
       setSelection,
@@ -353,9 +373,49 @@ export function useDocumentFileActions({
     ]
   );
 
+  const exportSlices = useCallback(async () => {
+    const exportScopeSlices = getSliceExportScopeSlices(slices, selectedSliceIds);
+    if (exportScopeSlices.length === 0) {
+      setStatusText('書き出し対象のスライスがありません', 'warning');
+      return;
+    }
+
+    const planResult = buildSliceExportPlans(exportScopeSlices);
+    if ('error' in planResult) {
+      setStatusText(planResult.error, 'warning');
+      return;
+    }
+
+    try {
+      const files = await renderSliceExportFiles({
+        canvasSize,
+        pixels,
+        plans: planResult.plans
+      });
+      const result = await window.pixelApi.exportSliceFiles({ files });
+      if (result.canceled) {
+        setStatusText('スライスの書き出しをキャンセルしました', 'warning');
+        return;
+      }
+      if (result.error) {
+        setStatusText(`スライスの書き出しに失敗しました: ${result.message ?? result.error}`, 'error');
+        return;
+      }
+
+      setStatusText(
+        `スライスの書き出しが完了しました: ${result.fileCount ?? files.length}件 / 保存先: ${result.directoryPath ?? '-'}`,
+        'success'
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '不明なエラー';
+      setStatusText(`スライスの書き出しに失敗しました: ${message}`, 'error');
+    }
+  }, [canvasSize, pixels, selectedSliceIds, setStatusText, slices]);
+
   return {
     savePng,
     saveAsPng,
-    loadPng
+    loadPng,
+    exportSlices
   };
 }

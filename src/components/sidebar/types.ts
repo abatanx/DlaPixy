@@ -3,9 +3,10 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import type { AnimationFrame, PaletteEntry, Selection, TilePreviewLayer } from '../../editor/types';
+import type { AnimationFrame, EditorSlice, PaletteEntry, Selection, TilePreviewLayer, Tool } from '../../editor/types';
 import type { PaletteUsageEntry } from '../../editor/palette-sync';
 import type { PaletteAutoSortKey, PaletteOrderMode } from '../../editor/palette-order';
+import type { SliceExportSettings } from '../../../shared/slice';
 import type { TransparentBackgroundMode } from '../../../shared/transparent-background';
 
 export type PaletteColorModalRequest = {
@@ -18,6 +19,7 @@ export type TilePreviewLayerSummary = Pick<TilePreviewLayer, 'id' | 'width' | 'h
 };
 
 export type EditorSidebarProps = {
+  tool: Tool;
   canvasSize: number;
   transparentBackgroundMode: TransparentBackgroundMode;
   previewDataUrl: string;
@@ -46,6 +48,17 @@ export type EditorSidebarProps = {
   toggleAnimationPreviewPlayback: () => void;
   setAnimationPreviewFps: (fps: number) => void;
   setAnimationPreviewLoop: (value: boolean) => void;
+  setStatusText: (text: string, type: 'success' | 'warning' | 'error' | 'info') => void;
+  slices: EditorSlice[];
+  selectedSliceIds: string[];
+  activeSlice: EditorSlice | null;
+  selectSliceFromList: (sliceId: string, selectionMode: 'replace' | 'toggle' | 'range') => void;
+  updateActiveSliceName: (value: string) => boolean;
+  updateActiveSliceBounds: (partial: Partial<Pick<EditorSlice, 'x' | 'y' | 'w' | 'h'>>) => boolean;
+  updateSelectedSliceSize: (partial: Partial<Pick<EditorSlice, 'w' | 'h'>>) => boolean;
+  updateSelectedSliceExportSettings: (
+    updater: (current: SliceExportSettings, slice: EditorSlice) => SliceExportSettings
+  ) => boolean;
   selectedColor: string;
   setSelectedColor: (value: string) => void;
   applySelectedColorChange: (value: PaletteEntry) => void;
@@ -101,6 +114,20 @@ export type SidebarPreviewSectionProps = Pick<
   | 'toggleAnimationPreviewPlayback'
   | 'setAnimationPreviewFps'
   | 'setAnimationPreviewLoop'
+>;
+
+export type SidebarSliceSectionProps = Pick<
+  EditorSidebarProps,
+  | 'canvasSize'
+  | 'slices'
+  | 'selectedSliceIds'
+  | 'activeSlice'
+  | 'selectSliceFromList'
+  | 'updateActiveSliceName'
+  | 'updateActiveSliceBounds'
+  | 'updateSelectedSliceSize'
+  | 'updateSelectedSliceExportSettings'
+  | 'setStatusText'
 >;
 
 export type SidebarPaletteSectionProps = Pick<

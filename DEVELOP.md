@@ -479,6 +479,8 @@ Current metadata shape:
   - https://github.com/abatanx/DlaPixy/issues/3
 - #33 `fix: Edited image disappears when changing canvas size`
   - https://github.com/abatanx/DlaPixy/issues/33
+- #38 `spec: Unity / iOS / Android 向けスライス機能を整理する`
+  - https://github.com/abatanx/DlaPixy/issues/38
 - #42 `refactor: スウォッチ整理処理を共通化する`
   - https://github.com/abatanx/DlaPixy/issues/42
 - #46 `feat: パレットの並び順モードを追加する（手動並び替え / 自動ソート）`
@@ -789,3 +791,152 @@ Current metadata shape:
   - `SIDECAR_SCHEMA_VERSION` was bumped to `2`, and sidecar palette entries now require UUID-format `id`.
   - Palette hover / reference lines and merge-selection UI now track swatches by `id`, resolving display index only when needed.
   - Color-semantic operations such as usage counts, pixel replacement, delete, and merge execution still resolve through `color`.
+
+## 17. Issue #38 Spec Notes (2026-04-07)
+- Goal:
+  - Reframe slices in a Fireworks-like way for DlaPixy:
+    - not as temporary selection
+    - but as persistent rectangular metadata for Unity / iOS / Android asset export
+- Proposed meaning split:
+  - `selection`
+    - temporary editing target
+  - `slice`
+    - saved rectangular asset definition / export unit
+- Proposed first version:
+  - support `user slice` only
+  - add a dedicated `slice` button to the right toolbar
+  - create one slice by dragging directly on the canvas
+  - generate multiple slices from a fixed grid over `Canvas`
+  - show slices as both canvas overlay and a persistent list
+  - render slice overlays as semi-transparent green rectangles
+  - allow add / select / move / resize / delete interactions while slice mode is active
+  - allow new-slice drag creation to start slightly outside the canvas edge, clamping the start point to the nearest edge cell
+  - support slice multi-selection:
+    - `Cmd/Ctrl + A` selects all slices
+    - `Cmd/Ctrl + click` toggles individual slices into the selection
+    - `Shift + click` selects a contiguous range on the slice list from the last-focused slice to the clicked slice
+    - `Shift + drag` performs marquee selection instead of creating a new slice
+  - `Cmd/Ctrl + D` duplicates the selected slices
+  - `Cmd/Ctrl + C` copies the selected slices
+  - `Cmd/Ctrl + V` pastes copied slices
+  - arrow keys move the selected slices by `1px`
+  - while slice mode is active, replace the normal left `Preview` / `Palette` cards with a dedicated slice info panel
+  - keep `Space + drag` viewport pan behavior available in slice mode as well, matching the normal editing flow
+  - save slices in sidecar metadata from the first version
+- Explicitly defer from the first version:
+  - auto slices
+  - per-slice export settings
+  - atlas / spritesheet auto layout
+  - Fireworks-style HTML / URL / alt metadata
+  - selection-driven slice creation
+- Proposed minimal shape:
+  - `EditorSlice = { id, name, x, y, w, h }`
+- Design direction:
+  - treat fixed-size auto slicing as a slice-generation helper that replaces the current slice set, not as the slice model itself
+  - store every slice as a `1x` logical base rect
+  - keep density / naming expansion in future export profiles
+  - target export compatibility such as:
+    - generic `name.png`, `name@2x.png`, `name@3x.png`, `name@4x.png`
+    - iOS / Apple `name.png`, `name@2x.png`, `name@3x.png`, `name@4x.png`
+    - Android drawable directories such as `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`
+  - there should be no global preset/profile library; export settings belong directly to each slice
+  - slices should evolve from `id / name / x / y / w / h` to something like:
+    - `id / name / x / y / w / h / exportSettings`
+  - `exportSettings` should own per-target export settings for `generic`, `apple`, and `android`
+    - each target settings block owns:
+      - base variant (`1x`, `@2x`, `@3x`, `@4x`, `ldpi`, `mdpi`, `hdpi`, ...)
+      - base axis (`width` or `height`)
+      - base size (integer px value for that base variant and axis)
+      - enabled variants for export
+    - android target settings additionally own output directory templates such as `mipmap-{density}` / `drawable-{density}`
+  - there should be no separate `enabledTargets`; the checked variants themselves determine what gets exported
+  - multiple selected slices should support batch-editing the same export settings, so the workflow still feels efficient without presets
+  - if the selected slices have different export settings, the UI should show a mixed state until the user applies common values
+  - `slice.name` should be the export basename, so duplicate names need validation before export
+  - the opposite axis should be auto-derived from the slice's original aspect ratio
+  - integer scales should use nearest-neighbor exact expansion
+  - non-integer Android densities (`1.5x`, `0.75x`) should be handled as part of the per-slice export settings, not as part of the base slice rect itself
+  - export UI should present target sections for `generic`, `apple`, and `android`
+  - each target section should present variant rows like:
+    - enabled checkbox
+    - variant label
+    - width / height fields
+    - computed `-> WxH` preview
+  - each target section should also have a slice-level `Dirs` field
+    - accepts a comma-separated list
+    - the same template list applies to every enabled variant within that target
+    - expanded directories are created under the selected export root
+  - Android `Dirs` may use `{density}` placeholders such as `mipmap-{density}, drawable-{density}`
+    - `{density}` expands per variant to `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`
+  - add a `Canvas > Slice > Save...` command for slice export
+    - choose an output directory first
+    - if no slices are selected, export all slices
+    - if one or more slices are selected, export only the selected slices
+    - each target slice should be written as individual files into the chosen directory
+  - only the base row should accept direct size input on the selected base axis; non-base rows should be derived displays
+  - the base row should be visually marked in the variant list
+  - generic / iOS rows should be fixed to `1x`, `@2x`, `@3x`, `@4x`
+  - the `1x` row exports without any filename suffix
+  - android rows should be fixed to `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`
+  - Android export should allow slice-level directory templates like `mipmap-{density}, drawable-{density}`, shared across the enabled Android variants
+  - a single slice may export to generic / iOS / android simultaneously, as long as those sections have checked variants
+  - use a toolbar-driven `slice mode` for canvas interactions
+  - switch the left sidebar to a slice-only info panel during slice mode
+  - keep the slice sidebar informational: no action buttons in the panel itself
+  - add `Canvas > Slice > Auto Slice...` for bulk generation
+    - dialog fields are `slice name`, `w`, `h`
+    - applying it replaces all existing slices
+    - ignore right / bottom remainder regions that do not fit the requested size
+    - generate names from top-left to bottom-right as `{sliceName}-{index}`
+    - zero-padding width is the minimum fixed width needed to represent the generated slice count
+      - e.g. `256` slices -> `000` .. `255`
+      - e.g. `4096` slices -> `0000` .. `4095`
+  - resize should be direct-manipulation via 8 always-visible handles (`TL / TC / TR / ML / MR / BL / BC / BR`) on the active slice
+  - expand the slice hit area slightly outside the visible rectangle so edge slices remain easy to drag and resize
+  - treat slice selection as:
+    - `selectedSliceIds` for the full set
+    - `activeSliceId` for the last-focused slice
+    - `Shift + drag` uses a marquee rectangle to replace the current slice selection
+  - allow group move / group delete for multi-selection
+  - allow group duplicate / group copy / group paste for multi-selection
+  - treat slice copy as metadata copy into an internal slice clipboard
+  - pasted slices must receive new `id` values
+  - keep resize available only for single selection
+  - allow arrow-key nudging for the current slice selection by `1px` per key press
+  - keep `Space + drag` viewport pan active in slice mode too, even when the pointer starts on a slice overlay
+  - completely disable `selection`, `Tile Preview`, and `Animation Preview` while slice mode is active
+- UI prototype memo:
+  - slice sidebar now includes a transient export-settings UI prototype for `generic` / `apple` / `android`
+  - the prototype is kept per slice in renderer memory only
+  - when multiple slices are selected, the prototype shows mixed values where needed and applies edits to all selected slices at once
+  - slice sidebar `W/H` inputs also batch-apply to the current slice selection, while `X/Y` still edits only the active slice
+  - if a target's base size is still untouched from the slice axis size, resizing the slice keeps that base size in sync instead of leaving stale mixed values
+  - no sidecar persistence, file-menu wiring, or actual export execution is connected yet
+
+## 18. Issue #38 Implementation Memo (2026-04-13)
+- Completed:
+  - `Canvas > Slice > Auto Slice...`
+    - Added a renderer modal with `slice name / W / H`
+    - Replaces the current slice set with a fixed grid
+    - Ignores right / bottom remainder areas that do not fit the requested size
+    - Generates names as `{sliceName}-{index}` with the minimum fixed zero-padding width
+    - Leaves `selectedSliceIds` empty after generation and keeps the first generated slice as `activeSliceId`
+  - slice export settings persistence
+    - `EditorSlice` now optionally carries `exportSettings`
+    - Sidecar save/load keeps export settings inside `document.slices[*].exportSettings`
+    - Existing sidecars without export settings still load; missing settings are normalized to defaults on load
+  - `Canvas > Slice > Save...`
+    - Added a native Canvas menu entry wired through IPC
+    - Export scope is `selected slices` when any are selected, otherwise `all slices`
+    - Renderer crops the source canvas by slice rect, scales with nearest-neighbor, and sends PNG payloads to Electron main for directory export
+  - export validation
+    - Rejects empty slice names
+    - Rejects duplicate slice names (case-insensitive within the export scope)
+    - Rejects forbidden filename characters in `slice.name`
+    - Rejects exports when a slice has no checked variants
+    - Rejects duplicate resolved relative output paths
+    - Rejects invalid relative paths such as absolute paths or `.` / `..` traversal in resolved export directories
+- Implementation detail:
+  - slice sidebar export controls no longer keep renderer-only temporary state
+  - export settings now live in the slice model itself, so undo / save / load / duplicate / paste all preserve them
+  - when slice `W/H` changes, export base sizes that were still mirroring the slice axis size continue to stay in sync

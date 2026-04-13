@@ -11,10 +11,18 @@ import {
   normalizePaletteEntries,
   type PaletteEntry
 } from '../../shared/palette';
+import {
+  cloneSliceExportSettings,
+  generateEditorSliceId,
+  isEditorSliceId,
+  normalizeSliceName,
+  type EditorSlice
+} from '../../shared/slice';
 import type { FloatingCompositeMode } from '../../shared/floating-composite';
 import type { Selection } from './types';
 
 export { generatePaletteEntryId, isPaletteEntryId, normalizeColorHex, normalizePaletteCaption, normalizePaletteEntries };
+export { generateEditorSliceId, isEditorSliceId, normalizeSliceName };
 
 // RGB値を16進カラー文字列（#rrggbb）に変換する。
 export function rgbaToHex(r: number, g: number, b: number): string {
@@ -36,6 +44,13 @@ export function createPaletteEntries(colors: string[]): PaletteEntry[] {
 // パレット配列をディープコピーしてイミュータブル更新に使う。
 export function clonePaletteEntries(entries: PaletteEntry[]): PaletteEntry[] {
   return entries.map((entry) => ({ ...entry }));
+}
+
+export function cloneSlices(entries: EditorSlice[]): EditorSlice[] {
+  return entries.map((entry) => ({
+    ...entry,
+    exportSettings: entry.exportSettings ? cloneSliceExportSettings(entry.exportSettings) : undefined
+  }));
 }
 
 // 16進カラー文字列（#rrggbb / #rrggbbaa）をRGBA値へ変換する。

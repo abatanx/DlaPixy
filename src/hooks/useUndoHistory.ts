@@ -5,8 +5,8 @@
 
 import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { MAX_UNDO } from '../editor/constants';
-import type { PaletteEntry, Selection } from '../editor/types';
-import { clonePaletteEntries, clonePixels, cloneSelection } from '../editor/utils';
+import type { EditorSlice, PaletteEntry, Selection } from '../editor/types';
+import { clonePaletteEntries, clonePixels, cloneSelection, cloneSlices } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -15,6 +15,9 @@ type UndoSnapshot = {
   pixels: Uint8ClampedArray;
   selection: Selection;
   palette: PaletteEntry[];
+  slices: EditorSlice[];
+  selectedSliceIds: string[];
+  activeSliceId: string | null;
   selectedColor: string;
 };
 
@@ -23,6 +26,9 @@ type UseUndoHistoryOptions = {
   pixels: Uint8ClampedArray;
   selection: Selection;
   palette: PaletteEntry[];
+  slices: EditorSlice[];
+  selectedSliceIds: string[];
+  activeSliceId: string | null;
   selectedColor: string;
   clearFloatingPaste: () => void;
   resetAnimationFrames: () => void;
@@ -31,6 +37,9 @@ type UseUndoHistoryOptions = {
   setSelection: Dispatch<SetStateAction<Selection>>;
   setLastTilePreviewSelection: Dispatch<SetStateAction<Selection>>;
   setPalette: Dispatch<SetStateAction<PaletteEntry[]>>;
+  setSlices: Dispatch<SetStateAction<EditorSlice[]>>;
+  setSelectedSliceIds: Dispatch<SetStateAction<string[]>>;
+  setActiveSliceId: Dispatch<SetStateAction<string | null>>;
   setSelectedColor: Dispatch<SetStateAction<string>>;
   setHasUnsavedChanges: Dispatch<SetStateAction<boolean>>;
   setStatusText: (text: string, type: StatusType) => void;
@@ -41,6 +50,9 @@ export function useUndoHistory({
   pixels,
   selection,
   palette,
+  slices,
+  selectedSliceIds,
+  activeSliceId,
   selectedColor,
   clearFloatingPaste,
   resetAnimationFrames,
@@ -49,6 +61,9 @@ export function useUndoHistory({
   setSelection,
   setLastTilePreviewSelection,
   setPalette,
+  setSlices,
+  setSelectedSliceIds,
+  setActiveSliceId,
   setSelectedColor,
   setHasUnsavedChanges,
   setStatusText
@@ -66,12 +81,15 @@ export function useUndoHistory({
       pixels: clonePixels(pixels),
       selection: cloneSelection(selection),
       palette: clonePaletteEntries(palette),
+      slices: cloneSlices(slices),
+      selectedSliceIds: [...selectedSliceIds],
+      activeSliceId,
       selectedColor
     });
     if (undoStackRef.current.length > MAX_UNDO) {
       undoStackRef.current.shift();
     }
-  }, [canvasSize, palette, pixels, selectedColor, selection]);
+  }, [activeSliceId, canvasSize, palette, pixels, selectedColor, selectedSliceIds, selection, slices]);
 
   const doUndo = useCallback(() => {
     const previous = undoStackRef.current.pop();
@@ -85,6 +103,9 @@ export function useUndoHistory({
     setSelection(previous.selection);
     setLastTilePreviewSelection(previous.selection);
     setPalette(clonePaletteEntries(previous.palette));
+    setSlices(cloneSlices(previous.slices));
+    setSelectedSliceIds([...previous.selectedSliceIds]);
+    setActiveSliceId(previous.activeSliceId);
     setSelectedColor(previous.selectedColor);
     if (previous.canvasSize !== canvasSize) {
       resetAnimationFrames();
@@ -101,8 +122,11 @@ export function useUndoHistory({
     setLastTilePreviewSelection,
     setPalette,
     setPixels,
+    setActiveSliceId,
     setSelectedColor,
+    setSelectedSliceIds,
     setSelection,
+    setSlices,
     setStatusText
   ]);
 

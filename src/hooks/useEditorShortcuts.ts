@@ -14,20 +14,30 @@ type StatusType = 'success' | 'warning' | 'error' | 'info';
 type UseEditorShortcutsOptions = {
   selectionRotateRequestActive: boolean;
   hasSelection: boolean;
+  hasSelectedSlices: boolean;
   floatingPasteRef: { current: unknown };
+  tool: Tool;
   setTool: Dispatch<SetStateAction<Tool>>;
+  activateSliceTool: () => boolean;
   setTransparentBackgroundMode: Dispatch<SetStateAction<TransparentBackgroundMode>>;
   setStatusText: (text: string, type: StatusType) => void;
   clearSelection: () => void;
+  clearSliceSelection: () => void;
   doUndo: () => void;
   copySelection: () => Promise<void>;
+  copySelectedSlices: () => boolean;
   pasteSelection: () => void;
+  pasteSlices: () => boolean;
   selectEntireCanvas: () => void;
+  selectAllSlices: () => boolean;
   deleteSelection: () => void;
+  deleteSelectedSlices: () => boolean;
+  duplicateSelectedSlices: () => boolean;
   selectReferenceByNumber: (number: number) => boolean;
   finalizeFloatingPaste: () => void;
   cancelFloatingPaste: () => void;
   nudgeFloatingPaste: (dx: number, dy: number) => void;
+  nudgeSelectedSlices: (dx: number, dy: number) => boolean;
   addAnimationFrame: () => void;
   addTilePreviewLayer: () => void;
   openSelectionRotateModal: () => void;
@@ -41,9 +51,11 @@ type UseEditorShortcutsOptions = {
   openZoomModal: () => void;
   openCanvasSizeModal: () => void;
   openGridSpacingModal: () => void;
+  openAutoSliceModal: () => void;
   openKMeansQuantizeModal: () => void;
   importGplPalette: (mode: 'replace' | 'append') => Promise<void>;
   exportGplPalette: (format: GplExportFormat) => Promise<void>;
+  exportSlices: () => Promise<void>;
 };
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -58,20 +70,30 @@ function isEditableElement(target: EventTarget | null): boolean {
 export function useEditorShortcuts({
   selectionRotateRequestActive,
   hasSelection,
+  hasSelectedSlices,
   floatingPasteRef,
+  tool,
   setTool,
+  activateSliceTool,
   setTransparentBackgroundMode,
   setStatusText,
   clearSelection,
+  clearSliceSelection,
   doUndo,
   copySelection,
+  copySelectedSlices,
   pasteSelection,
+  pasteSlices,
   selectEntireCanvas,
+  selectAllSlices,
   deleteSelection,
+  deleteSelectedSlices,
+  duplicateSelectedSlices,
   selectReferenceByNumber,
   finalizeFloatingPaste,
   cancelFloatingPaste,
   nudgeFloatingPaste,
+  nudgeSelectedSlices,
   addAnimationFrame,
   addTilePreviewLayer,
   openSelectionRotateModal,
@@ -85,9 +107,11 @@ export function useEditorShortcuts({
   openZoomModal,
   openCanvasSizeModal,
   openGridSpacingModal,
+  openAutoSliceModal,
   openKMeansQuantizeModal,
   importGplPalette,
-  exportGplPalette
+  exportGplPalette,
+  exportSlices
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -103,17 +127,37 @@ export function useEditorShortcuts({
       }
       if (withSystemKey && event.key.toLowerCase() === 'c') {
         event.preventDefault();
-        void copySelection();
+        if (tool === 'slice') {
+          copySelectedSlices();
+        } else {
+          void copySelection();
+        }
         return;
       }
       if (withSystemKey && event.key.toLowerCase() === 'v') {
         event.preventDefault();
-        pasteSelection();
+        if (tool === 'slice') {
+          pasteSlices();
+        } else {
+          pasteSelection();
+        }
         return;
       }
       if (withSystemKey && event.key.toLowerCase() === 'a') {
         event.preventDefault();
-        selectEntireCanvas();
+        if (tool === 'slice') {
+          selectAllSlices();
+        } else {
+          selectEntireCanvas();
+        }
+        return;
+      }
+      if (withSystemKey && event.key.toLowerCase() === 'd') {
+        if (tool !== 'slice') {
+          return;
+        }
+        event.preventDefault();
+        duplicateSelectedSlices();
         return;
       }
 
@@ -123,7 +167,11 @@ export function useEditorShortcuts({
 
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
-        deleteSelection();
+        if (tool === 'slice') {
+          deleteSelectedSlices();
+        } else {
+          deleteSelection();
+        }
         return;
       }
 
@@ -200,6 +248,12 @@ export function useEditorShortcuts({
           finalizeFloatingPaste();
           break;
         case 'Escape':
+          if (tool === 'slice' && hasSelectedSlices) {
+            event.preventDefault();
+            clearSliceSelection();
+            setStatusText('スライスの選択を解除しました', 'success');
+            break;
+          }
           if (floatingPasteRef.current) {
             event.preventDefault();
             cancelFloatingPaste();
@@ -211,6 +265,11 @@ export function useEditorShortcuts({
           }
           break;
         case 'ArrowUp':
+          if (tool === 'slice') {
+            event.preventDefault();
+            nudgeSelectedSlices(0, -1);
+            break;
+          }
           if (!floatingPasteRef.current) {
             break;
           }
@@ -218,6 +277,11 @@ export function useEditorShortcuts({
           nudgeFloatingPaste(0, -1);
           break;
         case 'ArrowDown':
+          if (tool === 'slice') {
+            event.preventDefault();
+            nudgeSelectedSlices(0, 1);
+            break;
+          }
           if (!floatingPasteRef.current) {
             break;
           }
@@ -225,6 +289,11 @@ export function useEditorShortcuts({
           nudgeFloatingPaste(0, 1);
           break;
         case 'ArrowLeft':
+          if (tool === 'slice') {
+            event.preventDefault();
+            nudgeSelectedSlices(-1, 0);
+            break;
+          }
           if (!floatingPasteRef.current) {
             break;
           }
@@ -232,6 +301,11 @@ export function useEditorShortcuts({
           nudgeFloatingPaste(-1, 0);
           break;
         case 'ArrowRight':
+          if (tool === 'slice') {
+            event.preventDefault();
+            nudgeSelectedSlices(1, 0);
+            break;
+          }
           if (!floatingPasteRef.current) {
             break;
           }
@@ -242,6 +316,12 @@ export function useEditorShortcuts({
           event.preventDefault();
           setTool('select');
           setStatusText('ツール: 矩形選択', 'info');
+          break;
+        case 'KeyR':
+          event.preventDefault();
+          if (activateSliceTool()) {
+            setStatusText('ツール: スライス', 'info');
+          }
           break;
         case 'KeyW':
           event.preventDefault();
@@ -259,14 +339,23 @@ export function useEditorShortcuts({
           setStatusText('ツール: 塗りつぶし', 'info');
           break;
         case 'KeyT':
+          if (tool === 'slice') {
+            break;
+          }
           event.preventDefault();
           addAnimationFrame();
           break;
         case 'KeyG':
+          if (tool === 'slice') {
+            break;
+          }
           event.preventDefault();
           addTilePreviewLayer();
           break;
         case 'KeyY':
+          if (tool === 'slice') {
+            break;
+          }
           event.preventDefault();
           openSelectionRotateModal();
           break;
@@ -308,22 +397,31 @@ export function useEditorShortcuts({
     addTilePreviewLayer,
     cancelFloatingPaste,
     clearSelection,
+    clearSliceSelection,
     copySelection,
+    copySelectedSlices,
     deleteSelection,
+    deleteSelectedSlices,
     doUndo,
+    duplicateSelectedSlices,
     finalizeFloatingPaste,
     floatingPasteRef,
     focusHoveredPixel,
     freezeHoveredPixelInfo,
     hasSelection,
+    hasSelectedSlices,
+    activateSliceTool,
     nudgeFloatingPaste,
+    nudgeSelectedSlices,
     openSelectionRotateModal,
     pasteSelection,
+    pasteSlices,
     selectEntireCanvas,
+    selectAllSlices,
     selectReferenceByNumber,
     selectionRotateRequestActive,
     setStatusText,
-    setTool,
+    tool,
     zoomIn,
     zoomOut
   ]);
@@ -403,6 +501,16 @@ export function useEditorShortcuts({
         case 'grid-spacing':
           openGridSpacingModal();
           break;
+        case 'slice-auto':
+          if (activateSliceTool()) {
+            openAutoSliceModal();
+          }
+          break;
+        case 'slice-export':
+          if (activateSliceTool()) {
+            void exportSlices();
+          }
+          break;
         case 'transparent-background':
           setTransparentBackgroundMode(action.mode);
           break;
@@ -430,11 +538,14 @@ export function useEditorShortcuts({
     exportGplPalette,
     importGplPalette,
     loadPng,
+    activateSliceTool,
     openCanvasSizeModal,
+    openAutoSliceModal,
     openGridSpacingModal,
     openKMeansQuantizeModal,
     saveAsPng,
     savePng,
-    setTransparentBackgroundMode
+    setTransparentBackgroundMode,
+    exportSlices
   ]);
 }

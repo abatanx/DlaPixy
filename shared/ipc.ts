@@ -13,6 +13,8 @@ export type MenuAction =
   | { type: 'open-recent'; filePath: string }
   | { type: 'canvas-size' }
   | { type: 'grid-spacing' }
+  | { type: 'slice-auto' }
+  | { type: 'slice-export' }
   | { type: 'transparent-background'; mode: TransparentBackgroundMode }
   | { type: 'palette-kmeans-quantize' }
   | { type: 'palette-import-replace' }

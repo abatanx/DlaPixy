@@ -486,6 +486,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - https://github.com/abatanx/DlaPixy/issues/3
 - #33 `fix: キャンバスサイズ変更で編集中の画像が消える`
   - https://github.com/abatanx/DlaPixy/issues/33
+- #38 `spec: Unity / iOS / Android 向けスライス機能を整理する`
+  - https://github.com/abatanx/DlaPixy/issues/38
 - #42 `refactor: スウォッチ整理処理を共通化する`
   - https://github.com/abatanx/DlaPixy/issues/42
 - #46 `feat: パレットの並び順モードを追加する（手動並び替え / 自動ソート）`
@@ -800,3 +802,150 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - `SIDECAR_SCHEMA_VERSION` は `2` に上げ、sidecar の palette entry では UUID 形式の `id` を必須にした。
   - パレット hover / 参照ライン / merge 選択 UI は `id` で追跡し、表示 index は必要時に都度解決する形へ寄せた。
   - 使用数集計、ピクセル置換、削除、merge 実行のような色意味論の処理は引き続き `color` で解決する。
+
+## 17. Issue #38 仕様メモ（2026-04-07）
+- 目的:
+  - Fireworks ライクな slice を DlaPixy 向けに再定義する。
+    - 一時的な selection ではなく
+    - Unity / iOS / Android 向けアセット export の基準になる persistent な矩形メタデータとして扱う
+- 意味の切り分け案:
+  - `selection`
+    - 一時的な編集対象
+  - `slice`
+    - 保存されるアセット矩形定義 / export 単位
+- 初版の提案:
+  - `user slice` のみ対応
+  - 右側ツールバーに専用の `slice` ボタンを追加する
+  - canvas 上のドラッグで 1 件作成できる
+  - `Canvas` を対象に固定グリッドから複数 slice を生成できる
+  - canvas overlay と常設一覧の両方で slice を確認できる
+  - slice overlay は緑の半透明矩形で表示する
+  - slice モード中に追加 / 選択 / 移動 / サイズ変更 / 削除できる
+  - 新規 slice のドラッグ作成は、キャンバス端の少し外側から始めても、開始点を最寄りの端セルへ clamp して受け付ける
+  - slice の複数選択に対応する
+    - `Cmd/Ctrl + A` で全 slice を選択
+    - `Cmd/Ctrl + click` で個別 slice の選択追加 / 解除
+    - `Shift + click` では、最後に focus された slice からクリックした slice までを、リスト順で連続選択する
+    - `Shift + drag` では新規 slice を作らず、矩形で複数 slice を選択する
+    - `Cmd/Ctrl + D` で選択中 slice を複製
+    - `Cmd/Ctrl + C` で選択中 slice をコピー
+    - `Cmd/Ctrl + V` でコピー済み slice を貼り付け
+  - カーソルキーで選択中 slice を `1px` ずつ移動できる
+  - slice モード中は通常の左 `Preview / Palette` カードを隠し、slice 専用情報パネルへ切り替える
+  - slice モード中でも `Space + drag` の viewport pan は通常編集と同じように有効にする
+  - sidecar metadata に保存する
+- 初版で見送るもの:
+  - auto slice
+  - slice ごとの export 設定
+  - atlas / spritesheet 自動配置
+  - Fireworks の HTML / URL / alt 系メタ
+  - selection 起点の slice 生成
+- 最小 shape 案:
+  - `EditorSlice = { id, name, x, y, w, h }`
+- 設計方針:
+  - 固定サイズの自動スライスは slice 本体ではなく、現在の slice 一式を置き換えて量産する helper として扱う
+  - すべての slice は `1x` 基準の logical rect として保存する
+  - density や命名規則の展開は将来の export profile 側で扱う
+  - 想定する export 相性:
+    - generic `name.png`, `name@2x.png`, `name@3x.png`, `name@4x.png`
+    - iOS / Apple `name.png`, `name@2x.png`, `name@3x.png`, `name@4x.png`
+    - Android の `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` directory 系
+  - global な preset / profile ライブラリは持たず、export 設定は slice ごとに直接持つ
+  - slice 自体は将来的に `id / name / x / y / w / h / exportSettings` のような shape へ拡張する
+  - `exportSettings` 側で、`generic` / `apple` / `android` それぞれの target 別 export 設定を管理する
+    - 各 target 設定は:
+      - 基準 variant (`1x`, `@2x`, `@3x`, `@4x`, `ldpi`, `mdpi`, `hdpi`, ...)
+      - 基準軸 (`width` / `height`)
+      - 基準サイズ（その基準 variant と基準軸に対する整数 px 値）
+      - export 対象にする有効 variant 一覧
+    - Android target 設定は追加で、出力先ディレクトリテンプレート（`mipmap-{density}` / `drawable-{density}` など）
+    を管理する
+  - 別途 `enabledTargets` のような target 有効化 state は持たず、チェックされた variant がそのまま export 対象になるようにする
+  - 複数選択した slice へ同じ export 設定を一括適用できるようにして、preset がなくても面倒にならない操作感を担保する
+  - 選択中 slice に異なる export 設定が混在している場合、UI は mixed state を表示し、適用時にまとめて上書きできるようにする
+  - `slice.name` は export basename としても使う前提なので、export 前に重複名 validation が必要
+  - 反対側の軸サイズは、元の slice 矩形のアスペクト比から自動算出する
+  - 整数倍率は nearest-neighbor の厳密拡大を基本にする
+  - Android の非整数 density (`1.5x`, `0.75x`) は基準矩形とは切り分け、slice ごとの export 設定側の論点として扱う
+  - export UI は `generic` / `apple` / `android` の target セクション単位で見せる
+  - 各 target セクションでは variant 行一覧を表示する
+    - 有効/無効 checkbox
+    - variant label
+    - width / height 欄
+    - `-> WxH` の自動計算プレビュー
+  - 各 target セクションは、slice 単位の `Dirs` 入力欄も持つ
+    - カンマ区切りで複数指定できる
+    - このテンプレート一覧は、その target の有効 variant 全体で共通設定とする
+    - 展開後のディレクトリは、選択した export 先の直下に作成する
+  - Android の `Dirs` では `mipmap-{density}, drawable-{density}` のように `{density}` を使える
+    - `{density}` は variant ごとに `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` へ展開する
+  - slice export 用に `キャンバス > スライス > 保存...` を追加する
+    - まず保存先ディレクトリを選ぶ
+    - slice が未選択なら全 slice を export する
+    - 1 件以上選択されているなら、選択中 slice のみを export する
+    - 対象 slice は選んだディレクトリへ個別ファイルとして書き出す
+  - 直接サイズを入力できるのは基準行の基準軸だけにし、それ以外の行は自動計算結果の表示に寄せる
+  - 基準行は一覧内で明示的に分かる見た目にする
+  - generic / iOS の variant 行は `1x`, `@2x`, `@3x`, `@4x` で固定する
+  - `1x` 行は export 時にファイル名 suffix を付与しない
+  - android の variant 行は `ldpi`, `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` で固定する
+  - Android export では、`mipmap-{density}, drawable-{density}` のような slice 単位ディレクトリテンプレートを、有効な Android variant 共通で使えるようにする
+  - 1 つの slice で `generic / iOS / android` の checked variant を併用して、まとめて export できるようにする
+  - canvas 操作は toolbar の `slice` モードへ寄せる
+  - slice モード中の左 sidebar は slice 専用情報パネルへ切り替える
+  - slice sidebar 自体には操作ボタンを置かず、情報表示と active slice 編集だけに寄せる
+  - 一括生成は `キャンバス > スライス > 自動スライス...` に寄せる
+    - ダイアログ項目は `スライス名`, `w`, `h`
+    - 実行時は既存 slice を全削除して置き換える
+    - 指定サイズに収まらない右端 / 下端の端数は無視する
+    - 左上から右下へ `{スライス名}-{index}` で連番採番する
+    - ゼロ埋め桁数は、生成件数を固定長で表現できる必要十分最小の桁数にする
+      - 例: `256` 個なら `000` .. `255`
+      - 例: `4096` 個なら `0000` .. `4095`
+  - resize は active slice の 4辺+4角、計 8 個の handle（`TL / TC / TR / ML / MR / BL / BC / BR`）を常時表示し、直接ドラッグして行う
+  - 端にある slice でも操作しやすいよう、slice のヒット領域は見えている矩形より少し外側まで広げる
+  - slice 選択は `selectedSliceIds` と `activeSliceId` を分けて扱う
+  - `Shift + drag` は選択矩形として扱い、現在の slice 選択をその矩形に交差したものへ置き換える
+  - 複数選択時は group move / group delete を有効にする
+  - 複数選択時は group duplicate / group copy / group paste も有効にする
+  - slice の copy は、矩形定義を内部 slice clipboard へ保持する扱いにする
+  - paste で作る slice には新しい `id` を採番する
+  - resize は単一選択時だけ有効にする
+  - カーソルキーで現在の slice 選択を `1px` ずつ移動できるようにする
+  - `Space + drag` による viewport pan は slice overlay / handle 上からでも通常編集と同じように有効にする
+  - slice モード中は `selection` / `Tile Preview` / `Animation Preview` を完全に無効化する
+- UI プロトタイプメモ:
+  - slice sidebar に `generic` / `apple` / `android` の export 設定 UI プロトタイプを追加した
+  - このプロトタイプは renderer メモリ上で slice ごとに保持する
+  - 複数 slice を選択しているときは mixed state を表示しつつ、編集は選択中すべてへ一括適用する
+  - slice sidebar の `W/H` 入力も現在の slice 選択へ一括適用し、`X/Y` は引き続き active slice のみ編集する
+  - target の base size がまだ slice 軸サイズ由来の未編集値なら、slice サイズ変更時も stale な mixed を残さず追従させる
+  - sidecar 保存、ファイルメニュー連携、実際の export 実行とはまだ未接続
+
+## 18. Issue #38 実装メモ (2026-04-13)
+- 実装完了:
+  - `キャンバス > スライス > 自動スライス...`
+    - `スライス名 / W / H` の renderer modal を追加
+    - 現在の slice 一式を固定グリッドで置き換える
+    - 指定サイズに収まらない右端 / 下端の端数は無視する
+    - `{sliceName}-{index}` 形式で、必要十分最小のゼロ埋め桁数を使って採番する
+    - 生成後は `selectedSliceIds` を空にし、先頭の生成 slice を `activeSliceId` にする
+  - slice export 設定の永続化
+    - `EditorSlice` が `exportSettings` を持てるようにした
+    - sidecar の `document.slices[*].exportSettings` に保存 / 読み込みする
+    - 既存 sidecar のように export 設定が無い slice も読み込み可能で、load 時に default 値へ正規化する
+  - `キャンバス > スライス > 保存...`
+    - Canvas メニューから IPC 経由で呼べるようにした
+    - 1 件以上選択されていれば `selected slices`、未選択なら `all slices` を export 対象にする
+    - renderer 側で slice 矩形を crop し、nearest-neighbor で拡大縮小した PNG を Electron main へ渡して directory export する
+  - export 前 validation
+    - 空の slice 名を拒否
+    - export 対象内での slice 名重複を大文字小文字無視で拒否
+    - `slice.name` の禁止文字を拒否
+    - checked variant が 1 つもない slice を拒否
+    - 解決後の相対出力 path の重複を拒否
+    - 絶対 path や `.` / `..` を含む不正な相対 path を拒否
+- 実装メモ:
+  - slice sidebar の export controls は renderer-only の一時 state ではなく、slice 本体 state を直接編集する形へ移した
+  - その結果、undo / save / load / duplicate / paste でも export 設定が維持される
+  - slice の `W/H` が変わったとき、まだ slice 軸サイズをそのまま参照していた base size は追従したままになる

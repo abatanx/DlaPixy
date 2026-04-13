@@ -45,6 +45,15 @@ declare global {
         error?: 'serialize-failed' | 'write-failed';
         message?: string;
       }>;
+      exportSliceFiles: (args: {
+        files: Array<{ relativePath: string; base64Png: string }>;
+      }) => Promise<{
+        canceled: boolean;
+        directoryPath?: string;
+        fileCount?: number;
+        error?: 'invalid-args' | 'invalid-path' | 'duplicate-path' | 'write-failed';
+        message?: string;
+      }>;
       setTransparentBackgroundMode: (mode: TransparentBackgroundMode) => Promise<{ ok: boolean }>;
       copyImageDataUrl: (args: { dataUrl: string; markerToken?: string }) => Promise<{ ok: boolean }>;
       readClipboardImageDataUrl: () => Promise<{
