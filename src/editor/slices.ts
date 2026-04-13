@@ -5,13 +5,25 @@
 
 import type { CSSProperties } from 'react';
 import {
+  cloneSliceExportSettings,
+  createDefaultSliceExportSettings,
   generateEditorSliceId,
+  hasSameSliceExportSettings,
   isEditorSliceId,
+  normalizeSliceExportSettings,
   normalizeSliceName,
+  syncSliceExportSettingsWithSize,
   type EditorSlice
 } from '../../shared/slice';
 
-export { generateEditorSliceId, isEditorSliceId, normalizeSliceName };
+export {
+  createDefaultSliceExportSettings,
+  generateEditorSliceId,
+  isEditorSliceId,
+  normalizeSliceExportSettings,
+  normalizeSliceName,
+  syncSliceExportSettingsWithSize
+};
 export type { EditorSlice };
 
 export type SliceResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
@@ -20,7 +32,10 @@ export const SLICE_CANVAS_EDGE_HIT_PADDING_PX = 12;
 export const SLICE_RESIZE_HANDLE_ORDER: SliceResizeHandle[] = ['tl', 'tc', 'tr', 'ml', 'mr', 'bl', 'bc', 'br'];
 
 export function cloneSlices(slices: EditorSlice[]): EditorSlice[] {
-  return slices.map((slice) => ({ ...slice }));
+  return slices.map((slice) => ({
+    ...slice,
+    exportSettings: slice.exportSettings ? cloneSliceExportSettings(slice.exportSettings) : undefined
+  }));
 }
 
 export function hasSameSlices(left: EditorSlice[], right: EditorSlice[]): boolean {
@@ -35,12 +50,54 @@ export function hasSameSlices(left: EditorSlice[], right: EditorSlice[]): boolea
       slice.x === right[index]?.x &&
       slice.y === right[index]?.y &&
       slice.w === right[index]?.w &&
-      slice.h === right[index]?.h
+      slice.h === right[index]?.h &&
+      hasSameSliceExportSettings(
+        normalizeSliceExportSettings(slice.exportSettings, slice),
+        normalizeSliceExportSettings(right[index]?.exportSettings, right[index] ?? slice)
+      )
   );
 }
 
 export function createDefaultSliceName(index: number): string {
   return `slice-${String(Math.max(1, index)).padStart(3, '0')}`;
+}
+
+export function generateAutoSlicesForCanvas(
+  canvasSize: number,
+  baseName: string,
+  sliceWidth: number,
+  sliceHeight: number
+): EditorSlice[] {
+  const normalizedWidth = Math.max(1, Math.trunc(sliceWidth));
+  const normalizedHeight = Math.max(1, Math.trunc(sliceHeight));
+  const columns = Math.floor(canvasSize / normalizedWidth);
+  const rows = Math.floor(canvasSize / normalizedHeight);
+  const total = columns * rows;
+  if (total <= 0) {
+    return [];
+  }
+
+  const prefix = normalizeSliceName(baseName) || 'slice';
+  const digits = Math.max(1, String(Math.max(0, total - 1)).length);
+  const generated: EditorSlice[] = [];
+  let index = 0;
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      generated.push({
+        id: generateEditorSliceId(),
+        name: `${prefix}-${String(index).padStart(digits, '0')}`,
+        x: column * normalizedWidth,
+        y: row * normalizedHeight,
+        w: normalizedWidth,
+        h: normalizedHeight,
+        exportSettings: createDefaultSliceExportSettings({ w: normalizedWidth })
+      });
+      index += 1;
+    }
+  }
+
+  return generated;
 }
 
 export function normalizeSliceRect(
@@ -92,7 +149,8 @@ export function normalizeEditorSlices(slices: EditorSlice[], canvasSize: number)
     normalized.push({
       id,
       name: normalizeSliceName(typeof slice.name === 'string' ? slice.name : ''),
-      ...rect
+      ...rect,
+      exportSettings: normalizeSliceExportSettings(slice.exportSettings, rect)
     });
   }
 
@@ -167,7 +225,13 @@ export function resizeSliceFromHandle(
     x: left,
     y: top,
     w: right - left + 1,
-    h: bottom - top + 1
+    h: bottom - top + 1,
+    exportSettings: syncSliceExportSettingsWithSize(slice, {
+      ...slice,
+      w: right - left + 1,
+      h: bottom - top + 1,
+      exportSettings: slice.exportSettings ?? createDefaultSliceExportSettings(slice)
+    })
   };
 }
 

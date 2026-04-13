@@ -6,6 +6,7 @@
 import type { AnimationFrame, EditorSlice, PaletteEntry, Selection, TilePreviewLayer, Tool } from '../../editor/types';
 import type { PaletteUsageEntry } from '../../editor/palette-sync';
 import type { PaletteAutoSortKey, PaletteOrderMode } from '../../editor/palette-order';
+import type { SliceExportSettings } from '../../../shared/slice';
 import type { TransparentBackgroundMode } from '../../../shared/transparent-background';
 
 export type PaletteColorModalRequest = {
@@ -47,6 +48,7 @@ export type EditorSidebarProps = {
   toggleAnimationPreviewPlayback: () => void;
   setAnimationPreviewFps: (fps: number) => void;
   setAnimationPreviewLoop: (value: boolean) => void;
+  setStatusText: (text: string, type: 'success' | 'warning' | 'error' | 'info') => void;
   slices: EditorSlice[];
   selectedSliceIds: string[];
   activeSlice: EditorSlice | null;
@@ -54,6 +56,9 @@ export type EditorSidebarProps = {
   updateActiveSliceName: (value: string) => boolean;
   updateActiveSliceBounds: (partial: Partial<Pick<EditorSlice, 'x' | 'y' | 'w' | 'h'>>) => boolean;
   updateSelectedSliceSize: (partial: Partial<Pick<EditorSlice, 'w' | 'h'>>) => boolean;
+  updateSelectedSliceExportSettings: (
+    updater: (current: SliceExportSettings, slice: EditorSlice) => SliceExportSettings
+  ) => boolean;
   selectedColor: string;
   setSelectedColor: (value: string) => void;
   applySelectedColorChange: (value: PaletteEntry) => void;
@@ -121,6 +126,8 @@ export type SidebarSliceSectionProps = Pick<
   | 'updateActiveSliceName'
   | 'updateActiveSliceBounds'
   | 'updateSelectedSliceSize'
+  | 'updateSelectedSliceExportSettings'
+  | 'setStatusText'
 >;
 
 export type SidebarPaletteSectionProps = Pick<

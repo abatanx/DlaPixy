@@ -6,16 +6,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent as ReactMouseEvent, type SetStateAction } from 'react';
 import {
   cloneSlices,
+  createDefaultSliceExportSettings,
   createDefaultSliceName,
+  generateAutoSlicesForCanvas,
   generateEditorSliceId,
   hasSameSlices,
   moveSlicesWithinCanvas,
+  normalizeSliceExportSettings,
   normalizeSliceName,
   normalizeSliceRect,
   resizeSliceFromHandle,
+  syncSliceExportSettingsWithSize,
   type EditorSlice,
   type SliceResizeHandle
 } from '../editor/slices';
+import { hasSameSliceExportSettings, type SliceExportSettings } from '../../shared/slice';
 import type { Selection, Tool } from '../editor/types';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
@@ -39,6 +44,8 @@ type SliceInteractionSession =
       start: { x: number; y: number };
       baseSlices: EditorSlice[];
       selectedIds: string[];
+      clickSelectionIds: string[];
+      clickActiveId: string | null;
       didSnapshot: boolean;
       didMove: boolean;
     }
@@ -243,12 +250,12 @@ export function useSliceMode({
 
   const selectAllSlices = useCallback(() => {
     if (slices.length === 0) {
-      setStatusText('slice がありません', 'warning');
+      setStatusText('スライスがありません', 'warning');
       return false;
     }
 
     selectSliceIds(slices.map((slice) => slice.id), slices[slices.length - 1]?.id ?? null);
-    setStatusText(`${slices.length}件の slice を選択しました`, 'success');
+    setStatusText(`${slices.length}件のスライスを選択しました`, 'success');
     return true;
   }, [selectSliceIds, setStatusText, slices]);
 
@@ -263,7 +270,7 @@ export function useSliceMode({
     setActiveSliceId(null);
     setHasUnsavedChanges(true);
     setStatusText(
-      selectedSliceIds.length === 1 ? 'slice を削除しました' : `${selectedSliceIds.length}件の slice を削除しました`,
+      selectedSliceIds.length === 1 ? 'スライスを削除しました' : `${selectedSliceIds.length}件のスライスを削除しました`,
       'success'
     );
     return true;
@@ -280,24 +287,22 @@ export function useSliceMode({
     setSelectedSliceIds(nextSelectedIds);
     setActiveSliceId((prev) => (prev === sliceId ? resolveNextActiveSliceId(slices.filter((slice) => slice.id !== sliceId), nextSelectedIds, null) : prev));
     setHasUnsavedChanges(true);
-    setStatusText('slice を削除しました', 'success');
+    setStatusText('スライスを削除しました', 'success');
     return true;
   }, [pushUndo, selectedSliceIds, setHasUnsavedChanges, setSlices, setStatusText, slices]);
 
   const copySelectedSlices = useCallback(() => {
     if (selectedSliceIds.length === 0) {
-      setStatusText('コピーする slice を選択してください', 'warning');
+      setStatusText('コピーするスライスを選択してください', 'warning');
       return false;
     }
 
-    clipboardRef.current = slices
-      .filter((slice) => selectedSliceIds.includes(slice.id))
-      .map((slice) => ({ ...slice }));
+    clipboardRef.current = cloneSlices(slices.filter((slice) => selectedSliceIds.includes(slice.id)));
     setSliceClipboardCount(clipboardRef.current.length);
     setStatusText(
       clipboardRef.current.length === 1
-        ? 'slice をコピーしました'
-        : `${clipboardRef.current.length}件の slice をコピーしました`,
+        ? 'スライスをコピーしました'
+        : `${clipboardRef.current.length}件のスライスをコピーしました`,
       'success'
     );
     return true;
@@ -305,7 +310,7 @@ export function useSliceMode({
 
   const pasteSlices = useCallback(() => {
     if (clipboardRef.current.length === 0) {
-      setStatusText('貼り付けできる slice がありません', 'warning');
+      setStatusText('貼り付けできるスライスがありません', 'warning');
       return false;
     }
 
@@ -323,7 +328,8 @@ export function useSliceMode({
         const createdSlice: EditorSlice = {
           ...slice,
           id: generateEditorSliceId(),
-          name: getUniqueSliceName(slice.name || createDefaultSliceName(next.length + 1), next)
+          name: getUniqueSliceName(slice.name || createDefaultSliceName(next.length + 1), next),
+          exportSettings: normalizeSliceExportSettings(slice.exportSettings, slice)
         };
         next.push(createdSlice);
         return createdSlice;
@@ -335,8 +341,8 @@ export function useSliceMode({
     setHasUnsavedChanges(true);
     setStatusText(
       clipboardRef.current.length === 1
-        ? 'slice を貼り付けました'
-        : `${clipboardRef.current.length}件の slice を貼り付けました`,
+        ? 'スライスを貼り付けました'
+        : `${clipboardRef.current.length}件のスライスを貼り付けました`,
       'success'
     );
     return true;
@@ -344,13 +350,11 @@ export function useSliceMode({
 
   const duplicateSelectedSlices = useCallback(() => {
     if (selectedSliceIds.length === 0) {
-      setStatusText('複製する slice を選択してください', 'warning');
+      setStatusText('複製するスライスを選択してください', 'warning');
       return false;
     }
 
-    clipboardRef.current = slices
-      .filter((slice) => selectedSliceIds.includes(slice.id))
-      .map((slice) => ({ ...slice }));
+    clipboardRef.current = cloneSlices(slices.filter((slice) => selectedSliceIds.includes(slice.id)));
     setSliceClipboardCount(clipboardRef.current.length);
     return pasteSlices();
   }, [pasteSlices, selectedSliceIds, setStatusText, slices]);
@@ -366,13 +370,21 @@ export function useSliceMode({
         return false;
       }
 
-      const nextSlice = normalizeSliceBounds(updater(target), canvasSize);
+      const normalizedNextSlice = normalizeSliceBounds(updater(target), canvasSize);
+      const nextSlice: EditorSlice = {
+        ...normalizedNextSlice,
+        exportSettings: syncSliceExportSettingsWithSize(target, normalizedNextSlice)
+      };
       if (
         nextSlice.name === target.name &&
         nextSlice.x === target.x &&
         nextSlice.y === target.y &&
         nextSlice.w === target.w &&
-        nextSlice.h === target.h
+        nextSlice.h === target.h &&
+        hasSameSliceExportSettings(
+          normalizeSliceExportSettings(nextSlice.exportSettings, nextSlice),
+          normalizeSliceExportSettings(target.exportSettings, target)
+        )
       ) {
         return false;
       }
@@ -416,13 +428,17 @@ export function useSliceMode({
           return slice;
         }
 
-        const nextSlice = normalizeSliceBounds(
+        const normalizedNextSlice = normalizeSliceBounds(
           {
             ...slice,
             ...partial
           },
           canvasSize
         );
+        const nextSlice: EditorSlice = {
+          ...normalizedNextSlice,
+          exportSettings: syncSliceExportSettingsWithSize(slice, normalizedNextSlice)
+        };
 
         if (
           nextSlice.x !== slice.x ||
@@ -448,6 +464,64 @@ export function useSliceMode({
     [canvasSize, pushUndo, selectedSliceIds, setHasUnsavedChanges, setSlices, slices, updateActiveSliceBounds]
   );
 
+  const updateSelectedSliceExportSettings = useCallback(
+    (updater: (current: SliceExportSettings, slice: EditorSlice) => SliceExportSettings) => {
+      const targetIds = selectedSliceIds.length > 0 ? selectedSliceIds : activeSliceId ? [activeSliceId] : [];
+      if (targetIds.length === 0) {
+        return false;
+      }
+
+      const targetIdSet = new Set(targetIds);
+      let changed = false;
+      const nextSlices = slices.map((slice) => {
+        if (!targetIdSet.has(slice.id)) {
+          return slice;
+        }
+
+        const currentSettings = normalizeSliceExportSettings(slice.exportSettings, slice);
+        const nextSettings = normalizeSliceExportSettings(updater(currentSettings, slice), slice);
+        if (hasSameSliceExportSettings(currentSettings, nextSettings)) {
+          return slice;
+        }
+
+        changed = true;
+        return {
+          ...slice,
+          exportSettings: nextSettings
+        };
+      });
+
+      if (!changed) {
+        return false;
+      }
+
+      pushUndo();
+      setSlices(nextSlices);
+      setHasUnsavedChanges(true);
+      return true;
+    },
+    [activeSliceId, pushUndo, selectedSliceIds, setHasUnsavedChanges, setSlices, slices]
+  );
+
+  const replaceSlicesWithAutoGrid = useCallback(
+    (args: { baseName: string; width: number; height: number }) => {
+      const nextSlices = generateAutoSlicesForCanvas(canvasSize, args.baseName, args.width, args.height);
+      if (nextSlices.length === 0) {
+        setStatusText('指定サイズではスライスを生成できません', 'warning');
+        return false;
+      }
+
+      pushUndo();
+      setSlices(nextSlices);
+      setSelectedSliceIds(nextSlices.map((slice) => slice.id));
+      setActiveSliceId(nextSlices[0]?.id ?? null);
+      setHasUnsavedChanges(true);
+      setStatusText(`${nextSlices.length}件のスライスを自動生成しました`, 'success');
+      return true;
+    },
+    [canvasSize, pushUndo, setActiveSliceId, setHasUnsavedChanges, setSelectedSliceIds, setSlices, setStatusText]
+  );
+
   const commitCreatedSlice = useCallback(
     (rect: Omit<EditorSlice, 'id' | 'name'>) => {
       pushUndo();
@@ -455,7 +529,8 @@ export function useSliceMode({
         const nextSlice: EditorSlice = {
           id: generateEditorSliceId(),
           name: getUniqueSliceName(createDefaultSliceName(prev.length + 1), prev),
-          ...rect
+          ...rect,
+          exportSettings: createDefaultSliceExportSettings(rect)
         };
         const next = [...prev, nextSlice];
         setSelectedSliceIds([nextSlice.id]);
@@ -463,7 +538,7 @@ export function useSliceMode({
         return next;
       });
       setHasUnsavedChanges(true);
-      setStatusText('slice を追加しました', 'success');
+      setStatusText('スライスを追加しました', 'success');
     },
     [pushUndo, setHasUnsavedChanges, setSlices, setStatusText]
   );
@@ -548,13 +623,18 @@ export function useSliceMode({
         return;
       }
 
-      const nextSelectedIds = currentlySelected ? selectedSliceIds : [sliceId];
-      selectSliceIds(nextSelectedIds, sliceId);
+      const preserveGroupForDrag = currentlySelected && selectedSliceIds.length > 1;
+      const nextSelectedIds = preserveGroupForDrag ? selectedSliceIds : [sliceId];
+      if (!preserveGroupForDrag) {
+        selectSliceIds(nextSelectedIds, sliceId);
+      }
       interactionRef.current = {
         type: 'move',
         start: cell,
         baseSlices: cloneSlices(slices),
         selectedIds: nextSelectedIds,
+        clickSelectionIds: [sliceId],
+        clickActiveId: sliceId,
         didSnapshot: false,
         didMove: false
       };
@@ -707,18 +787,23 @@ export function useSliceMode({
       setActiveSliceId(nextSelectedIds[nextSelectedIds.length - 1] ?? null);
       setStatusText(
         nextSelectedIds.length > 0
-          ? `${nextSelectedIds.length}件の slice を選択しました`
-          : '範囲内に slice はありません',
+          ? `${nextSelectedIds.length}件のスライスを選択しました`
+          : '範囲内にスライスはありません',
         nextSelectedIds.length > 0 ? 'success' : 'warning'
       );
       return;
     }
 
+    if (session.type === 'move' && !session.didMove) {
+      selectSliceIds(session.clickSelectionIds, session.clickActiveId);
+      return;
+    }
+
     if (session.didSnapshot) {
       setHasUnsavedChanges(true);
-      setStatusText(session.type === 'move' ? 'slice を移動しました' : 'slice のサイズを変更しました', 'success');
+      setStatusText(session.type === 'move' ? 'スライスを移動しました' : 'スライスのサイズを変更しました', 'success');
     }
-  }, [clearSliceSelection, commitCreatedSlice, setHasUnsavedChanges, setStatusText]);
+  }, [clearSliceSelection, commitCreatedSlice, selectSliceIds, setHasUnsavedChanges, setStatusText]);
 
   const onMouseLeaveCanvas = useCallback(() => {
     if (!isSliceMode) {
@@ -818,6 +903,8 @@ export function useSliceMode({
     updateActiveSliceName,
     updateActiveSliceBounds,
     updateSelectedSliceSize,
+    updateSelectedSliceExportSettings,
+    replaceSlicesWithAutoGrid,
     beginCanvasInteractionFromClient,
     onCanvasMouseDown,
     onSliceMouseDown,

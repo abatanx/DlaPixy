@@ -61,6 +61,17 @@ async function pathExists(targetPath: string): Promise<boolean> {
   }
 }
 
+async function readFileIfExists(targetPath: string): Promise<Buffer | null> {
+  try {
+    return await fs.readFile(targetPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
 async function resolveInitialDirectory(): Promise<string> {
   if (preferences.lastDirectory && (await pathExists(preferences.lastDirectory))) {
     return preferences.lastDirectory;
@@ -198,14 +209,23 @@ function isEditorSlice(value: unknown): value is EditorSlice {
     return false;
   }
 
-  const candidate = value as { id?: unknown; name?: unknown; x?: unknown; y?: unknown; w?: unknown; h?: unknown };
+  const candidate = value as {
+    id?: unknown;
+    name?: unknown;
+    x?: unknown;
+    y?: unknown;
+    w?: unknown;
+    h?: unknown;
+    exportSettings?: unknown;
+  };
   return (
     isEditorSliceId(candidate.id) &&
     typeof candidate.name === 'string' &&
     isFiniteNumber(candidate.x) &&
     isFiniteNumber(candidate.y) &&
     isFiniteNumber(candidate.w) &&
-    isFiniteNumber(candidate.h)
+    isFiniteNumber(candidate.h) &&
+    (candidate.exportSettings === undefined || isRecord(candidate.exportSettings))
   );
 }
 
@@ -607,6 +627,109 @@ ipcMain.handle(
         error: 'write-failed' as const,
         filePath: result.filePath,
         message: error instanceof Error ? error.message : 'GPL の書き出しに失敗しました'
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  'slice:export-files',
+  async (
+    _,
+    args: {
+      files: Array<{ relativePath: string; base64Png: string }>;
+    }
+  ) => {
+    const initialDir = await resolveInitialDirectory();
+    const result = await dialog.showOpenDialog({
+      defaultPath: initialDir,
+      properties: ['openDirectory', 'createDirectory']
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { canceled: true };
+    }
+
+    const rootDirectory = result.filePaths[0];
+    const normalizedRoot = path.resolve(rootDirectory);
+    const seenPaths = new Set<string>();
+    const plannedWrites: Array<{ outputPath: string; base64Png: string }> = [];
+    const rollbackEntries: Array<{ outputPath: string; previousContent: Buffer | null }> = [];
+
+    try {
+      for (const file of args.files) {
+        if (!file || typeof file.relativePath !== 'string' || typeof file.base64Png !== 'string') {
+          return {
+            canceled: false,
+            error: 'invalid-args' as const,
+            message: '書き出しファイル情報が不正です'
+          };
+        }
+
+        const outputPath = path.resolve(normalizedRoot, file.relativePath);
+        const relativeFromRoot = path.relative(normalizedRoot, outputPath);
+        if (
+          relativeFromRoot.startsWith('..') ||
+          path.isAbsolute(relativeFromRoot) ||
+          relativeFromRoot.length === 0
+        ) {
+          return {
+            canceled: false,
+            error: 'invalid-path' as const,
+            message: `書き出し先パスが不正です: ${file.relativePath}`
+          };
+        }
+
+        const dedupeKey = process.platform === 'win32' ? outputPath.toLowerCase() : outputPath;
+        if (seenPaths.has(dedupeKey)) {
+          return {
+            canceled: false,
+            error: 'duplicate-path' as const,
+            message: `書き出し先パスが重複しています: ${file.relativePath}`
+          };
+        }
+        seenPaths.add(dedupeKey);
+        plannedWrites.push({
+          outputPath,
+          base64Png: file.base64Png
+        });
+      }
+
+      for (const plannedWrite of plannedWrites) {
+        rollbackEntries.push({
+          outputPath: plannedWrite.outputPath,
+          previousContent: await readFileIfExists(plannedWrite.outputPath)
+        });
+        await fs.mkdir(path.dirname(plannedWrite.outputPath), { recursive: true });
+        await fs.writeFile(plannedWrite.outputPath, Buffer.from(plannedWrite.base64Png, 'base64'));
+      }
+
+      preferences.lastDirectory = rootDirectory;
+      void savePreferences();
+      return {
+        canceled: false,
+        directoryPath: rootDirectory,
+        fileCount: plannedWrites.length
+      };
+    } catch (error) {
+      for (const rollbackEntry of rollbackEntries.reverse()) {
+        try {
+          if (rollbackEntry.previousContent) {
+            await fs.mkdir(path.dirname(rollbackEntry.outputPath), { recursive: true });
+            await fs.writeFile(rollbackEntry.outputPath, rollbackEntry.previousContent);
+          } else {
+            await fs.rm(rollbackEntry.outputPath, { force: true });
+          }
+        } catch {
+          // ignore rollback failure and return the original error to renderer
+        }
+      }
+
+      return {
+        canceled: false,
+        error: 'write-failed' as const,
+        directoryPath: rootDirectory,
+        message: error instanceof Error ? error.message : 'スライスの書き出しに失敗しました'
       };
     }
   }

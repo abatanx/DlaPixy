@@ -3,212 +3,23 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  ANDROID_SLICE_EXPORT_VARIANTS,
+  GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS,
+  SLICE_EXPORT_TARGET_LABELS,
+  buildSimulatedExportPaths,
+  resolveComputedVariantSize,
+  resolveDisplayTargetUiState,
+  resolveSliceExportSettings
+} from '../../editor/slice-export';
+import type {
+  SliceExportSettings,
+  SliceExportTargetKey,
+  SliceExportTargetSettings,
+  SliceExportVariantDefinition
+} from '../../../shared/slice';
 import type { SidebarSliceSectionProps } from './types';
-
-type SliceExportTargetKey = 'generic' | 'apple' | 'android';
-type SliceExportAxis = 'width' | 'height';
-
-type SliceExportVariantDefinition = {
-  key: string;
-  label: string;
-  scale: number;
-};
-
-type SliceExportTargetUiState = {
-  baseVariant: string;
-  baseAxis: SliceExportAxis;
-  baseSizeInput: string;
-  variants: Record<string, boolean>;
-  directoryTemplates: string;
-};
-
-type SliceExportUiState = Record<SliceExportTargetKey, SliceExportTargetUiState>;
-
-type SliceExportVariantDisplayState = {
-  checked: boolean;
-  someChecked: boolean;
-  mixed: boolean;
-};
-
-type SliceExportTargetDisplayState = {
-  baseVariant: string | null;
-  baseAxis: SliceExportAxis | null;
-  baseSizeInput: string;
-  directoryTemplates: string;
-  variants: Record<string, SliceExportVariantDisplayState>;
-  mixed: {
-    baseVariant: boolean;
-    baseAxis: boolean;
-    baseSizeInput: boolean;
-    directoryTemplates: boolean;
-    anyVariant: boolean;
-  };
-};
-
-const GENERIC_AND_APPLE_VARIANTS: SliceExportVariantDefinition[] = [
-  { key: '1x', label: '1x', scale: 1 },
-  { key: '@2x', label: '@2x', scale: 2 },
-  { key: '@3x', label: '@3x', scale: 3 },
-  { key: '@4x', label: '@4x', scale: 4 }
-];
-
-const ANDROID_VARIANTS: SliceExportVariantDefinition[] = [
-  { key: 'ldpi', label: 'ldpi', scale: 0.75 },
-  { key: 'mdpi', label: 'mdpi', scale: 1 },
-  { key: 'hdpi', label: 'hdpi', scale: 1.5 },
-  { key: 'xhdpi', label: 'xhdpi', scale: 2 },
-  { key: 'xxhdpi', label: 'xxhdpi', scale: 3 },
-  { key: 'xxxhdpi', label: 'xxxhdpi', scale: 4 }
-];
-
-const SLICE_EXPORT_TARGET_LABELS: Record<SliceExportTargetKey, string> = {
-  generic: 'Generic',
-  apple: 'iOS',
-  android: 'Android'
-};
-
-function resolveDirectoryPlaceholder(target: SliceExportTargetKey, variant: SliceExportVariantDefinition): string {
-  if (target === 'android') {
-    return variant.key;
-  }
-  return variant.key.replace(/^@/, '');
-}
-
-function buildSimulatedExportPaths(args: {
-  target: SliceExportTargetKey;
-  slice: { w: number; h: number };
-  variants: SliceExportVariantDefinition[];
-  state: SliceExportTargetUiState;
-  baseName: string;
-}): Array<{ relativePath: string; width: number; height: number }> {
-  const directoryTemplates = args.state.directoryTemplates
-    .split(',')
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-  const directories = directoryTemplates.length > 0 ? directoryTemplates : [''];
-
-  return args.variants
-    .filter((variant) => args.state.variants[variant.key])
-    .flatMap((variant) => {
-      const computed = resolveComputedVariantSize(args.slice, args.state, variant, args.variants);
-      const density = resolveDirectoryPlaceholder(args.target, variant);
-      const suffix = args.target === 'android' ? '' : variant.key === '1x' ? '' : variant.key;
-      const fileName = `${args.baseName}${suffix}.png`;
-
-      return directories.map((directoryTemplate) => {
-        const relativeDirectory = directoryTemplate.replaceAll('{density}', density).replace(/^\/+|\/+$/g, '');
-        return {
-          relativePath: relativeDirectory.length > 0 ? `${relativeDirectory}/${fileName}` : fileName,
-          width: computed.width,
-          height: computed.height
-        };
-      });
-    });
-}
-
-function createDefaultTargetUiState(
-  axisSize: number,
-  baseVariant: string,
-  variants: SliceExportVariantDefinition[],
-  directoryTemplates = ''
-): SliceExportTargetUiState {
-  return {
-    baseVariant,
-    baseAxis: 'width',
-    baseSizeInput: String(axisSize),
-    variants: Object.fromEntries(variants.map((variant) => [variant.key, variant.key === baseVariant])),
-    directoryTemplates
-  };
-}
-
-function createDefaultSliceExportUiState(slice: { w: number }): SliceExportUiState {
-  return {
-    generic: createDefaultTargetUiState(slice.w, '1x', GENERIC_AND_APPLE_VARIANTS),
-    apple: createDefaultTargetUiState(slice.w, '1x', GENERIC_AND_APPLE_VARIANTS),
-    android: createDefaultTargetUiState(slice.w, 'mdpi', ANDROID_VARIANTS, 'drawable-{density}')
-  };
-}
-
-function resolveSharedValue<T>(values: T[]): { value: T | null; mixed: boolean } {
-  if (values.length === 0) {
-    return { value: null, mixed: false };
-  }
-
-  const [firstValue] = values;
-  const isSame = values.every((value) => value === firstValue);
-  return {
-    value: isSame ? firstValue : null,
-    mixed: !isSame
-  };
-}
-
-function resolveDisplayTargetUiState(
-  states: SliceExportTargetUiState[],
-  variants: SliceExportVariantDefinition[]
-): SliceExportTargetDisplayState {
-  const baseVariant = resolveSharedValue(states.map((state) => state.baseVariant));
-  const baseAxis = resolveSharedValue(states.map((state) => state.baseAxis));
-  const baseSizeInput = resolveSharedValue(states.map((state) => state.baseSizeInput));
-  const directoryTemplates = resolveSharedValue(states.map((state) => state.directoryTemplates));
-
-  const variantStates = Object.fromEntries(
-    variants.map((variant) => {
-      const values = states.map((state) => Boolean(state.variants[variant.key]));
-      const checked = values.every(Boolean);
-      const someChecked = values.some(Boolean);
-      return [
-        variant.key,
-        {
-          checked,
-          someChecked,
-          mixed: someChecked && !checked
-        } satisfies SliceExportVariantDisplayState
-      ];
-    })
-  );
-
-  return {
-    baseVariant: baseVariant.value,
-    baseAxis: baseAxis.value,
-    baseSizeInput: baseSizeInput.value ?? '',
-    directoryTemplates: directoryTemplates.value ?? '',
-    variants: variantStates,
-    mixed: {
-      baseVariant: baseVariant.mixed,
-      baseAxis: baseAxis.mixed,
-      baseSizeInput: baseSizeInput.mixed,
-      directoryTemplates: directoryTemplates.mixed,
-      anyVariant: variants.some((variant) => variantStates[variant.key]?.mixed)
-    }
-  };
-}
-
-function resolveComputedVariantSize(
-  slice: { w: number; h: number },
-  state: SliceExportTargetUiState,
-  variant: SliceExportVariantDefinition,
-  variants: SliceExportVariantDefinition[]
-): { width: number; height: number; isBase: boolean } {
-  const baseScale = variants.find((candidate) => candidate.key === state.baseVariant)?.scale ?? variants[0]?.scale ?? 1;
-  const rawBaseSize = Number.parseInt(state.baseSizeInput, 10);
-  const baseAxisSize = Math.max(1, Number.isFinite(rawBaseSize) ? rawBaseSize : state.baseAxis === 'width' ? slice.w : slice.h);
-  const baseWidth =
-    state.baseAxis === 'width'
-      ? baseAxisSize
-      : Math.max(1, Math.round((baseAxisSize * slice.w) / Math.max(1, slice.h)));
-  const baseHeight =
-    state.baseAxis === 'height'
-      ? baseAxisSize
-      : Math.max(1, Math.round((baseAxisSize * slice.h) / Math.max(1, slice.w)));
-  const ratio = variant.scale / Math.max(baseScale, 0.0001);
-
-  return {
-    width: Math.max(1, Math.round(baseWidth * ratio)),
-    height: Math.max(1, Math.round(baseHeight * ratio)),
-    isBase: variant.key === state.baseVariant
-  };
-}
 
 export const SidebarSliceSection = memo(function SidebarSliceSection({
   canvasSize,
@@ -218,7 +29,9 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
   selectSliceFromList,
   updateActiveSliceName,
   updateActiveSliceBounds,
-  updateSelectedSliceSize
+  updateSelectedSliceSize,
+  updateSelectedSliceExportSettings,
+  setStatusText
 }: SidebarSliceSectionProps) {
   const [nameInput, setNameInput] = useState<string>('');
   const [xInput, setXInput] = useState<string>('0');
@@ -226,64 +39,8 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
   const [wInput, setWInput] = useState<string>('1');
   const [hInput, setHInput] = useState<string>('1');
   const [activeExportTab, setActiveExportTab] = useState<SliceExportTargetKey>('generic');
-  const [exportUiBySliceId, setExportUiBySliceId] = useState<Record<string, SliceExportUiState>>({});
-  const previousSlicesRef = useRef<Record<string, { w: number; h: number }>>({});
-
-  useEffect(() => {
-    setExportUiBySliceId((current) => {
-      const next: Record<string, SliceExportUiState> = { ...current };
-      const previousSlices = previousSlicesRef.current;
-      const sliceIds = new Set(slices.map((slice) => slice.id));
-      let changed = false;
-
-      for (const sliceId of Object.keys(next)) {
-        if (sliceIds.has(sliceId)) {
-          continue;
-        }
-        delete next[sliceId];
-        changed = true;
-      }
-
-      for (const slice of slices) {
-        const previousSlice = previousSlices[slice.id];
-        const currentState = next[slice.id];
-        if (!currentState) {
-          next[slice.id] = createDefaultSliceExportUiState(slice);
-          changed = true;
-          continue;
-        }
-
-        if (!previousSlice) {
-          continue;
-        }
-
-        let targetChanged = false;
-        const syncedState: SliceExportUiState = { ...currentState };
-        for (const target of ['generic', 'apple', 'android'] as SliceExportTargetKey[]) {
-          const targetState = currentState[target];
-          const previousAxisSize = targetState.baseAxis === 'width' ? previousSlice.w : previousSlice.h;
-          const nextAxisSize = targetState.baseAxis === 'width' ? slice.w : slice.h;
-          if (targetState.baseSizeInput !== String(previousAxisSize)) {
-            continue;
-          }
-
-          syncedState[target] = {
-            ...targetState,
-            baseSizeInput: String(nextAxisSize)
-          };
-          targetChanged = true;
-        }
-
-        if (targetChanged) {
-          next[slice.id] = syncedState;
-          changed = true;
-        }
-      }
-
-      previousSlicesRef.current = Object.fromEntries(slices.map((slice) => [slice.id, { w: slice.w, h: slice.h }]));
-      return changed ? next : current;
-    });
-  }, [slices]);
+  const isMultiSliceSelection = selectedSliceIds.length > 1;
+  const showSingleSliceFields = !isMultiSliceSelection && activeSlice !== null;
 
   const exportScopeSlices = useMemo(() => {
     if (selectedSliceIds.length > 0) {
@@ -303,13 +60,16 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
       };
     }
 
-    const width = resolveSharedValue(exportScopeSlices.map((slice) => String(slice.w)));
-    const height = resolveSharedValue(exportScopeSlices.map((slice) => String(slice.h)));
+    const widths = exportScopeSlices.map((slice) => String(slice.w));
+    const heights = exportScopeSlices.map((slice) => String(slice.h));
+    const firstWidth = widths[0] ?? '';
+    const firstHeight = heights[0] ?? '';
+
     return {
-      width: width.value ?? '',
-      height: height.value ?? '',
-      mixedWidth: width.mixed,
-      mixedHeight: height.mixed
+      width: widths.every((value) => value === firstWidth) ? firstWidth : '',
+      height: heights.every((value) => value === firstHeight) ? firstHeight : '',
+      mixedWidth: widths.some((value) => value !== firstWidth),
+      mixedHeight: heights.some((value) => value !== firstHeight)
     };
   }, [exportScopeSlices]);
 
@@ -336,15 +96,24 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
       return null;
     }
 
-    const targetStates = exportScopeSlices.map((slice) => exportUiBySliceId[slice.id] ?? createDefaultSliceExportUiState(slice));
+    const targetStates = exportScopeSlices.map((slice) => resolveSliceExportSettings(slice));
     return {
-      generic: resolveDisplayTargetUiState(targetStates.map((state) => state.generic), GENERIC_AND_APPLE_VARIANTS),
-      apple: resolveDisplayTargetUiState(targetStates.map((state) => state.apple), GENERIC_AND_APPLE_VARIANTS),
-      android: resolveDisplayTargetUiState(targetStates.map((state) => state.android), ANDROID_VARIANTS)
-    } satisfies Record<SliceExportTargetKey, SliceExportTargetDisplayState>;
-  }, [exportScopeSlices, exportUiBySliceId]);
+      generic: resolveDisplayTargetUiState(
+        targetStates.map((state) => state.generic),
+        GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS
+      ),
+      apple: resolveDisplayTargetUiState(
+        targetStates.map((state) => state.apple),
+        GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS
+      ),
+      android: resolveDisplayTargetUiState(targetStates.map((state) => state.android), ANDROID_SLICE_EXPORT_VARIANTS)
+    };
+  }, [exportScopeSlices]);
 
-  const getCheckedVariantCountLabel = (target: SliceExportTargetKey, variants: SliceExportVariantDefinition[]): string => {
+  const getCheckedVariantCountLabel = (
+    target: SliceExportTargetKey,
+    variants: SliceExportVariantDefinition[]
+  ): string => {
     if (!exportDisplayState) {
       return '0';
     }
@@ -375,6 +144,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     if (!activeSlice) {
       return;
     }
+
     const accepted = updateActiveSliceName(nameInput);
     if (!accepted) {
       setNameInput(activeSlice.name);
@@ -438,38 +208,29 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     event.currentTarget.blur();
   };
 
-  const updateSelectedExportUi = (updater: (current: SliceExportUiState) => SliceExportUiState) => {
-    if (exportScopeSlices.length === 0) {
-      return;
-    }
-
-    setExportUiBySliceId((current) => {
-      let changed = false;
-      const next: Record<string, SliceExportUiState> = { ...current };
-
-      for (const slice of exportScopeSlices) {
-        const currentState = next[slice.id] ?? createDefaultSliceExportUiState(slice);
-        const nextState = updater(currentState);
-        if (nextState === currentState) {
-          continue;
-        }
-        next[slice.id] = nextState;
-        changed = true;
-      }
-
-      return changed ? next : current;
-    });
-  };
-
   const updateTargetExportUi = (
     target: SliceExportTargetKey,
-    updater: (current: SliceExportTargetUiState) => SliceExportTargetUiState
+    updater: (current: SliceExportTargetSettings) => SliceExportTargetSettings
   ) => {
-    updateSelectedExportUi((current) => ({
+    updateSelectedSliceExportSettings((current: SliceExportSettings) => ({
       ...current,
       [target]: updater(current[target])
     }));
   };
+
+  const copySimulatedPaths = useCallback(async (paths: string[]) => {
+    if (paths.length === 0 || !navigator.clipboard?.writeText) {
+      setStatusText('ファイル一覧のコピーに失敗しました', 'error');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(paths.join('\n'));
+      setStatusText('ファイル一覧をコピーしました', 'success');
+    } catch {
+      setStatusText('ファイル一覧のコピーに失敗しました', 'error');
+    }
+  }, [setStatusText]);
 
   const renderExportTargetSection = (
     target: SliceExportTargetKey,
@@ -484,17 +245,15 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     const isHeightDisabled = targetState.baseSizeInput.trim() !== '' && targetState.baseAxis === 'width';
     const widthValue = targetState.baseAxis === 'width' ? targetState.baseSizeInput : '';
     const heightValue = targetState.baseAxis === 'height' ? targetState.baseSizeInput : '';
-    const baseVariantLabel = variants.find((variant) => variant.key === targetState.baseVariant)?.label ?? 'Base';
-    const simulatedPaths = exportScopeSlices.flatMap((slice) => {
-      const sliceTargetState = (exportUiBySliceId[slice.id] ?? createDefaultSliceExportUiState(slice))[target];
-      return buildSimulatedExportPaths({
+    const baseVariantLabel = variants.find((variant) => variant.key === targetState.baseVariant)?.label ?? '基準';
+    const simulatedPaths = exportScopeSlices.flatMap((slice) =>
+      buildSimulatedExportPaths({
         target,
         slice,
-        variants,
-        state: sliceTargetState,
+        settings: resolveSliceExportSettings(slice)[target],
         baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
-      });
-    });
+      })
+    );
 
     return (
       <div key={target} className="p-1 d-flex flex-column gap-2 slice-sidebar-export-target small">
@@ -515,7 +274,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                     baseSizeInput: event.target.value
                   }))
                 }
-                aria-label={`${SLICE_EXPORT_TARGET_LABELS[target]} base width`}
+                aria-label={`${SLICE_EXPORT_TARGET_LABELS[target]} の基準幅`}
               />
               <span className="input-group-text" aria-hidden="true">
                 <i className="fa-solid fa-xmark" />
@@ -533,7 +292,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                     baseSizeInput: event.target.value
                   }))
                 }
-                aria-label={`${SLICE_EXPORT_TARGET_LABELS[target]} base height`}
+                aria-label={`${SLICE_EXPORT_TARGET_LABELS[target]} の基準高さ`}
               />
             </div>
           </div>
@@ -544,12 +303,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
             <tbody>
               {variants.map((variant) => {
                 const computedSizes = exportScopeSlices.map((slice) =>
-                  resolveComputedVariantSize(
-                    slice,
-                    (exportUiBySliceId[slice.id] ?? createDefaultSliceExportUiState(slice))[target],
-                    variant,
-                    variants
-                  )
+                  resolveComputedVariantSize(slice, resolveSliceExportSettings(slice)[target], variant, variants)
                 );
                 const [firstComputed] = computedSizes;
                 const isConsistentSize =
@@ -596,7 +350,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                       {isConsistentSize && firstComputed ? (
                         `${firstComputed.width}×${firstComputed.height}`
                       ) : (
-                        <span className="fst-italic">mixed</span>
+                        <span className="fst-italic">混在</span>
                       )}
                     </td>
                     <td className="text-end">
@@ -614,7 +368,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                           }
                           aria-label={`${variant.label} を基準にする`}
                         />
-                        <span>Base</span>
+                        <span>基準</span>
                       </label>
                     </td>
                   </tr>
@@ -625,12 +379,14 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
         </div>
 
         <div className="input-group input-group-sm">
-          <span className="input-group-text">Dirs</span>
+          <span className="input-group-text" aria-label="出力先ディレクトリ" title="出力先ディレクトリ">
+            <i className="fa-solid fa-folder-open" aria-hidden="true" />
+          </span>
           <input
             type="text"
             className="form-control"
             value={targetState.directoryTemplates}
-            placeholder={targetState.mixed.directoryTemplates ? 'mixed' : undefined}
+            placeholder={targetState.mixed.directoryTemplates ? '混在' : undefined}
             onChange={(event) =>
               updateTargetExportUi(target, (current) => ({
                 ...current,
@@ -641,7 +397,19 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
         </div>
 
         <div className="d-flex flex-column gap-1">
-          <div className="small text-body-secondary">Files</div>
+          <div className="d-flex align-items-center justify-content-between gap-2">
+            <div className="small text-body-secondary">{simulatedPaths.length} File(s)</div>
+            <button
+              type="button"
+              className="canvas-copy-btn"
+              onClick={() => void copySimulatedPaths(simulatedPaths.map(({ relativePath }) => relativePath))}
+              disabled={simulatedPaths.length === 0}
+              aria-label="ファイル一覧をコピー"
+              title="ファイル一覧をコピー"
+            >
+              <i className="fa-regular fa-copy" aria-hidden="true" />
+            </button>
+          </div>
           <div className="small font-monospace text-body-secondary d-flex flex-column gap-1">
             {simulatedPaths.length > 0 ? (
               simulatedPaths.map(({ relativePath, width, height }, index) => (
@@ -650,7 +418,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                 </div>
               ))
             ) : (
-              <div className="text-body-tertiary">checked variant がないよ</div>
+              <div className="text-body-tertiary">選択されたバリアントがありません</div>
             )}
           </div>
         </div>
@@ -672,7 +440,10 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               const isSelected = selectedSliceIds.includes(slice.id);
               const isActive = activeSlice?.id === slice.id;
               return (
-                <div key={slice.id} className={`list-group-item slice-sidebar-item ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''}`}>
+                <div
+                  key={slice.id}
+                  className={`list-group-item slice-sidebar-item ${isSelected ? 'is-selected' : ''} ${isActive ? 'is-active' : ''}`}
+                >
                   <div
                     className="slice-sidebar-item-main user-select-none"
                     role="option"
@@ -684,67 +455,70 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                   >
                     <span className="slice-sidebar-item-index">#{index + 1}</span>
                     <span className="slice-sidebar-item-name">{slice.name || 'slice'}</span>
-                    <span className="slice-sidebar-item-meta">{slice.x},{slice.y} / {slice.w}x{slice.h}</span>
+                    <span className="slice-sidebar-item-meta">
+                      {slice.x},{slice.y} / {slice.w}x{slice.h}
+                    </span>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="text-body-secondary small p-3">
-            まだ slice はないよ。canvas 上をドラッグして追加してね。
-          </div>
+          <div className="text-body-secondary small p-3">スライスはまだありません。canvas 上をドラッグして追加してください。</div>
         )}
       </div>
 
       <div className="border rounded p-3 d-flex flex-column gap-3">
-        <div className="small text-body-secondary">
-          {activeSlice ? `Active: ${activeSlice.name || 'slice'}` : 'Active: -'}
-        </div>
-        <div className="input-group input-group-sm">
-          <span className="input-group-text">名前</span>
-          <input
-            type="text"
-            className="form-control"
-            value={nameInput}
-            disabled={!activeSlice}
-            onChange={(event) => setNameInput(event.target.value)}
-            onBlur={commitName}
-            onKeyDown={(event) => handleFieldKeyDown(event, commitName)}
-          />
-        </div>
-
-        <div className="d-flex flex-column gap-2">
-          <div className="input-group input-group-sm flex-nowrap slice-sidebar-bounds-group">
-            <span className="input-group-text" aria-label="位置 (X/Y)" title="位置 (X/Y)">
-              <i className="fa-solid fa-location-crosshairs" aria-hidden="true" />
+        {isMultiSliceSelection ? null : (
+          <div className="input-group input-group-sm">
+            <span className="input-group-text" aria-label="名前" title="名前">
+              <i className="fa-solid fa-tag" aria-hidden="true" />
             </span>
             <input
-              type="number"
-              className="form-control text-end"
-              min={0}
-              max={canvasSize - 1}
-              value={xInput}
+              type="text"
+              className="form-control"
+              value={nameInput}
               disabled={!activeSlice}
-              onChange={(event) => setXInput(event.target.value)}
-              onBlur={() => commitBound('x', xInput)}
-              onKeyDown={(event) => handleFieldKeyDown(event, () => commitBound('x', xInput))}
-            />
-            <span className="input-group-text" aria-hidden="true">
-              <i className="fa-solid fa-xmark" />
-            </span>
-            <input
-              type="number"
-              className="form-control text-end"
-              min={0}
-              max={canvasSize - 1}
-              value={yInput}
-              disabled={!activeSlice}
-              onChange={(event) => setYInput(event.target.value)}
-              onBlur={() => commitBound('y', yInput)}
-              onKeyDown={(event) => handleFieldKeyDown(event, () => commitBound('y', yInput))}
+              onChange={(event) => setNameInput(event.target.value)}
+              onBlur={commitName}
+              onKeyDown={(event) => handleFieldKeyDown(event, commitName)}
             />
           </div>
+        )}
+
+        <div className="d-flex flex-column gap-2">
+          {showSingleSliceFields ? (
+            <div className="input-group input-group-sm flex-nowrap slice-sidebar-bounds-group">
+              <span className="input-group-text" aria-label="位置 (X/Y)" title="位置 (X/Y)">
+                <i className="fa-solid fa-location-crosshairs" aria-hidden="true" />
+              </span>
+              <input
+                type="number"
+                className="form-control text-end"
+                min={0}
+                max={canvasSize - 1}
+                value={xInput}
+                disabled={!activeSlice}
+                onChange={(event) => setXInput(event.target.value)}
+                onBlur={() => commitBound('x', xInput)}
+                onKeyDown={(event) => handleFieldKeyDown(event, () => commitBound('x', xInput))}
+              />
+              <span className="input-group-text" aria-hidden="true">
+                <i className="fa-solid fa-xmark" />
+              </span>
+              <input
+                type="number"
+                className="form-control text-end"
+                min={0}
+                max={canvasSize - 1}
+                value={yInput}
+                disabled={!activeSlice}
+                onChange={(event) => setYInput(event.target.value)}
+                onBlur={() => commitBound('y', yInput)}
+                onKeyDown={(event) => handleFieldKeyDown(event, () => commitBound('y', yInput))}
+              />
+            </div>
+          ) : null}
 
           <div className="input-group input-group-sm flex-nowrap slice-sidebar-bounds-group">
             <span className="input-group-text" aria-label="サイズ (W/H)" title="サイズ (W/H)">
@@ -757,7 +531,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               max={canvasSize}
               value={wInput}
               disabled={exportScopeSlices.length === 0}
-              placeholder={selectedSizeDisplay.mixedWidth ? 'mixed' : undefined}
+              placeholder={selectedSizeDisplay.mixedWidth ? '混在' : undefined}
               onChange={(event) => setWInput(event.target.value)}
               onBlur={() => commitSizeBound('w', wInput)}
               onKeyDown={(event) => handleFieldKeyDown(event, () => commitSizeBound('w', wInput))}
@@ -772,7 +546,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               max={canvasSize}
               value={hInput}
               disabled={exportScopeSlices.length === 0}
-              placeholder={selectedSizeDisplay.mixedHeight ? 'mixed' : undefined}
+              placeholder={selectedSizeDisplay.mixedHeight ? '混在' : undefined}
               onChange={(event) => setHInput(event.target.value)}
               onBlur={() => commitSizeBound('h', hInput)}
               onKeyDown={(event) => handleFieldKeyDown(event, () => commitSizeBound('h', hInput))}
@@ -785,9 +559,9 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
         <div className="d-flex flex-column gap-2">
           <ul className="nav nav-tabs sidebar-slice-export-tabs small" role="tablist">
             {([
-              ['generic', GENERIC_AND_APPLE_VARIANTS],
-              ['apple', GENERIC_AND_APPLE_VARIANTS],
-              ['android', ANDROID_VARIANTS]
+              ['generic', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS],
+              ['apple', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS],
+              ['android', ANDROID_SLICE_EXPORT_VARIANTS]
             ] as Array<[SliceExportTargetKey, SliceExportVariantDefinition[]]>).map(([target, variants]) => (
               <li key={target} className="nav-item" role="presentation">
                 <button
@@ -799,7 +573,9 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                   onClick={() => setActiveExportTab(target)}
                 >
                   <span className="sidebar-slice-export-tab-label">{SLICE_EXPORT_TARGET_LABELS[target]}</span>
-                  <span className="badge text-bg-light border text-body-secondary">{getCheckedVariantCountLabel(target, variants)}</span>
+                  <span className="badge text-bg-light border text-body-secondary">
+                    {getCheckedVariantCountLabel(target, variants)}
+                  </span>
                 </button>
               </li>
             ))}
@@ -811,21 +587,21 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               className={`tab-pane fade ${activeExportTab === 'generic' ? 'show active' : ''}`}
               role="tabpanel"
             >
-              {renderExportTargetSection('generic', GENERIC_AND_APPLE_VARIANTS)}
+              {renderExportTargetSection('generic', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS)}
             </div>
             <div
               id="sidebar-slice-export-pane-apple"
               className={`tab-pane fade ${activeExportTab === 'apple' ? 'show active' : ''}`}
               role="tabpanel"
             >
-              {renderExportTargetSection('apple', GENERIC_AND_APPLE_VARIANTS)}
+              {renderExportTargetSection('apple', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS)}
             </div>
             <div
               id="sidebar-slice-export-pane-android"
               className={`tab-pane fade ${activeExportTab === 'android' ? 'show active' : ''}`}
               role="tabpanel"
             >
-              {renderExportTargetSection('android', ANDROID_VARIANTS)}
+              {renderExportTargetSection('android', ANDROID_SLICE_EXPORT_VARIANTS)}
             </div>
           </div>
         </div>

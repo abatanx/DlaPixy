@@ -9,6 +9,7 @@ import type { Tool } from '../editor/types';
 type EditorToolbarProps = {
   tool: Tool;
   setTool: (tool: Tool) => void;
+  activateSliceTool: () => boolean;
   canAddAnimationFrame: boolean;
   canDeleteSelection: boolean;
   addAnimationFrame: () => void;
@@ -27,6 +28,7 @@ type EditorToolbarProps = {
 export function EditorToolbar({
   tool,
   setTool,
+  activateSliceTool,
   canAddAnimationFrame,
   canDeleteSelection,
   addAnimationFrame,
@@ -160,8 +162,10 @@ export function EditorToolbar({
       <button
         type="button"
         className={`btn btn-sm editor-tool-btn ${tool === 'slice' ? 'active' : ''}`}
-        onClick={() => setTool('slice')}
-        title="Slice ツール (R)"
+        onClick={() => {
+          activateSliceTool();
+        }}
+        title="スライスツール (R)"
       >
         <span className="editor-btn-inner">
           <i className="fa-solid fa-vector-square" aria-hidden="true" />

@@ -12,6 +12,7 @@ import {
   type PaletteEntry
 } from '../../shared/palette';
 import {
+  cloneSliceExportSettings,
   generateEditorSliceId,
   isEditorSliceId,
   normalizeSliceName,
@@ -46,7 +47,10 @@ export function clonePaletteEntries(entries: PaletteEntry[]): PaletteEntry[] {
 }
 
 export function cloneSlices(entries: EditorSlice[]): EditorSlice[] {
-  return entries.map((entry) => ({ ...entry }));
+  return entries.map((entry) => ({
+    ...entry,
+    exportSettings: entry.exportSettings ? cloneSliceExportSettings(entry.exportSettings) : undefined
+  }));
 }
 
 // 16進カラー文字列（#rrggbb / #rrggbbaa）をRGBA値へ変換する。

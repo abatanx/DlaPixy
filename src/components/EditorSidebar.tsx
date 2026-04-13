@@ -40,6 +40,7 @@ export const EditorSidebar = memo(function EditorSidebar({
   toggleAnimationPreviewPlayback,
   setAnimationPreviewFps,
   setAnimationPreviewLoop,
+  setStatusText,
   slices,
   selectedSliceIds,
   activeSlice,
@@ -47,6 +48,7 @@ export const EditorSidebar = memo(function EditorSidebar({
   updateActiveSliceName,
   updateActiveSliceBounds,
   updateSelectedSliceSize,
+  updateSelectedSliceExportSettings,
   selectedColor,
   setSelectedColor,
   applySelectedColorChange,
@@ -85,6 +87,8 @@ export const EditorSidebar = memo(function EditorSidebar({
               updateActiveSliceName={updateActiveSliceName}
               updateActiveSliceBounds={updateActiveSliceBounds}
               updateSelectedSliceSize={updateSelectedSliceSize}
+              updateSelectedSliceExportSettings={updateSelectedSliceExportSettings}
+              setStatusText={setStatusText}
             />
           </div>
         </div>

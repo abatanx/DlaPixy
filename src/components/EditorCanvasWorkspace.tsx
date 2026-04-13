@@ -78,6 +78,7 @@ type EditorCanvasWorkspaceProps = {
   removeReferencePixelInfo: (referenceKey: string) => void;
   tool: Tool;
   setTool: (tool: Tool) => void;
+  activateSliceTool: () => boolean;
   hasCommittedSelection: boolean;
   canDeleteAction: boolean;
   addAnimationFrame: () => void;
@@ -135,6 +136,7 @@ export function EditorCanvasWorkspace({
   removeReferencePixelInfo,
   tool,
   setTool,
+  activateSliceTool,
   hasCommittedSelection,
   canDeleteAction,
   addAnimationFrame,
@@ -498,6 +500,7 @@ export function EditorCanvasWorkspace({
         <EditorToolbar
           tool={tool}
           setTool={setTool}
+          activateSliceTool={activateSliceTool}
           canAddAnimationFrame={hasCommittedSelection}
           canDeleteSelection={canDeleteAction}
           addAnimationFrame={addAnimationFrame}

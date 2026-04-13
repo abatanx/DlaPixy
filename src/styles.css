@@ -832,13 +832,18 @@ body {
 }
 
 .canvas-slice-overlay.is-selected {
-  background: rgba(22, 163, 74, 0.26);
+  border-color: rgba(220, 38, 38, 0.92);
+  background: rgba(239, 68, 68, 0.24);
 }
 
 .canvas-slice-overlay.is-active {
   border-width: 2px;
-  background: rgba(22, 163, 74, 0.3);
   box-shadow: 0 0 0 1px rgba(240, 253, 244, 0.7);
+}
+
+.canvas-slice-overlay.is-selected.is-active {
+  background: rgba(220, 38, 38, 0.3);
+  box-shadow: 0 0 0 1px rgba(254, 242, 242, 0.78);
 }
 
 .canvas-slice-overlay.is-draft {
@@ -896,6 +901,12 @@ body {
   white-space: nowrap;
   pointer-events: none;
   z-index: 1;
+}
+
+.canvas-slice-overlay.is-selected .canvas-slice-label {
+  border-color: rgba(220, 38, 38, 0.92);
+  background: rgba(254, 242, 242, 0.98);
+  color: #b91c1c;
 }
 
 .canvas-slice-label.top {
@@ -995,7 +1006,10 @@ body {
 }
 
 .slice-sidebar-list {
+  --slice-sidebar-visible-count: 10;
+  --slice-sidebar-item-height: 2rem;
   min-height: 10rem;
+  max-height: calc(var(--slice-sidebar-visible-count) * var(--slice-sidebar-item-height));
   background: rgba(248, 250, 252, 0.85);
 }
 
@@ -1003,15 +1017,16 @@ body {
   display: flex;
   align-items: stretch;
   gap: 0.35rem;
+  min-height: var(--slice-sidebar-item-height);
   padding: 0.4rem 0.5rem;
 }
 
 .slice-sidebar-item.is-selected {
-  background: rgba(220, 252, 231, 0.78);
+  background: rgba(254, 226, 226, 0.9);
 }
 
 .slice-sidebar-item.is-active {
-  border-left: 3px solid #16a34a;
+  border-left: 3px solid #dc2626;
   padding-left: calc(0.5rem - 3px);
 }
 
@@ -1037,7 +1052,7 @@ body {
 .slice-sidebar-item-index {
   flex: 0 0 auto;
   font-size: 0.72rem;
-  color: #16a34a;
+  color: #dc2626;
   font-weight: 700;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }

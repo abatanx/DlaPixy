@@ -18,6 +18,7 @@ type UseEditorShortcutsOptions = {
   floatingPasteRef: { current: unknown };
   tool: Tool;
   setTool: Dispatch<SetStateAction<Tool>>;
+  activateSliceTool: () => boolean;
   setTransparentBackgroundMode: Dispatch<SetStateAction<TransparentBackgroundMode>>;
   setStatusText: (text: string, type: StatusType) => void;
   clearSelection: () => void;
@@ -50,9 +51,11 @@ type UseEditorShortcutsOptions = {
   openZoomModal: () => void;
   openCanvasSizeModal: () => void;
   openGridSpacingModal: () => void;
+  openAutoSliceModal: () => void;
   openKMeansQuantizeModal: () => void;
   importGplPalette: (mode: 'replace' | 'append') => Promise<void>;
   exportGplPalette: (format: GplExportFormat) => Promise<void>;
+  exportSlices: () => Promise<void>;
 };
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -71,6 +74,7 @@ export function useEditorShortcuts({
   floatingPasteRef,
   tool,
   setTool,
+  activateSliceTool,
   setTransparentBackgroundMode,
   setStatusText,
   clearSelection,
@@ -103,9 +107,11 @@ export function useEditorShortcuts({
   openZoomModal,
   openCanvasSizeModal,
   openGridSpacingModal,
+  openAutoSliceModal,
   openKMeansQuantizeModal,
   importGplPalette,
-  exportGplPalette
+  exportGplPalette,
+  exportSlices
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -245,7 +251,7 @@ export function useEditorShortcuts({
           if (tool === 'slice' && hasSelectedSlices) {
             event.preventDefault();
             clearSliceSelection();
-            setStatusText('slice の選択を解除しました', 'success');
+            setStatusText('スライスの選択を解除しました', 'success');
             break;
           }
           if (floatingPasteRef.current) {
@@ -313,8 +319,9 @@ export function useEditorShortcuts({
           break;
         case 'KeyR':
           event.preventDefault();
-          setTool('slice');
-          setStatusText('ツール: slice', 'info');
+          if (activateSliceTool()) {
+            setStatusText('ツール: スライス', 'info');
+          }
           break;
         case 'KeyW':
           event.preventDefault();
@@ -403,6 +410,7 @@ export function useEditorShortcuts({
     freezeHoveredPixelInfo,
     hasSelection,
     hasSelectedSlices,
+    activateSliceTool,
     nudgeFloatingPaste,
     nudgeSelectedSlices,
     openSelectionRotateModal,
@@ -413,7 +421,6 @@ export function useEditorShortcuts({
     selectReferenceByNumber,
     selectionRotateRequestActive,
     setStatusText,
-    setTool,
     tool,
     zoomIn,
     zoomOut
@@ -494,6 +501,16 @@ export function useEditorShortcuts({
         case 'grid-spacing':
           openGridSpacingModal();
           break;
+        case 'slice-auto':
+          if (activateSliceTool()) {
+            openAutoSliceModal();
+          }
+          break;
+        case 'slice-export':
+          if (activateSliceTool()) {
+            void exportSlices();
+          }
+          break;
         case 'transparent-background':
           setTransparentBackgroundMode(action.mode);
           break;
@@ -521,11 +538,14 @@ export function useEditorShortcuts({
     exportGplPalette,
     importGplPalette,
     loadPng,
+    activateSliceTool,
     openCanvasSizeModal,
+    openAutoSliceModal,
     openGridSpacingModal,
     openKMeansQuantizeModal,
     saveAsPng,
     savePng,
-    setTransparentBackgroundMode
+    setTransparentBackgroundMode,
+    exportSlices
   ]);
 }

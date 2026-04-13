@@ -3,6 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
+import { AutoSliceModal } from './modals/AutoSliceModal';
 import { CanvasSizeModal } from './modals/CanvasSizeModal';
 import { ConfirmModal } from './modals/ConfirmModal';
 import { GridSpacingModal } from './modals/GridSpacingModal';
@@ -34,6 +35,17 @@ type GridSpacingModalState = {
   gridSpacing: number;
   canvasSize: number;
   onApply: (value: number) => void;
+  onClose: () => void;
+};
+
+type AutoSliceModalState = {
+  request: {
+    baseName: string;
+    width: number;
+    height: number;
+  } | null;
+  canvasSize: number;
+  onApply: (args: { baseName: string; width: number; height: number }) => boolean;
   onClose: () => void;
 };
 
@@ -73,6 +85,7 @@ type EditorModalLayerProps = {
   toast: ToastState;
   canvasSizeModal: CanvasSizeModalState;
   gridSpacingModal: GridSpacingModalState;
+  autoSliceModal: AutoSliceModalState;
   zoomModal: ZoomModalState;
   transparentBackgroundMode: TransparentBackgroundMode;
   kMeansQuantizeModal: KMeansQuantizeModalState;
@@ -85,6 +98,7 @@ export function EditorModalLayer({
   toast,
   canvasSizeModal,
   gridSpacingModal,
+  autoSliceModal,
   zoomModal,
   transparentBackgroundMode,
   kMeansQuantizeModal,
@@ -113,6 +127,16 @@ export function EditorModalLayer({
         canvasSize={gridSpacingModal.canvasSize}
         onApply={gridSpacingModal.onApply}
         onClose={gridSpacingModal.onClose}
+        onValidationError={onValidationError}
+      />
+      <AutoSliceModal
+        isOpen={autoSliceModal.request !== null}
+        canvasSize={autoSliceModal.canvasSize}
+        initialBaseName={autoSliceModal.request?.baseName ?? 'slice'}
+        initialWidth={autoSliceModal.request?.width ?? 1}
+        initialHeight={autoSliceModal.request?.height ?? 1}
+        onApply={autoSliceModal.onApply}
+        onClose={autoSliceModal.onClose}
         onValidationError={onValidationError}
       />
       <ZoomModal

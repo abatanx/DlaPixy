@@ -95,6 +95,20 @@ function buildCanvasMenuTemplate({
       },
       { type: 'separator' },
       {
+        label: 'Slice',
+        submenu: [
+          {
+            label: '自動スライス...',
+            click: () => sendMenuAction({ type: 'slice-auto' })
+          },
+          {
+            label: '保存...',
+            click: () => sendMenuAction({ type: 'slice-export' })
+          }
+        ]
+      },
+      { type: 'separator' },
+      {
         label: '透過バックグラウンド',
         submenu: TRANSPARENT_BACKGROUND_MODES.map((mode) => ({
           label: TRANSPARENT_BACKGROUND_LABELS[mode],

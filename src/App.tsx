@@ -87,6 +87,9 @@ export function App() {
   const [paletteColorModalRequest, setPaletteColorModalRequest] = useState<PaletteColorModalRequest>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [autoSliceRequest, setAutoSliceRequest] = useState<{ baseName: string; width: number; height: number } | null>(
+    null
+  );
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
@@ -242,6 +245,8 @@ export function App() {
     updateActiveSliceName,
     updateActiveSliceBounds,
     updateSelectedSliceSize,
+    updateSelectedSliceExportSettings,
+    replaceSlicesWithAutoGrid,
     beginCanvasInteractionFromClient,
     onCanvasMouseDown: onSliceCanvasMouseDown,
     onSliceMouseDown,
@@ -505,7 +510,7 @@ export function App() {
     disabled: isSliceMode
   });
 
-  const { savePng, saveAsPng, loadPng } = useDocumentFileActions({
+  const { savePng, saveAsPng, loadPng, exportSlices } = useDocumentFileActions({
     canvasSize,
     currentFilePath,
     floatingCompositeMode,
@@ -513,6 +518,7 @@ export function App() {
     hasUnsavedChanges,
     palette,
     slices,
+    selectedSliceIds,
     pixels,
     selectedColor,
     tool,
@@ -545,6 +551,29 @@ export function App() {
     setStatusText
   });
 
+  const openAutoSliceModal = useCallback(() => {
+    const fallbackSize = gridSpacing > 0 ? gridSpacing : canvasSize;
+    setAutoSliceRequest({
+      baseName: activeSlice?.name || 'slice',
+      width: activeSlice?.w ?? fallbackSize,
+      height: activeSlice?.h ?? fallbackSize
+    });
+  }, [activeSlice, canvasSize, gridSpacing]);
+
+  const closeAutoSliceModal = useCallback(() => {
+    setAutoSliceRequest(null);
+  }, []);
+
+  const activateSliceTool = useCallback(() => {
+    if (floatingPasteRef.current) {
+      setStatusText('スライスツールへ切り替える前に Enter で確定するか Esc でキャンセルしてください', 'warning');
+      return false;
+    }
+
+    setTool('slice');
+    return true;
+  }, [setStatusText, setTool]);
+
   useEditorShortcuts({
     selectionRotateRequestActive: selectionRotateRequest !== null,
     hasSelection: selection !== null,
@@ -552,6 +581,7 @@ export function App() {
     floatingPasteRef,
     tool,
     setTool,
+    activateSliceTool,
     setTransparentBackgroundMode,
     setStatusText,
     clearSelection,
@@ -584,9 +614,11 @@ export function App() {
     openZoomModal,
     openCanvasSizeModal,
     openGridSpacingModal,
+    openAutoSliceModal,
     openKMeansQuantizeModal,
     importGplPalette,
     exportGplPalette,
+    exportSlices
   });
 
   const onValidationError = (message: string) => {
@@ -708,6 +740,7 @@ export function App() {
             toggleAnimationPreviewPlayback={toggleAnimationPreviewPlayback}
             setAnimationPreviewFps={updateAnimationPreviewFps}
             setAnimationPreviewLoop={setAnimationPreviewLoop}
+            setStatusText={setStatusText}
             slices={orderedSlices}
             selectedSliceIds={selectedSliceIds}
             activeSlice={activeSlice}
@@ -715,6 +748,7 @@ export function App() {
             updateActiveSliceName={updateActiveSliceName}
             updateActiveSliceBounds={updateActiveSliceBounds}
             updateSelectedSliceSize={updateSelectedSliceSize}
+            updateSelectedSliceExportSettings={updateSelectedSliceExportSettings}
             selectedColor={selectedColor}
             setSelectedColor={setSelectedColor}
             applySelectedColorChange={applySelectedColorChange}
@@ -798,6 +832,7 @@ export function App() {
               removeReferencePixelInfo={removeReferencePixelInfo}
               tool={tool}
               setTool={setTool}
+              activateSliceTool={activateSliceTool}
               hasCommittedSelection={!isSliceMode && hasCommittedSelection}
               canDeleteAction={isSliceMode ? canDeleteSlices : hasCommittedSelection}
               addAnimationFrame={addAnimationFrame}
@@ -829,6 +864,12 @@ export function App() {
             canvasSize,
             onApply: applyGridSpacing,
             onClose: closeGridSpacingModal
+          }}
+          autoSliceModal={{
+            request: autoSliceRequest,
+            canvasSize,
+            onApply: replaceSlicesWithAutoGrid,
+            onClose: closeAutoSliceModal
           }}
           zoomModal={{
             isOpen: isZoomModalOpen,

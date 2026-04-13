@@ -24,6 +24,11 @@ import {
 } from '../editor/constants';
 import { resolveNextSelectedColor } from '../editor/app-utils';
 import { collectPaletteUsageFromPixels, syncPaletteEntriesWithUsage } from '../editor/palette-sync';
+import {
+  buildSliceExportPlans,
+  getSliceExportScopeSlices,
+  renderSliceExportFiles
+} from '../editor/slice-export';
 import { normalizeEditorSlices } from '../editor/slices';
 import type { EditorMeta, EditorSlice, PaletteEntry, Selection, Tool } from '../editor/types';
 import { clampCanvasSize, clonePaletteEntries, cloneSlices, normalizePaletteEntries } from '../editor/utils';
@@ -38,6 +43,7 @@ type UseDocumentFileActionsOptions = {
   floatingCompositeMode: FloatingCompositeMode;
   palette: PaletteEntry[];
   slices: EditorSlice[];
+  selectedSliceIds: string[];
   pixels: Uint8ClampedArray;
   selectedColor: string;
   tool: Tool;
@@ -78,6 +84,7 @@ export function useDocumentFileActions({
   floatingCompositeMode,
   palette,
   slices,
+  selectedSliceIds,
   pixels,
   selectedColor,
   tool,
@@ -366,9 +373,49 @@ export function useDocumentFileActions({
     ]
   );
 
+  const exportSlices = useCallback(async () => {
+    const exportScopeSlices = getSliceExportScopeSlices(slices, selectedSliceIds);
+    if (exportScopeSlices.length === 0) {
+      setStatusText('書き出し対象のスライスがありません', 'warning');
+      return;
+    }
+
+    const planResult = buildSliceExportPlans(exportScopeSlices);
+    if ('error' in planResult) {
+      setStatusText(planResult.error, 'warning');
+      return;
+    }
+
+    try {
+      const files = await renderSliceExportFiles({
+        canvasSize,
+        pixels,
+        plans: planResult.plans
+      });
+      const result = await window.pixelApi.exportSliceFiles({ files });
+      if (result.canceled) {
+        setStatusText('スライスの書き出しをキャンセルしました', 'warning');
+        return;
+      }
+      if (result.error) {
+        setStatusText(`スライスの書き出しに失敗しました: ${result.message ?? result.error}`, 'error');
+        return;
+      }
+
+      setStatusText(
+        `スライスの書き出しが完了しました: ${result.fileCount ?? files.length}件 / 保存先: ${result.directoryPath ?? '-'}`,
+        'success'
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '不明なエラー';
+      setStatusText(`スライスの書き出しに失敗しました: ${message}`, 'error');
+    }
+  }, [canvasSize, pixels, selectedSliceIds, setStatusText, slices]);
+
   return {
     savePng,
     saveAsPng,
-    loadPng
+    loadPng,
+    exportSlices
   };
 }

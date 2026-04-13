@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('pixelApi', {
     paletteName?: string;
   }) =>
     ipcRenderer.invoke('palette:export-gpl', args),
+  exportSliceFiles: (args: { files: Array<{ relativePath: string; base64Png: string }> }) =>
+    ipcRenderer.invoke('slice:export-files', args),
   setTransparentBackgroundMode: (mode: TransparentBackgroundMode) =>
     ipcRenderer.invoke('editor:set-transparent-background-mode', mode) as Promise<{ ok: boolean }>,
   copyImageDataUrl: (args: { dataUrl: string; markerToken?: string }) =>

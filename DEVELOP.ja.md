@@ -921,3 +921,31 @@ PNG の隣に `<filename>.dla-pixy.json` として保存。
   - slice sidebar の `W/H` 入力も現在の slice 選択へ一括適用し、`X/Y` は引き続き active slice のみ編集する
   - target の base size がまだ slice 軸サイズ由来の未編集値なら、slice サイズ変更時も stale な mixed を残さず追従させる
   - sidecar 保存、ファイルメニュー連携、実際の export 実行とはまだ未接続
+
+## 18. Issue #38 実装メモ (2026-04-13)
+- 実装完了:
+  - `キャンバス > スライス > 自動スライス...`
+    - `スライス名 / W / H` の renderer modal を追加
+    - 現在の slice 一式を固定グリッドで置き換える
+    - 指定サイズに収まらない右端 / 下端の端数は無視する
+    - `{sliceName}-{index}` 形式で、必要十分最小のゼロ埋め桁数を使って採番する
+    - 生成後は `selectedSliceIds` を空にし、先頭の生成 slice を `activeSliceId` にする
+  - slice export 設定の永続化
+    - `EditorSlice` が `exportSettings` を持てるようにした
+    - sidecar の `document.slices[*].exportSettings` に保存 / 読み込みする
+    - 既存 sidecar のように export 設定が無い slice も読み込み可能で、load 時に default 値へ正規化する
+  - `キャンバス > スライス > 保存...`
+    - Canvas メニューから IPC 経由で呼べるようにした
+    - 1 件以上選択されていれば `selected slices`、未選択なら `all slices` を export 対象にする
+    - renderer 側で slice 矩形を crop し、nearest-neighbor で拡大縮小した PNG を Electron main へ渡して directory export する
+  - export 前 validation
+    - 空の slice 名を拒否
+    - export 対象内での slice 名重複を大文字小文字無視で拒否
+    - `slice.name` の禁止文字を拒否
+    - checked variant が 1 つもない slice を拒否
+    - 解決後の相対出力 path の重複を拒否
+    - 絶対 path や `.` / `..` を含む不正な相対 path を拒否
+- 実装メモ:
+  - slice sidebar の export controls は renderer-only の一時 state ではなく、slice 本体 state を直接編集する形へ移した
+  - その結果、undo / save / load / duplicate / paste でも export 設定が維持される
+  - slice の `W/H` が変わったとき、まだ slice 軸サイズをそのまま参照していた base size は追従したままになる

@@ -912,3 +912,31 @@ Current metadata shape:
   - slice sidebar `W/H` inputs also batch-apply to the current slice selection, while `X/Y` still edits only the active slice
   - if a target's base size is still untouched from the slice axis size, resizing the slice keeps that base size in sync instead of leaving stale mixed values
   - no sidecar persistence, file-menu wiring, or actual export execution is connected yet
+
+## 18. Issue #38 Implementation Memo (2026-04-13)
+- Completed:
+  - `Canvas > Slice > Auto Slice...`
+    - Added a renderer modal with `slice name / W / H`
+    - Replaces the current slice set with a fixed grid
+    - Ignores right / bottom remainder areas that do not fit the requested size
+    - Generates names as `{sliceName}-{index}` with the minimum fixed zero-padding width
+    - Leaves `selectedSliceIds` empty after generation and keeps the first generated slice as `activeSliceId`
+  - slice export settings persistence
+    - `EditorSlice` now optionally carries `exportSettings`
+    - Sidecar save/load keeps export settings inside `document.slices[*].exportSettings`
+    - Existing sidecars without export settings still load; missing settings are normalized to defaults on load
+  - `Canvas > Slice > Save...`
+    - Added a native Canvas menu entry wired through IPC
+    - Export scope is `selected slices` when any are selected, otherwise `all slices`
+    - Renderer crops the source canvas by slice rect, scales with nearest-neighbor, and sends PNG payloads to Electron main for directory export
+  - export validation
+    - Rejects empty slice names
+    - Rejects duplicate slice names (case-insensitive within the export scope)
+    - Rejects forbidden filename characters in `slice.name`
+    - Rejects exports when a slice has no checked variants
+    - Rejects duplicate resolved relative output paths
+    - Rejects invalid relative paths such as absolute paths or `.` / `..` traversal in resolved export directories
+- Implementation detail:
+  - slice sidebar export controls no longer keep renderer-only temporary state
+  - export settings now live in the slice model itself, so undo / save / load / duplicate / paste all preserve them
+  - when slice `W/H` changes, export base sizes that were still mirroring the slice axis size continue to stay in sync
