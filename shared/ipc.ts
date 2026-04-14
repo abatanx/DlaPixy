@@ -7,6 +7,7 @@ import type { GplExportFormat } from './palette-gpl';
 import type { TransparentBackgroundMode } from './transparent-background';
 
 export type MenuAction =
+  | { type: 'show-licenses' }
   | { type: 'open' }
   | { type: 'save' }
   | { type: 'save-as' }

@@ -43,6 +43,8 @@ let preferences: AppPreferences = {
 };
 let currentTransparentBackgroundMode: TransparentBackgroundMode = DEFAULT_TRANSPARENT_BACKGROUND_MODE;
 
+app.setName('DlaPixy');
+
 function getPreferencesPath(): string {
   return path.join(app.getPath('userData'), PREFERENCES_FILE);
 }

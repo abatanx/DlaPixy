@@ -8,6 +8,7 @@ import { CanvasSizeModal } from './modals/CanvasSizeModal';
 import { ConfirmModal } from './modals/ConfirmModal';
 import { GridSpacingModal } from './modals/GridSpacingModal';
 import { KMeansQuantizeModal } from './modals/KMeansQuantizeModal';
+import { OssLicensesModal } from './modals/OssLicensesModal';
 import { SelectionRotateModal } from './modals/SelectionRotateModal';
 import { ZoomModal } from './modals/ZoomModal';
 import type { TransparentBackgroundMode } from '../../shared/transparent-background';
@@ -81,6 +82,11 @@ type PaletteRemovalModalState = {
   onClose: () => void;
 };
 
+type OssLicensesModalState = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
 type EditorModalLayerProps = {
   toast: ToastState;
   canvasSizeModal: CanvasSizeModalState;
@@ -91,6 +97,7 @@ type EditorModalLayerProps = {
   kMeansQuantizeModal: KMeansQuantizeModalState;
   selectionRotateModal: SelectionRotateModalState;
   paletteRemovalModal: PaletteRemovalModalState;
+  ossLicensesModal: OssLicensesModalState;
   onValidationError: (message: string) => void;
 };
 
@@ -104,6 +111,7 @@ export function EditorModalLayer({
   kMeansQuantizeModal,
   selectionRotateModal,
   paletteRemovalModal,
+  ossLicensesModal,
   onValidationError
 }: EditorModalLayerProps) {
   const removalColors = paletteRemovalModal.request?.colors ?? [];
@@ -197,6 +205,10 @@ export function EditorModalLayer({
             : 'この色を削除すると、該当するピクセルはすべて透明になります。続けてよければ削除してください。'}
         </p>
       </ConfirmModal>
+      <OssLicensesModal
+        isOpen={ossLicensesModal.isOpen}
+        onClose={ossLicensesModal.onClose}
+      />
     </>
   );
 }

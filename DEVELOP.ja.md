@@ -93,6 +93,7 @@ npm run dist
 - PNG 保存時は既存メタ情報チャンクを保持するが、DlaPixy の復元は sidecar JSON のみを見る
 - sidecar が壊れていると警告して、PNG 単体読込へフォールバックする
 - ネイティブ `Canvas` メニューからキャンバスサイズ / グリッド間隔 / 表示倍率系を開く
+- OSS ライセンスダイアログは app/help メニューから開き、生成済み JSON マニフェストを表示元にする
 - 透過背景モードは編集キャンバス、各種プレビュー、モーダルプレビューで共通利用する
 - 状態表示は toast ベースで、常設の sidebar 状態欄はない
 - footer に canvas / grid / zoom / current file を表示する
@@ -173,6 +174,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存する。
   - Electron ウィンドウ、IPC、PNG + sidecar I/O、ネイティブダイアログ
 - `electron/menu.ts`
   - ネイティブ File / Canvas / Palette メニュー配線
+- `scripts/generate-oss-licenses.cjs`
+  - ライセンスダイアログ用の OSS マニフェスト JSON を生成する
 - `electron/preload.ts`
   - renderer 向け `window.pixelApi` ブリッジ
 

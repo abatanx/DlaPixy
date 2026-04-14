@@ -94,6 +94,7 @@ export function App() {
   const [autoSliceRequest, setAutoSliceRequest] = useState<{ baseName: string; width: number; height: number } | null>(
     null
   );
+  const [isOssLicensesModalOpen, setIsOssLicensesModalOpen] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
@@ -577,6 +578,14 @@ export function App() {
     setAutoSliceRequest(null);
   }, []);
 
+  const openOssLicensesModal = useCallback(() => {
+    setIsOssLicensesModalOpen(true);
+  }, []);
+
+  const closeOssLicensesModal = useCallback(() => {
+    setIsOssLicensesModalOpen(false);
+  }, []);
+
   const activateSliceTool = useCallback(() => {
     if (floatingPasteRef.current) {
       setStatusText('スライスツールへ切り替える前に Enter で確定するか Esc でキャンセルしてください', 'warning');
@@ -628,6 +637,7 @@ export function App() {
     openZoomModal,
     openCanvasSizeModal,
     openGridSpacingModal,
+    openOssLicensesModal,
     openAutoSliceModal,
     openKMeansQuantizeModal,
     importGplPalette,
@@ -904,6 +914,10 @@ export function App() {
             request: paletteRemovalRequest,
             onConfirm: confirmPaletteRemoval,
             onClose: closePaletteRemovalModal
+          }}
+          ossLicensesModal={{
+            isOpen: isOssLicensesModalOpen,
+            onClose: closeOssLicensesModal
           }}
           onValidationError={onValidationError}
         />

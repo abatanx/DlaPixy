@@ -3,7 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { Menu } from 'electron';
+import { app, Menu } from 'electron';
 import type { MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import type { MenuAction } from '../shared/ipc';
@@ -25,6 +25,28 @@ type BuildApplicationMenuArgs = {
   sendMenuAction: (action: MenuAction) => void;
   setTransparentBackgroundMode: (mode: TransparentBackgroundMode) => void;
 };
+
+function buildAppMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): MenuItemConstructorOptions {
+  return {
+    label: app.name,
+    submenu: [
+      { role: 'about' },
+      { type: 'separator' },
+      {
+        label: 'ライセンス',
+        click: () => sendMenuAction({ type: 'show-licenses' })
+      },
+      { type: 'separator' },
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
+      { type: 'separator' },
+      { role: 'quit' }
+    ]
+  };
+}
 
 function buildFileMenuTemplate({
   preferences,
@@ -151,21 +173,36 @@ function buildPaletteMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs):
   };
 }
 
+function buildHelpMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs): MenuItemConstructorOptions {
+  return {
+    label: 'Help',
+    submenu: [
+      {
+        label: 'ライセンス',
+        click: () => sendMenuAction({ type: 'show-licenses' })
+      }
+    ]
+  };
+}
+
 export function buildApplicationMenu(args: BuildApplicationMenuArgs): void {
+  const appMenu = buildAppMenuTemplate(args);
   const fileMenu = buildFileMenuTemplate(args);
   const canvasMenu = buildCanvasMenuTemplate(args);
   const paletteMenu = buildPaletteMenuTemplate(args);
+  const helpMenu = buildHelpMenuTemplate(args);
   const template: MenuItemConstructorOptions[] = process.platform === 'darwin'
     ? [
-        { role: 'appMenu' },
+        appMenu,
         fileMenu,
         canvasMenu,
         paletteMenu,
         { role: 'editMenu' },
         { role: 'viewMenu' },
-        { role: 'windowMenu' }
+        { role: 'windowMenu' },
+        helpMenu
       ]
-    : [fileMenu, canvasMenu, paletteMenu, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }];
+    : [fileMenu, canvasMenu, paletteMenu, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }, helpMenu];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }

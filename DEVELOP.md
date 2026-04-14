@@ -93,6 +93,7 @@ Notes:
 - Existing PNG metadata chunks are preserved on save, but DlaPixy state is restored only from sidecar JSON
 - Invalid sidecar shows warning and falls back to plain PNG load
 - Native `Canvas` menu opens canvas-size, grid-spacing, and zoom flows
+- OSS licenses dialog is available from the app/help menu and is backed by a generated JSON manifest
 - Transparent background mode is shared across editor canvas, previews, and modal previews
 - Status messages are toast-based; persistent sidebar status row is removed
 - Footer shows canvas, grid, zoom, and current file status
@@ -173,6 +174,8 @@ Rules:
   - Electron window, IPC, PNG + sidecar I/O, native dialogs
 - `electron/menu.ts`
   - native File / Canvas / Palette menu wiring
+- `scripts/generate-oss-licenses.cjs`
+  - generates the OSS license manifest consumed by the licenses modal
 - `electron/preload.ts`
   - `window.pixelApi` bridge for renderer
 

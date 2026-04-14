@@ -2094,6 +2094,124 @@ body {
   text-align: right;
 }
 
+.oss-licenses-modal-body {
+  max-height: min(70vh, 42rem);
+  overflow: auto;
+}
+
+.oss-license-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.oss-license-item {
+  border: 1px solid #dbe3ee;
+  border-radius: 0.8rem;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.oss-license-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.oss-license-summary::-webkit-details-marker {
+  display: none;
+}
+
+.oss-license-item[open] .oss-license-summary {
+  background: rgba(248, 250, 252, 0.92);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.oss-license-summary-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.oss-license-name-row,
+.oss-license-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.oss-license-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.oss-license-version {
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.oss-license-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.35rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(29, 78, 216, 0.12);
+  color: #1d4ed8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.oss-license-summary-icon {
+  flex: 0 0 auto;
+  color: #94a3b8;
+  transition: transform 140ms ease, color 140ms ease;
+}
+
+.oss-license-item[open] .oss-license-summary-icon {
+  color: #475569;
+  transform: rotate(180deg);
+}
+
+.oss-license-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem;
+}
+
+.oss-license-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.oss-license-text {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.7rem;
+  background: rgba(248, 250, 252, 0.92);
+  color: #334155;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .app-footer {
   flex: 0 0 auto;
   min-height: 2.75rem;

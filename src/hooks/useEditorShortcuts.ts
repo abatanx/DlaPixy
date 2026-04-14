@@ -52,6 +52,7 @@ type UseEditorShortcutsOptions = {
   openZoomModal: () => void;
   openCanvasSizeModal: () => void;
   openGridSpacingModal: () => void;
+  openOssLicensesModal: () => void;
   openAutoSliceModal: () => void;
   openKMeansQuantizeModal: () => void;
   importGplPalette: (mode: 'replace' | 'append') => Promise<void>;
@@ -109,6 +110,7 @@ export function useEditorShortcuts({
   openZoomModal,
   openCanvasSizeModal,
   openGridSpacingModal,
+  openOssLicensesModal,
   openAutoSliceModal,
   openKMeansQuantizeModal,
   importGplPalette,
@@ -494,6 +496,9 @@ export function useEditorShortcuts({
         case 'open':
           void loadPng();
           break;
+        case 'show-licenses':
+          openOssLicensesModal();
+          break;
         case 'save':
           void savePng();
           break;
@@ -550,6 +555,7 @@ export function useEditorShortcuts({
     openCanvasSizeModal,
     openAutoSliceModal,
     openGridSpacingModal,
+    openOssLicensesModal,
     openKMeansQuantizeModal,
     saveAsPng,
     savePng,
