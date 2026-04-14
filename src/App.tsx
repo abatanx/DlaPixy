@@ -733,6 +733,7 @@ export function App() {
             tilePreviewLayers={tilePreviewLayerSummaries}
             tilePreviewBaseSize={tilePreviewBaseSize}
             hasTilePreviewCandidate={hasTilePreviewCandidate}
+            addTilePreviewLayer={addTilePreviewLayer}
             clearTilePreviewLayers={clearTilePreviewLayers}
             reorderTilePreviewLayers={reorderTilePreviewLayers}
             removeTilePreviewLayer={removeTilePreviewLayer}

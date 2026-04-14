@@ -460,8 +460,7 @@ body {
   max-height: 220px;
   scrollbar-gutter: stable;
   border: 1px solid rgba(148, 163, 184, 0.45);
-  border-radius: 0.45rem;
-  padding: 0.2rem;
+  border-radius: 0;
 }
 
 .preview-scroll-wrap {
@@ -554,6 +553,53 @@ body {
   font-size: 0.72rem;
   line-height: 1.2;
   color: #475569;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.tile-preview-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.65rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 0.45rem;
+  line-height: 1;
+}
+
+.tile-preview-action-btn-add {
+  background: rgba(29, 78, 216, 0.12);
+  color: #1d4ed8;
+}
+
+.tile-preview-action-btn-add:hover,
+.tile-preview-action-btn-add:focus-visible {
+  background: rgba(29, 78, 216, 0.2);
+  color: #1e3a8a;
+}
+
+.tile-preview-action-btn-remove {
+  width: 1.65rem;
+  padding: 0;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.tile-preview-action-btn-remove:hover,
+.tile-preview-action-btn-remove:focus-visible {
+  background: rgba(220, 38, 38, 0.2);
+  color: #991b1b;
+}
+
+.tile-preview-action-btn:disabled {
+  opacity: 0.45;
+}
+
+.tile-preview-action-label {
+  color: currentColor;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 

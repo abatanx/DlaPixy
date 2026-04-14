@@ -22,6 +22,7 @@ export const EditorSidebar = memo(function EditorSidebar({
   tilePreviewLayers,
   tilePreviewBaseSize,
   hasTilePreviewCandidate,
+  addTilePreviewLayer,
   clearTilePreviewLayers,
   reorderTilePreviewLayers,
   removeTilePreviewLayer,
@@ -111,6 +112,7 @@ export const EditorSidebar = memo(function EditorSidebar({
             tilePreviewLayers={tilePreviewLayers}
             tilePreviewBaseSize={tilePreviewBaseSize}
             hasTilePreviewCandidate={hasTilePreviewCandidate}
+            addTilePreviewLayer={addTilePreviewLayer}
             clearTilePreviewLayers={clearTilePreviewLayers}
             reorderTilePreviewLayers={reorderTilePreviewLayers}
             removeTilePreviewLayer={removeTilePreviewLayer}

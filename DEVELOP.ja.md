@@ -80,7 +80,8 @@ npm run dist
   - 1x Preview
   - Tile Preview（正規化した重ねを `3x3` 反復）
   - Animation Preview（フレーム一覧、FPS、ループ、並び替え、削除、全消去）
-- Tile Preview への登録は `G`
+- プレビュー枠は角丸をやめ、ピクセル表示が見切れない直角フレームにそろえている
+- Tile Preview への登録はサイドバー追加ボタンまたは `G`
 - Animation Preview への登録は `T`
 
 ### 4.5 ファイル / シェル連携

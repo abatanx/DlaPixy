@@ -27,12 +27,14 @@
 
 ## 1x Preview
 - Large previews stay scrollable instead of shrinking to fit.
+- Preview frames use square corners so the visible pixel area is not clipped by rounded borders.
 
 ## Tile Preview
 - Lives below the 1x preview.
 - Uses current selection, or keeps the last valid selection after selection is cleared.
 - Updates in real time while pixels change.
 - Auto-fits to parent width and renders in a square viewport.
+- The sidebar exposes an add button with visible `G` shortcut guidance.
 - `G` registers the current selection as a preview-only stack entry.
 - The first registered entry defines the base size for the stack.
 - Later entries are clipped or transparent-padded to that base size before compositing.

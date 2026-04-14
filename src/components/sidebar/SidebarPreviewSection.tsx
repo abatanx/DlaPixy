@@ -18,6 +18,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
   tilePreviewLayers,
   tilePreviewBaseSize,
   hasTilePreviewCandidate,
+  addTilePreviewLayer,
   clearTilePreviewLayers,
   reorderTilePreviewLayers,
   removeTilePreviewLayer,
@@ -45,6 +46,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
   const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
   const canPlayAnimation = animationFrames.length >= 2;
   const canAddAnimationFrame = selection !== null;
+  const canAddTilePreviewLayer = selection !== null;
   const canClearTilePreviewLayers = tilePreviewLayerCount > 0;
 
   useEffect(() => {
@@ -182,7 +184,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
             ) : (
               <div className="preview-placeholder">
                 <span>矩形選択で 3x3 タイル表示</span>
-                <span className="preview-placeholder-hint">Gで重ねプレビューに追加</span>
+                <span className="preview-placeholder-hint">追加ボタンまたは G で重ねプレビューに追加</span>
               </div>
             )}
           </div>
@@ -196,7 +198,17 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
             </div>
             <button
               type="button"
-              className="btn btn-sm btn-outline-danger animation-preview-icon-button ms-auto"
+              className="btn btn-sm tile-preview-action-btn tile-preview-action-btn-add ms-auto"
+              onClick={addTilePreviewLayer}
+              disabled={!canAddTilePreviewLayer}
+              aria-label="現在の選択範囲を Tile Preview の重ねに追加"
+              title="現在の選択範囲を Tile Preview の重ねに追加 (G)"
+            >
+              <span className="tile-preview-action-label">+G</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm tile-preview-action-btn tile-preview-action-btn-remove"
               onClick={clearTilePreviewLayers}
               disabled={!canClearTilePreviewLayers}
               aria-label="Tile Preview の重ねをすべて削除"
@@ -209,11 +221,11 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
           <div className="form-text mt-2 text-center">
             {tilePreviewLayerCount > 0
               ? hasTilePreviewCandidate && selection
-                ? `${tilePreviewLayerCount}枚重ね + 現在選択を未確定候補として重ね表示`
+                ? `${tilePreviewLayerCount}枚重ね + 現在選択を未確定候補として重ね表示 / 追加はボタンまたは G`
                 : `${tilePreviewLayerCount}枚重ねを3x3で表示`
               : tilePreviewSelection
-                ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'}`
-                : '選択範囲なし'}
+                ? `${tilePreviewSelection.w}x${tilePreviewSelection.h} を3x3で表示${selection ? ' (現在選択中)' : ' (最終選択範囲)'} / 追加はボタンまたは G`
+                : '選択範囲なし / 追加はボタンまたは G'}
           </div>
           {tilePreviewLayers.length > 0 ? (
             <div className="tile-preview-layer-list mt-2" role="list" aria-label="tile preview stacks">

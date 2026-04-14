@@ -80,7 +80,8 @@ Notes:
   - 1x preview
   - Tile Preview (`3x3` repeat of normalized layers)
   - Animation Preview with frame list, FPS, loop, reorder, delete, clear
-- Tile Preview layers are registered with `G`
+- Preview frames use square corners so pixel content is not clipped by rounded chrome
+- Tile Preview layers are registered with the sidebar add button or `G`
 - Animation frames are registered with `T`
 
 ### 4.5 File / Shell Integration

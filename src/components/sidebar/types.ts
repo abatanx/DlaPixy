@@ -30,6 +30,7 @@ export type EditorSidebarProps = {
   tilePreviewLayers: TilePreviewLayerSummary[];
   tilePreviewBaseSize: { width: number; height: number } | null;
   hasTilePreviewCandidate: boolean;
+  addTilePreviewLayer: () => void;
   clearTilePreviewLayers: () => void;
   reorderTilePreviewLayers: (topFirstLayerIds: string[]) => void;
   removeTilePreviewLayer: (layerId: string) => void;
@@ -96,6 +97,7 @@ export type SidebarPreviewSectionProps = Pick<
   | 'tilePreviewLayers'
   | 'tilePreviewBaseSize'
   | 'hasTilePreviewCandidate'
+  | 'addTilePreviewLayer'
   | 'clearTilePreviewLayers'
   | 'reorderTilePreviewLayers'
   | 'removeTilePreviewLayer'
