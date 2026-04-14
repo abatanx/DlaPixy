@@ -10,6 +10,7 @@ import {
   SLICE_EXPORT_TARGET_LABELS,
   buildSimulatedExportPaths,
   resolveComputedVariantSize,
+  resolveComputedVariantScalePercent,
   resolveDisplayTargetUiState,
   resolveSliceExportSettings
 } from '../../editor/slice-export';
@@ -19,7 +20,15 @@ import type {
   SliceExportTargetSettings,
   SliceExportVariantDefinition
 } from '../../../shared/slice';
+import { getEnabledSliceExportTargets } from '../../../shared/slice';
+import { SliceExportTargetMark, SliceExportTargetMarks } from '../SliceExportTargetMarks';
 import type { SidebarSliceSectionProps } from './types';
+
+const SLICE_EXPORT_TARGET_SECTIONS: Array<[SliceExportTargetKey, SliceExportVariantDefinition[]]> = [
+  ['generic', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS],
+  ['apple', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS],
+  ['android', ANDROID_SLICE_EXPORT_VARIANTS]
+];
 
 export const SidebarSliceSection = memo(function SidebarSliceSection({
   canvasSize,
@@ -109,6 +118,28 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
       android: resolveDisplayTargetUiState(targetStates.map((state) => state.android), ANDROID_SLICE_EXPORT_VARIANTS)
     };
   }, [exportScopeSlices]);
+
+  const enabledTargetsBySliceId = useMemo(
+    () => new Map(slices.map((slice) => [slice.id, getEnabledSliceExportTargets(slice)])),
+    [slices]
+  );
+  const allSimulatedPaths = useMemo(
+    () =>
+      SLICE_EXPORT_TARGET_SECTIONS.flatMap(([target]) =>
+        exportScopeSlices.flatMap((slice) =>
+          buildSimulatedExportPaths({
+            target,
+            slice,
+            settings: resolveSliceExportSettings(slice)[target],
+            baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
+          }).map((simulation) => ({
+            target,
+            ...simulation
+          }))
+        )
+      ),
+    [activeSlice?.id, exportScopeSlices, nameInput]
+  );
 
   const getCheckedVariantCountLabel = (
     target: SliceExportTargetKey,
@@ -246,14 +277,6 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     const widthValue = targetState.baseAxis === 'width' ? targetState.baseSizeInput : '';
     const heightValue = targetState.baseAxis === 'height' ? targetState.baseSizeInput : '';
     const baseVariantLabel = variants.find((variant) => variant.key === targetState.baseVariant)?.label ?? '基準';
-    const simulatedPaths = exportScopeSlices.flatMap((slice) =>
-      buildSimulatedExportPaths({
-        target,
-        slice,
-        settings: resolveSliceExportSettings(slice)[target],
-        baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
-      })
-    );
 
     return (
       <div key={target} className="p-1 d-flex flex-column gap-2 slice-sidebar-export-target small">
@@ -305,14 +328,22 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                 const computedSizes = exportScopeSlices.map((slice) =>
                   resolveComputedVariantSize(slice, resolveSliceExportSettings(slice)[target], variant, variants)
                 );
+                const computedScales = exportScopeSlices.map((slice) =>
+                  resolveComputedVariantScalePercent(slice, resolveSliceExportSettings(slice)[target], variant, variants)
+                );
                 const [firstComputed] = computedSizes;
+                const [firstScale] = computedScales;
                 const isConsistentSize =
                   computedSizes.length === 0 ||
                   computedSizes.every(
                     (computed) => computed.width === firstComputed?.width && computed.height === firstComputed?.height
                   );
+                const isConsistentScale =
+                  computedScales.length === 0 ||
+                  computedScales.every((scale) => Math.round(scale * 10) === Math.round((firstScale ?? 0) * 10));
                 const variantDisplay = targetState.variants[variant.key];
                 const isBase = targetState.baseVariant === variant.key && !targetState.mixed.baseVariant;
+                const showsUpscale = isConsistentScale && (firstScale ?? 0) > 100;
                 return (
                   <tr
                     key={variant.key}
@@ -343,12 +374,12 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                       </label>
                     </td>
                     <td
-                      className={`text-end font-monospace small ${
-                        isBase ? 'fw-semibold text-body-emphasis' : 'text-body-secondary'
+                      className={`text-end font-monospace small ${isBase ? 'fw-semibold' : ''} ${
+                        showsUpscale ? 'text-danger' : isBase ? 'text-body-emphasis' : 'text-body-secondary'
                       }`}
                     >
-                      {isConsistentSize && firstComputed ? (
-                        `${firstComputed.width}×${firstComputed.height}`
+                      {isConsistentSize && isConsistentScale && firstComputed ? (
+                        `${firstComputed.width}×${firstComputed.height} (${formatScalePercent(firstScale ?? 100)})`
                       ) : (
                         <span className="fst-italic">混在</span>
                       )}
@@ -395,33 +426,6 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
             }
           />
         </div>
-
-        <div className="d-flex flex-column gap-1">
-          <div className="d-flex align-items-center justify-content-between gap-2">
-            <div className="small text-body-secondary">{simulatedPaths.length} File(s)</div>
-            <button
-              type="button"
-              className="canvas-copy-btn"
-              onClick={() => void copySimulatedPaths(simulatedPaths.map(({ relativePath }) => relativePath))}
-              disabled={simulatedPaths.length === 0}
-              aria-label="ファイル一覧をコピー"
-              title="ファイル一覧をコピー"
-            >
-              <i className="fa-regular fa-copy" aria-hidden="true" />
-            </button>
-          </div>
-          <div className="small font-monospace text-body-secondary d-flex flex-column gap-1">
-            {simulatedPaths.length > 0 ? (
-              simulatedPaths.map(({ relativePath, width, height }, index) => (
-                <div key={`${index}:${relativePath}-${width}x${height}`}>
-                  {relativePath} ({width}x{height})
-                </div>
-              ))
-            ) : (
-              <div className="text-body-tertiary">選択されたバリアントがありません</div>
-            )}
-          </div>
-        </div>
       </div>
     );
   };
@@ -439,6 +443,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
             {slices.map((slice, index) => {
               const isSelected = selectedSliceIds.includes(slice.id);
               const isActive = activeSlice?.id === slice.id;
+              const enabledTargets = enabledTargetsBySliceId.get(slice.id) ?? [];
               return (
                 <div
                   key={slice.id}
@@ -454,10 +459,16 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                     title={`${slice.name || 'slice'} (${slice.x},${slice.y}, ${slice.w}x${slice.h})`}
                   >
                     <span className="slice-sidebar-item-index">#{index + 1}</span>
-                    <span className="slice-sidebar-item-name">{slice.name || 'slice'}</span>
-                    <span className="slice-sidebar-item-meta">
-                      {slice.x},{slice.y} / {slice.w}x{slice.h}
-                    </span>
+                    <div className="slice-sidebar-item-content">
+                      <span className="slice-sidebar-item-name">{slice.name || 'slice'}</span>
+                      <SliceExportTargetMarks
+                        targets={enabledTargets}
+                        className="slice-sidebar-item-targets"
+                      />
+                      <span className="slice-sidebar-item-meta">
+                        {slice.x},{slice.y} / {slice.w}x{slice.h}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -558,11 +569,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
       {exportScopeSlices.length > 0 ? (
         <div className="d-flex flex-column gap-2">
           <ul className="nav nav-tabs sidebar-slice-export-tabs small" role="tablist">
-            {([
-              ['generic', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS],
-              ['apple', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS],
-              ['android', ANDROID_SLICE_EXPORT_VARIANTS]
-            ] as Array<[SliceExportTargetKey, SliceExportVariantDefinition[]]>).map(([target, variants]) => (
+            {SLICE_EXPORT_TARGET_SECTIONS.map(([target, variants]) => (
               <li key={target} className="nav-item" role="presentation">
                 <button
                   type="button"
@@ -572,7 +579,10 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                   aria-controls={`sidebar-slice-export-pane-${target}`}
                   onClick={() => setActiveExportTab(target)}
                 >
-                  <span className="sidebar-slice-export-tab-label">{SLICE_EXPORT_TARGET_LABELS[target]}</span>
+                  <span className="sidebar-slice-export-tab-label">
+                    <SliceExportTargetMark target={target} className="sidebar-slice-export-tab-icon" />
+                    <span>{SLICE_EXPORT_TARGET_LABELS[target]}</span>
+                  </span>
                   <span className="badge text-bg-light border text-body-secondary">
                     {getCheckedVariantCountLabel(target, variants)}
                   </span>
@@ -604,8 +614,46 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               {renderExportTargetSection('android', ANDROID_SLICE_EXPORT_VARIANTS)}
             </div>
           </div>
+
+          <div className="d-flex flex-column gap-1 slice-sidebar-export-files">
+            <div className="d-flex align-items-center justify-content-between gap-2">
+              <div className="small text-body-secondary">{allSimulatedPaths.length} File(s)</div>
+              <button
+                type="button"
+                className="canvas-copy-btn"
+                onClick={() => void copySimulatedPaths(allSimulatedPaths.map(({ relativePath }) => relativePath))}
+                disabled={allSimulatedPaths.length === 0}
+                aria-label="ファイル一覧をコピー"
+                title="ファイル一覧をコピー"
+              >
+                <i className="fa-regular fa-copy" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="small font-monospace text-body-secondary d-flex flex-column gap-1">
+              {allSimulatedPaths.length > 0 ? (
+                allSimulatedPaths.map(({ target, relativePath, width, height }, index) => (
+                  <div
+                    key={`${index}:${target}:${relativePath}-${width}x${height}`}
+                    className="slice-sidebar-export-file-item"
+                  >
+                    <SliceExportTargetMark target={target} className="slice-sidebar-export-file-icon" />
+                    <span>
+                      {relativePath} ({width}x{height})
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-body-tertiary">選択されたバリアントがありません</div>
+              )}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
   );
 });
+
+function formatScalePercent(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+}

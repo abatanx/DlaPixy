@@ -94,6 +94,9 @@ Notes:
 - Invalid sidecar shows warning and falls back to plain PNG load
 - Native `Canvas` menu opens canvas-size, grid-spacing, and zoom flows
 - OSS licenses dialog is available from the app/help menu and is backed by a generated JSON manifest
+- Slice export targets show platform marks in tabs, centered list rows, and under the in-canvas slice name when that target has at least one enabled variant
+- Slice export size rows also show output scale percent; values above `100%` (upscale) are highlighted in red
+- Slice export `File(s)` preview lists simulated outputs from all targets at once, instead of only the active tab
 - Transparent background mode is shared across editor canvas, previews, and modal previews
 - Status messages are toast-based; persistent sidebar status row is removed
 - Footer shows canvas, grid, zoom, and current file status

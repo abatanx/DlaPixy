@@ -1124,20 +1124,72 @@ body {
   transform: translate(-50%, calc(-100% - 0.28rem));
 }
 
-.canvas-slice-label.corner {
+.canvas-slice-center-stack {
+  position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   max-width: calc(100% - 0.5rem);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  text-align: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.canvas-slice-label.corner {
+  position: static;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: center;
 }
 
 .canvas-slice-label.left {
   left: 0;
   top: 50%;
   transform: translate(calc(-100% - 0.28rem), -50%) rotate(-90deg);
+}
+
+.slice-export-target-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+}
+
+.slice-export-target-mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow:
+    -1px 0 0 rgba(15, 23, 42, 0.92),
+    1px 0 0 rgba(15, 23, 42, 0.92),
+    0 -1px 0 rgba(15, 23, 42, 0.92),
+    0 1px 0 rgba(15, 23, 42, 0.92),
+    0 0 4px rgba(15, 23, 42, 0.45);
+}
+
+.slice-export-target-mark.is-generic {
+}
+
+.slice-export-target-mark.is-apple {
+}
+
+.slice-export-target-mark.is-android {
+}
+
+.canvas-slice-targets {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.canvas-slice-targets .slice-export-target-mark {
+  font-size: 0.68rem;
 }
 
 .canvas-selection-size-label {
@@ -1246,7 +1298,7 @@ body {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
-  align-items: baseline;
+  align-items: center;
   gap: 0.45rem;
   text-align: left;
   cursor: pointer;
@@ -1281,6 +1333,25 @@ body {
   color: #64748b;
   font-size: 0.68rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  white-space: nowrap;
+}
+
+.slice-sidebar-item-content {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.slice-sidebar-item-targets {
+  justify-content: center;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.slice-sidebar-item-targets .slice-export-target-mark {
+  font-size: 0.72rem;
 }
 
 .slice-sidebar-bounds-group .input-group-text {
@@ -1312,13 +1383,35 @@ body {
   margin-top: 0;
 }
 
+.slice-sidebar-export-files {
+  min-height: 0;
+}
+
+.slice-sidebar-export-file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  line-height: 1.3;
+}
+
+.slice-sidebar-export-file-icon {
+  flex: 0 0 auto;
+}
+
 .sidebar-slice-export-tabs .nav-link {
   display: inline-flex;
   align-items: center;
 }
 
 .sidebar-slice-export-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   line-height: 1;
+}
+
+.sidebar-slice-export-tab-icon {
+  font-size: 0.72rem;
 }
 
 .sidebar-palette-header {

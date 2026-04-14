@@ -159,6 +159,22 @@ export function isSliceExportSettings(value: unknown): value is SliceExportSetti
   );
 }
 
+export function hasEnabledSliceExportVariants(
+  settings: SliceExportTargetSettings,
+  variants: SliceExportVariantDefinition[]
+): boolean {
+  return variants.some((variant) => settings.variants[variant.key]);
+}
+
+export function getEnabledSliceExportTargets(
+  slice: Pick<EditorSlice, 'w' | 'h' | 'exportSettings'>
+): SliceExportTargetKey[] {
+  const settings = normalizeSliceExportSettings(slice.exportSettings, slice);
+  return SLICE_EXPORT_TARGET_KEYS.filter((target) =>
+    hasEnabledSliceExportVariants(settings[target], SLICE_EXPORT_VARIANTS_BY_TARGET[target])
+  );
+}
+
 function createDefaultSliceExportTargetSettings(
   axisSize: number,
   baseVariant: string,

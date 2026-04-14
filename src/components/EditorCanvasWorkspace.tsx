@@ -24,6 +24,8 @@ import {
   getSliceHandleStyle,
   type SliceResizeHandle
 } from '../editor/slices';
+import { getEnabledSliceExportTargets } from '../../shared/slice';
+import { SliceExportTargetMarks } from './SliceExportTargetMarks';
 import type { EditorSlice, FloatingCompositeMode, HoveredPixelInfo, Selection, Tool } from '../editor/types';
 
 type PixelInfoFields = {
@@ -214,6 +216,7 @@ export function EditorCanvasWorkspace({
               ? slices.map((slice) => {
                   const isSelected = selectedSliceIdSet.has(slice.id);
                   const isActive = activeSliceId === slice.id;
+                  const enabledTargets = getEnabledSliceExportTargets(slice);
                   return (
                     <div
                       key={slice.id}
@@ -232,9 +235,15 @@ export function EditorCanvasWorkspace({
                         className="canvas-slice-hit-area"
                         aria-hidden="true"
                       />
-                      <span className="canvas-slice-label corner">
-                        {slice.name || 'slice'}
-                      </span>
+                      <div className="canvas-slice-center-stack">
+                        <span className="canvas-slice-label corner">
+                          {slice.name || 'slice'}
+                        </span>
+                        <SliceExportTargetMarks
+                          targets={enabledTargets}
+                          className="canvas-slice-targets"
+                        />
+                      </div>
                       <span className="canvas-slice-label top">{slice.w}</span>
                       <span className="canvas-slice-label left">{slice.h}</span>
                       {isActive && selectedSliceIds.length === 1

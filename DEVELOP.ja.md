@@ -94,6 +94,9 @@ npm run dist
 - sidecar が壊れていると警告して、PNG 単体読込へフォールバックする
 - ネイティブ `Canvas` メニューからキャンバスサイズ / グリッド間隔 / 表示倍率系を開く
 - OSS ライセンスダイアログは app/help メニューから開き、生成済み JSON マニフェストを表示元にする
+- Slice の export target は、有効 variant があるときだけタブ・一覧中央・canvas 上のラベル下にプラットフォームマークを出す
+- Slice export のサイズ行には出力倍率も表示し、`100%` 超の拡大は赤で強調する
+- Slice export の `File(s)` プレビューは、アクティブなタブだけでなく全ターゲット分の想定出力をまとめて表示する
 - 透過背景モードは編集キャンバス、各種プレビュー、モーダルプレビューで共通利用する
 - 状態表示は toast ベースで、常設の sidebar 状態欄はない
 - footer に canvas / grid / zoom / current file を表示する

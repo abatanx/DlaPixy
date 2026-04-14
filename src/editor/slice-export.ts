@@ -131,6 +131,18 @@ export function resolveComputedVariantSize(
   };
 }
 
+export function resolveComputedVariantScalePercent(
+  slice: Pick<EditorSlice, 'w' | 'h'>,
+  state: SliceExportTargetSettings,
+  variant: SliceExportVariantDefinition,
+  variants: SliceExportVariantDefinition[]
+): number {
+  const computed = resolveComputedVariantSize(slice, state, variant, variants);
+  const sourceAxisSize = state.baseAxis === 'width' ? Math.max(1, slice.w) : Math.max(1, slice.h);
+  const targetAxisSize = state.baseAxis === 'width' ? computed.width : computed.height;
+  return (targetAxisSize / sourceAxisSize) * 100;
+}
+
 export function buildSimulatedExportPaths(args: {
   target: SliceExportTargetKey;
   slice: Pick<EditorSlice, 'w' | 'h'>;
