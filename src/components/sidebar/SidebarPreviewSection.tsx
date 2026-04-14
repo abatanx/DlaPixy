@@ -3,7 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { memo, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
+import { memo, useEffect, useRef, useState, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { getTransparentBackgroundSurfaceClassName } from '../../editor/transparent-background';
 import type { SidebarPreviewSectionProps } from './types';
 
@@ -40,8 +40,25 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
 }: SidebarPreviewSectionProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'tiling' | 'animation'>('preview');
   const [draggingTilePreviewLayerId, setDraggingTilePreviewLayerId] = useState<string | null>(null);
+  const [isPreviewPanning, setIsPreviewPanning] = useState<boolean>(false);
   const previousFrameCountRef = useRef<number>(animationFrames.length);
   const previousTilePreviewFocusSequenceRef = useRef<number>(tilePreviewFocusSequence);
+  const previewScrollWrapRef = useRef<HTMLDivElement | null>(null);
+  const previewPanStateRef = useRef<{
+    active: boolean;
+    pointerId: number | null;
+    startX: number;
+    startY: number;
+    startScrollLeft: number;
+    startScrollTop: number;
+  }>({
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startScrollLeft: 0,
+    startScrollTop: 0
+  });
   const displayedTilePreviewLayers = [...tilePreviewLayers].reverse();
   const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
   const canPlayAnimation = animationFrames.length >= 2;
@@ -62,6 +79,13 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
     }
     previousTilePreviewFocusSequenceRef.current = tilePreviewFocusSequence;
   }, [tilePreviewFocusSequence]);
+
+  useEffect(() => {
+    return () => {
+      previewPanStateRef.current.active = false;
+      previewPanStateRef.current.pointerId = null;
+    };
+  }, []);
 
   const onTilePreviewLayerDragStart = (event: ReactDragEvent<HTMLDivElement>, sourceId: string) => {
     setDraggingTilePreviewLayerId(sourceId);
@@ -98,6 +122,72 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
     const insertAfter = event.clientY >= targetBounds.top + targetBounds.height / 2;
     remainingLayerIds.splice(insertAfter ? targetIndex + 1 : targetIndex, 0, sourceId);
     reorderTilePreviewLayers(remainingLayerIds);
+  };
+
+  const endPreviewPan = (pointerId?: number) => {
+    if (!previewPanStateRef.current.active) {
+      return;
+    }
+
+    const previewElement = previewScrollWrapRef.current;
+    if (previewElement && pointerId !== undefined && previewElement.hasPointerCapture(pointerId)) {
+      previewElement.releasePointerCapture(pointerId);
+    }
+
+    previewPanStateRef.current.active = false;
+    previewPanStateRef.current.pointerId = null;
+    setIsPreviewPanning(false);
+  };
+
+  const onPreviewPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !previewDataUrl) {
+      return;
+    }
+
+    const previewElement = previewScrollWrapRef.current;
+    if (!previewElement) {
+      return;
+    }
+
+    previewPanStateRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startScrollLeft: previewElement.scrollLeft,
+      startScrollTop: previewElement.scrollTop
+    };
+    previewElement.setPointerCapture(event.pointerId);
+    setIsPreviewPanning(true);
+    event.preventDefault();
+  };
+
+  const onPreviewPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const previewElement = previewScrollWrapRef.current;
+    const panState = previewPanStateRef.current;
+    if (!previewElement || !panState.active || panState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const dx = event.clientX - panState.startX;
+    const dy = event.clientY - panState.startY;
+    previewElement.scrollLeft = panState.startScrollLeft - dx;
+    previewElement.scrollTop = panState.startScrollTop - dy;
+    event.preventDefault();
+  };
+
+  const onPreviewPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (previewPanStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+    endPreviewPan(event.pointerId);
+  };
+
+  const onPreviewPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (previewPanStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+    endPreviewPan(event.pointerId);
   };
 
   return (
@@ -155,7 +245,14 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
           className={`tab-pane fade ${activeTab === 'preview' ? 'show active' : ''}`}
           role="tabpanel"
         >
-          <div className={`preview-wrap preview-scroll-wrap ${transparentBackgroundClassName}`}>
+          <div
+            ref={previewScrollWrapRef}
+            className={`preview-wrap preview-scroll-wrap ${transparentBackgroundClassName} ${previewDataUrl ? 'is-draggable' : ''} ${isPreviewPanning ? 'is-dragging' : ''}`}
+            onPointerDown={onPreviewPointerDown}
+            onPointerMove={onPreviewPointerMove}
+            onPointerUp={onPreviewPointerUp}
+            onPointerCancel={onPreviewPointerCancel}
+          >
             {previewDataUrl ? (
               <div className="preview-scroll-content">
                 <img
@@ -164,6 +261,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
                   className="preview-image preview-scroll-image"
                   width={canvasSize}
                   height={canvasSize}
+                  draggable={false}
                 />
               </div>
             ) : null}
@@ -258,7 +356,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
                     <div className="tile-preview-layer-actions">
                       <button
                         type="button"
-                        className="canvas-copy-btn"
+                        className="tile-preview-layer-action-btn tile-preview-layer-action-btn-danger"
                         onClick={() => removeTilePreviewLayer(layer.id)}
                         title="削除"
                         aria-label="削除"
@@ -293,7 +391,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
           <div className="animation-preview-controls mt-2">
             <button
               type="button"
-              className="btn btn-sm btn-outline-secondary animation-preview-icon-button"
+              className="btn btn-sm animation-preview-icon-button animation-preview-control-btn animation-preview-control-btn-add"
               onClick={addAnimationFrame}
               disabled={!canAddAnimationFrame}
               aria-label="現在の選択範囲をアニメーションフレームに追加"
@@ -304,7 +402,11 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
             </button>
             <button
               type="button"
-              className="btn btn-sm btn-outline-secondary animation-preview-icon-button"
+              className={`btn btn-sm animation-preview-icon-button animation-preview-control-btn ${
+                isAnimationPreviewPlaying
+                  ? 'animation-preview-control-btn-play animation-preview-control-btn-playing'
+                  : 'animation-preview-control-btn-play'
+              }`}
               onClick={toggleAnimationPreviewPlayback}
               disabled={!canPlayAnimation}
               aria-label={isAnimationPreviewPlaying ? 'アニメーション再生を停止' : 'アニメーション再生を開始'}
@@ -328,7 +430,9 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
             </label>
             <button
               type="button"
-              className={`btn btn-sm animation-preview-icon-button ${isAnimationPreviewLoop ? 'btn-outline-primary' : 'btn-outline-secondary'}`}
+              className={`btn btn-sm animation-preview-icon-button animation-preview-control-btn animation-preview-control-btn-loop ${
+                isAnimationPreviewLoop ? 'animation-preview-control-btn-active' : ''
+              }`}
               onClick={() => setAnimationPreviewLoop(!isAnimationPreviewLoop)}
               aria-label="ループ再生を切り替え"
               aria-pressed={isAnimationPreviewLoop}
@@ -339,7 +443,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
             </button>
             <button
               type="button"
-              className="btn btn-sm btn-outline-danger animation-preview-icon-button ms-auto"
+              className="btn btn-sm animation-preview-icon-button animation-preview-control-btn animation-preview-control-btn-clear ms-auto"
               onClick={clearAnimationFrames}
               disabled={animationFrames.length === 0}
               aria-label="アニメーションフレームをすべて削除"
@@ -376,7 +480,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
                   <div className="animation-frame-actions">
                     <button
                       type="button"
-                      className="canvas-copy-btn"
+                      className="animation-frame-action-btn animation-frame-action-btn-neutral"
                       onClick={() => moveAnimationFrame(frame.id, 'up')}
                       disabled={index === 0}
                       title="上へ"
@@ -386,7 +490,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
                     </button>
                     <button
                       type="button"
-                      className="canvas-copy-btn"
+                      className="animation-frame-action-btn animation-frame-action-btn-neutral"
                       onClick={() => moveAnimationFrame(frame.id, 'down')}
                       disabled={index === animationFrames.length - 1}
                       title="下へ"
@@ -396,7 +500,7 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
                     </button>
                     <button
                       type="button"
-                      className="canvas-copy-btn"
+                      className="animation-frame-action-btn animation-frame-action-btn-danger"
                       onClick={() => removeAnimationFrame(frame.id)}
                       title="削除"
                       aria-label="削除"
