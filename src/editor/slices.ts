@@ -28,8 +28,27 @@ export type { EditorSlice };
 
 export type SliceResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
 
-export const SLICE_CANVAS_EDGE_HIT_PADDING_PX = 12;
 export const SLICE_RESIZE_HANDLE_ORDER: SliceResizeHandle[] = ['tl', 'tc', 'tr', 'ml', 'mr', 'bl', 'bc', 'br'];
+
+type CanvasClientRect = Pick<DOMRectReadOnly, 'left' | 'right' | 'top' | 'bottom'>;
+
+export function isClientWithinCanvasMargin(
+  rect: CanvasClientRect,
+  clientX: number,
+  clientY: number,
+  marginPx: number
+): boolean {
+  return (
+    clientX >= rect.left - marginPx &&
+    clientX <= rect.right + marginPx &&
+    clientY >= rect.top - marginPx &&
+    clientY <= rect.bottom + marginPx
+  );
+}
+
+export function isClientInsideCanvasRect(rect: CanvasClientRect, clientX: number, clientY: number): boolean {
+  return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+}
 
 export function cloneSlices(slices: EditorSlice[]): EditorSlice[] {
   return slices.map((slice) => ({

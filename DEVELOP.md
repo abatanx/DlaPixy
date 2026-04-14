@@ -43,6 +43,7 @@ Notes:
 
 ### 4.2 Selection / Floating Operations
 - Rectangular selection, select-all, copy, delete, paste
+- The visible stage margin around the canvas also accepts Select drag-start and clear-click behavior via edge-cell clamping
 - OS clipboard image paste is supported
 - Floating paste / move supports:
   - drag move

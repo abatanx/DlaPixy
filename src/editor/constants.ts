@@ -22,6 +22,8 @@ export const DEFAULT_ZOOM = 3;
 export const MIN_ZOOM = 1;
 // 表示倍率の上限。
 export const MAX_ZOOM = 12;
+// キャンバス周辺に表示する共通余白。
+export const CANVAS_STAGE_VISIBLE_MARGIN_PX = 48;
 // Undo履歴の保持上限件数。
 export const MAX_UNDO = 40;
 // キャンバスサイズの下限。

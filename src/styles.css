@@ -112,18 +112,21 @@ body {
 }
 
 .canvas-stage {
-  --floating-stage-padding: 0.5rem;
+  --canvas-stage-visible-margin: 0.5rem;
+  --canvas-stage-visible-background: rgba(255, 255, 255, 0.96);
+  --canvas-stage-outer-background: #f7f9fc;
   overflow: auto;
   width: 100%;
   flex: 1 1 0;
   min-height: 0;
   max-height: none;
   align-items: flex-start;
-  padding: var(--floating-stage-padding);
+  padding: var(--canvas-stage-visible-margin);
+  background: var(--canvas-stage-outer-background);
 }
 
 .canvas-stage-with-toolbar {
-  padding-right: calc(4.75rem + var(--floating-stage-padding));
+  padding-right: calc(4.75rem + var(--canvas-stage-visible-margin));
 }
 
 .canvas-stage.is-panning {
@@ -750,6 +753,8 @@ body {
   position: relative;
   flex: 0 0 auto;
   overflow: visible;
+  background: var(--canvas-stage-visible-background);
+  box-shadow: 0 0 0 var(--canvas-stage-visible-margin) var(--canvas-stage-visible-background);
 }
 
 .canvas-floating-visual {

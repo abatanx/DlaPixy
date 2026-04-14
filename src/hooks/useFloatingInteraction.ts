@@ -23,6 +23,10 @@ type DrawState = {
   selectionStart: { x: number; y: number } | null;
   selectionMoved: boolean;
   clearSelectionOnMouseUp: boolean;
+  startedFromVisibleMargin: boolean;
+  pendingMovePoint: { x: number; y: number } | null;
+  pendingMoveOrigin: { x: number; y: number } | null;
+  pendingLiftSelection: boolean;
   lastDrawCell: { x: number; y: number } | null;
   moveStartPoint: { x: number; y: number } | null;
   moveStartOrigin: { x: number; y: number } | null;
@@ -37,7 +41,7 @@ type UseFloatingInteractionOptions = {
   drawStateRef: MutableRefObject<DrawState>;
   floatingPasteRef: MutableRefObject<FloatingPasteState | null>;
   floatingResizeRef: MutableRefObject<FloatingResizeSession | null>;
-  floatingStagePaddingCells: number;
+  floatingInteractionStagePaddingCells: number;
   resolveCanvasPointFromClient: (clientX: number, clientY: number) => { x: number; y: number } | null;
   applyFloatingPasteBlock: (
     floating: FloatingPasteState,
@@ -58,7 +62,7 @@ export function useFloatingInteraction({
   drawStateRef,
   floatingPasteRef,
   floatingResizeRef,
-  floatingStagePaddingCells,
+  floatingInteractionStagePaddingCells,
   resolveCanvasPointFromClient,
   applyFloatingPasteBlock,
   setStatusText
@@ -100,6 +104,10 @@ export function useFloatingInteraction({
       drawStateRef.current.selectionStart = null;
       drawStateRef.current.selectionMoved = false;
       drawStateRef.current.clearSelectionOnMouseUp = false;
+      drawStateRef.current.startedFromVisibleMargin = false;
+      drawStateRef.current.pendingMovePoint = null;
+      drawStateRef.current.pendingMoveOrigin = null;
+      drawStateRef.current.pendingLiftSelection = false;
       drawStateRef.current.lastDrawCell = null;
       drawStateRef.current.moveStartPoint = point;
       drawStateRef.current.moveStartOrigin = origin;
@@ -114,6 +122,10 @@ export function useFloatingInteraction({
       drawStateRef.current.selectionStart = null;
       drawStateRef.current.selectionMoved = false;
       drawStateRef.current.clearSelectionOnMouseUp = false;
+      drawStateRef.current.startedFromVisibleMargin = false;
+      drawStateRef.current.pendingMovePoint = null;
+      drawStateRef.current.pendingMoveOrigin = null;
+      drawStateRef.current.pendingLiftSelection = false;
       drawStateRef.current.lastDrawCell = null;
       drawStateRef.current.moveStartPoint = null;
       drawStateRef.current.moveStartOrigin = null;
@@ -148,7 +160,7 @@ export function useFloatingInteraction({
           floating,
           floatingResizeRef.current.startRect,
           canvasSize,
-          floatingStagePaddingCells
+          floatingInteractionStagePaddingCells
         );
         if (
           nextRect.x !== floating.x ||
@@ -194,7 +206,7 @@ export function useFloatingInteraction({
       drawStateRef,
       floatingPasteRef,
       floatingResizeRef,
-      floatingStagePaddingCells,
+      floatingInteractionStagePaddingCells,
       resolveCanvasPointFromClient
     ]
   );

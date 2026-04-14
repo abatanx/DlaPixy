@@ -18,8 +18,9 @@ import {
 import { EditorToolbar } from './EditorToolbar';
 import type { FloatingResizeHandle } from '../editor/floating-interaction';
 import {
-  SLICE_CANVAS_EDGE_HIT_PADDING_PX,
   SLICE_RESIZE_HANDLE_ORDER,
+  isClientInsideCanvasRect,
+  isClientWithinCanvasMargin,
   getSliceHandleStyle,
   type SliceResizeHandle
 } from '../editor/slices';
@@ -37,7 +38,7 @@ type EditorCanvasWorkspaceProps = {
   canvasStageRef: MutableRefObject<HTMLDivElement | null>;
   canvasRef: MutableRefObject<HTMLCanvasElement | null>;
   displaySize: number;
-  floatingStagePaddingPx: number;
+  canvasStageVisibleMarginPx: number;
   transparentBackgroundClassName: string;
   isPanning: boolean;
   isSpacePressed: boolean;
@@ -95,7 +96,7 @@ export function EditorCanvasWorkspace({
   canvasStageRef,
   canvasRef,
   displaySize,
-  floatingStagePaddingPx,
+  canvasStageVisibleMarginPx,
   transparentBackgroundClassName,
   isPanning,
   isSpacePressed,
@@ -163,20 +164,17 @@ export function EditorCanvasWorkspace({
       }
 
       const rect = canvasRef.current.getBoundingClientRect();
-      const isWithinExpandedCanvas =
-        clientX >= rect.left - SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
-        clientX <= rect.right + SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
-        clientY >= rect.top - SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
-        clientY <= rect.bottom + SLICE_CANVAS_EDGE_HIT_PADDING_PX;
-      const isInsideVisibleCanvas =
-        clientX >= rect.left &&
-        clientX <= rect.right &&
-        clientY >= rect.top &&
-        clientY <= rect.bottom;
+      const isWithinExpandedCanvas = isClientWithinCanvasMargin(
+        rect,
+        clientX,
+        clientY,
+        canvasStageVisibleMarginPx
+      );
+      const isInsideVisibleCanvas = isClientInsideCanvasRect(rect, clientX, clientY);
 
       setIsSliceCreateHotzoneHovered(isWithinExpandedCanvas && !isInsideVisibleCanvas);
     },
-    [canvasRef, isPanning, isSpacePressed, tool]
+    [canvasRef, canvasStageVisibleMarginPx, isPanning, isSpacePressed, tool]
   );
   const onCanvasStageMouseMove = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -196,7 +194,7 @@ export function EditorCanvasWorkspace({
           className={`card-body d-flex canvas-stage canvas-stage-with-toolbar ${isPanning ? 'is-panning' : ''} ${
             isSliceCreateHotzoneHovered ? 'is-slice-create-hotzone' : ''
           }`}
-          style={{ '--floating-stage-padding': `${floatingStagePaddingPx}px` } as CSSProperties}
+          style={{ '--canvas-stage-visible-margin': `${canvasStageVisibleMarginPx}px` } as CSSProperties}
           onMouseDown={onCanvasStageMouseDown}
           onMouseMove={onCanvasStageMouseMove}
           onMouseLeave={onCanvasStageMouseLeave}

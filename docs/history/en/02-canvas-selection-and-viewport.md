@@ -16,6 +16,7 @@
 ## Selection and Floating Operations
 - Rectangular selection supports copy, delete, paste, and direct drag-move.
 - Clicking empty stage space with Select clears the selection.
+- The visible canvas margin also behaves as a clamped edge-cell interaction zone for Select drag-start, drag-extend, and clear-click flows.
 - Click without drag in Select picks one tile aligned to current grid spacing.
 - Drawing tools respect the current selection bounds.
 - Paste accepts both DlaPixy internal clipboard data and OS clipboard images.
@@ -54,6 +55,8 @@
 - Footer status row shows `Canvas`, `Grid`, `Zoom`, and `Current File`.
 - Clicking footer labels opens the same existing modals.
 - macOS-style shortcut notation is shown in footer labels (`⌘I`, `⌘G`, `⌘R`).
+- The visible stage margin around the canvas is also the slice-create hotzone in slice mode.
+- Floating interaction padding is kept as a separate responsibility from the visible stage margin.
 
 ## Important Behavior Notes
 - Canvas resize preserves existing pixels with a top-left anchor.

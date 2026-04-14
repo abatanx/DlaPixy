@@ -37,6 +37,7 @@ import {
   type TransparentBackgroundMode
 } from '../shared/transparent-background';
 import {
+  CANVAS_STAGE_VISIBLE_MARGIN_PX,
   DEFAULT_CANVAS_SIZE,
   DEFAULT_GRID_SPACING,
   DEFAULT_PALETTE,
@@ -53,10 +54,13 @@ import type {
 import type { DrawState } from './editor/canvas-pointer';
 import {
   FLOATING_HANDLE_ORDER,
-  FLOATING_STAGE_PADDING_PX,
+  FLOATING_INTERACTION_STAGE_PADDING_PX,
   getFloatingHandleStyle
 } from './editor/floating-interaction';
-import { SLICE_CANVAS_EDGE_HIT_PADDING_PX, SLICE_RESIZE_HANDLE_ORDER } from './editor/slices';
+import {
+  SLICE_RESIZE_HANDLE_ORDER,
+  isClientWithinCanvasMargin
+} from './editor/slices';
 import { collectPaletteUsageFromPixels, type PaletteUsageAnalysis } from './editor/palette-sync';
 import { clonePaletteEntries, createEmptyPixels, normalizePaletteEntries } from './editor/utils';
 
@@ -110,6 +114,10 @@ export function App() {
     selectionStart: null,
     selectionMoved: false,
     clearSelectionOnMouseUp: false,
+    startedFromVisibleMargin: false,
+    pendingMovePoint: null,
+    pendingMoveOrigin: null,
+    pendingLiftSelection: false,
     lastDrawCell: null,
     moveStartPoint: null,
     moveStartOrigin: null
@@ -142,7 +150,10 @@ export function App() {
     setStatusText
   });
   const isFloatingPasteActive = floatingPasteRef.current !== null;
-  const floatingStagePaddingCells = useMemo(() => Math.max(1, Math.ceil(FLOATING_STAGE_PADDING_PX / zoom)), [zoom]);
+  const floatingInteractionStagePaddingCells = useMemo(
+    () => Math.max(1, Math.ceil(FLOATING_INTERACTION_STAGE_PADDING_PX / zoom)),
+    [zoom]
+  );
   const paletteUsage = useMemo<PaletteUsageAnalysis>(
     () => collectPaletteUsageFromPixels(pixels, canvasSize),
     [canvasSize, pixels]
@@ -450,12 +461,14 @@ export function App() {
     drawStateRef,
     floatingPasteRef,
     floatingResizeRef,
-    floatingStagePaddingCells,
+    floatingInteractionStagePaddingCells,
+    canvasStageVisibleMarginPx: CANVAS_STAGE_VISIBLE_MARGIN_PX,
     beginPan,
     updatePan,
     endPan,
     resolveCanvasPointFromClient,
     resolveCanvasCellFromClient,
+    resolveCanvasClampedCellFromClient,
     applyFloatingPasteBlock,
     liftSelectionToFloatingPaste,
     applyStrokeSegment,
@@ -646,10 +659,7 @@ export function App() {
       ) {
         const rect = canvasRef.current.getBoundingClientRect();
         const isWithinExpandedCanvas =
-          event.clientX >= rect.left - SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
-          event.clientX <= rect.right + SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
-          event.clientY >= rect.top - SLICE_CANVAS_EDGE_HIT_PADDING_PX &&
-          event.clientY <= rect.bottom + SLICE_CANVAS_EDGE_HIT_PADDING_PX;
+          isClientWithinCanvasMargin(rect, event.clientX, event.clientY, CANVAS_STAGE_VISIBLE_MARGIN_PX);
 
         if (isWithinExpandedCanvas) {
           beginCanvasInteractionFromClient(event.clientX, event.clientY, {
@@ -791,7 +801,7 @@ export function App() {
               canvasStageRef={canvasStageRef}
               canvasRef={canvasRef}
               displaySize={displaySize}
-              floatingStagePaddingPx={FLOATING_STAGE_PADDING_PX}
+              canvasStageVisibleMarginPx={CANVAS_STAGE_VISIBLE_MARGIN_PX}
               transparentBackgroundClassName={transparentBackgroundClassName}
               isPanning={isPanning}
               isSpacePressed={isSpacePressed}

@@ -27,6 +27,9 @@ export function useFloatingSelectionState({
   const clearFloatingPaste = useCallback(() => {
     floatingPasteRef.current = null;
     floatingResizeRef.current = null;
+    drawStateRef.current.pendingMovePoint = null;
+    drawStateRef.current.pendingMoveOrigin = null;
+    drawStateRef.current.pendingLiftSelection = false;
     drawStateRef.current.moveStartPoint = null;
     drawStateRef.current.moveStartOrigin = null;
   }, [drawStateRef]);

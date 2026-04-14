@@ -24,7 +24,7 @@ export type FloatingResizeSession = {
 };
 
 export const FLOATING_HANDLE_RADIUS = 10;
-export const FLOATING_STAGE_PADDING_PX = 72;
+export const FLOATING_INTERACTION_STAGE_PADDING_PX = 72;
 export const FLOATING_HANDLE_ORDER: FloatingResizeHandle[] = ['tl', 'tc', 'tr', 'ml', 'mr', 'bl', 'bc', 'br'];
 
 function clampNumber(value: number, min: number, max: number): number {

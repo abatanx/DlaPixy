@@ -7,6 +7,7 @@ import { useCallback, useEffect, type MouseEvent as ReactMouseEvent, type Mutabl
 import type { DrawState } from '../editor/canvas-pointer';
 import type { FloatingPasteState } from '../editor/floating-paste';
 import type { FloatingResizeSession } from '../editor/floating-interaction';
+import { isClientWithinCanvasMargin } from '../editor/slices';
 import type { Selection, Tool } from '../editor/types';
 import { pointInSelection } from '../editor/utils';
 import { useFloatingInteraction } from './useFloatingInteraction';
@@ -34,12 +35,14 @@ type UseCanvasPointerInteractionsOptions = {
   drawStateRef: MutableRefObject<DrawState>;
   floatingPasteRef: MutableRefObject<FloatingPasteState | null>;
   floatingResizeRef: MutableRefObject<FloatingResizeSession | null>;
-  floatingStagePaddingCells: number;
+  floatingInteractionStagePaddingCells: number;
+  canvasStageVisibleMarginPx: number;
   beginPan: (clientX: number, clientY: number) => void;
   updatePan: (clientX: number, clientY: number) => void;
   endPan: () => void;
   resolveCanvasPointFromClient: (clientX: number, clientY: number) => { x: number; y: number } | null;
   resolveCanvasCellFromClient: (clientX: number, clientY: number) => { x: number; y: number } | null;
+  resolveCanvasClampedCellFromClient: (clientX: number, clientY: number) => { x: number; y: number } | null;
   applyFloatingPasteBlock: (
     floating: FloatingPasteState,
     nextX: number,
@@ -75,12 +78,14 @@ export function useCanvasPointerInteractions({
   drawStateRef,
   floatingPasteRef,
   floatingResizeRef,
-  floatingStagePaddingCells,
+  floatingInteractionStagePaddingCells,
+  canvasStageVisibleMarginPx,
   beginPan,
   updatePan,
   endPan,
   resolveCanvasPointFromClient,
   resolveCanvasCellFromClient,
+  resolveCanvasClampedCellFromClient,
   applyFloatingPasteBlock,
   liftSelectionToFloatingPaste,
   applyStrokeSegment,
@@ -124,11 +129,76 @@ export function useCanvasPointerInteractions({
     drawStateRef.current.selectionStart = null;
     drawStateRef.current.selectionMoved = false;
     drawStateRef.current.clearSelectionOnMouseUp = false;
+    drawStateRef.current.startedFromVisibleMargin = false;
+    drawStateRef.current.pendingMovePoint = null;
+    drawStateRef.current.pendingMoveOrigin = null;
+    drawStateRef.current.pendingLiftSelection = false;
     drawStateRef.current.lastDrawCell = null;
     drawStateRef.current.moveStartPoint = null;
     drawStateRef.current.moveStartOrigin = null;
     floatingResizeRef.current = null;
   }, [drawStateRef, floatingResizeRef]);
+
+  const clearSelectionState = useCallback(() => {
+    clearFloatingPaste();
+    setSelection(null);
+    setStatusText('選択を解除しました', 'success');
+  }, [clearFloatingPaste, setSelection, setStatusText]);
+
+  const startSelectionInteraction = useCallback(
+    (
+      cell: { x: number; y: number },
+      {
+        clearSelectionOnMouseUp,
+        startedFromVisibleMargin
+      }: { clearSelectionOnMouseUp: boolean; startedFromVisibleMargin: boolean }
+    ) => {
+      clearFloatingPaste();
+      pushUndo();
+      drawStateRef.current.active = true;
+      drawStateRef.current.selectionStart = cell;
+      drawStateRef.current.selectionMoved = false;
+      drawStateRef.current.clearSelectionOnMouseUp = clearSelectionOnMouseUp;
+      drawStateRef.current.startedFromVisibleMargin = startedFromVisibleMargin;
+      drawStateRef.current.pendingMovePoint = null;
+      drawStateRef.current.pendingMoveOrigin = null;
+      drawStateRef.current.pendingLiftSelection = false;
+      drawStateRef.current.lastDrawCell = null;
+      drawStateRef.current.moveStartPoint = null;
+      drawStateRef.current.moveStartOrigin = null;
+
+      if (!clearSelectionOnMouseUp && !startedFromVisibleMargin && gridSpacing > 0) {
+        setSelection({ x: cell.x, y: cell.y, w: 1, h: 1 });
+      }
+    },
+    [clearFloatingPaste, drawStateRef, gridSpacing, pushUndo, setSelection]
+  );
+
+  const beginPendingFloatingMove = useCallback(
+    (
+      point: { x: number; y: number },
+      origin: { x: number; y: number },
+      {
+        liftSelectionOnMove
+      }: {
+        liftSelectionOnMove: boolean;
+      }
+    ) => {
+      drawStateRef.current.active = true;
+      drawStateRef.current.selectionStart = null;
+      drawStateRef.current.selectionMoved = false;
+      drawStateRef.current.clearSelectionOnMouseUp = false;
+      drawStateRef.current.startedFromVisibleMargin = false;
+      drawStateRef.current.pendingMovePoint = point;
+      drawStateRef.current.pendingMoveOrigin = origin;
+      drawStateRef.current.pendingLiftSelection = liftSelectionOnMove;
+      drawStateRef.current.lastDrawCell = null;
+      drawStateRef.current.moveStartPoint = null;
+      drawStateRef.current.moveStartOrigin = null;
+      floatingResizeRef.current = null;
+    },
+    [drawStateRef, floatingResizeRef]
+  );
 
   const {
     resolveFloatingResizeHandleFromClientPoint,
@@ -145,11 +215,138 @@ export function useCanvasPointerInteractions({
     drawStateRef,
     floatingPasteRef,
     floatingResizeRef,
-    floatingStagePaddingCells,
+    floatingInteractionStagePaddingCells,
     resolveCanvasPointFromClient,
     applyFloatingPasteBlock,
     setStatusText
   });
+
+  const beginSelectInteractionFromClient = useCallback(
+    (clientX: number, clientY: number): boolean => {
+      const cell = resolveCanvasClampedCellFromClient(clientX, clientY);
+      if (!cell) {
+        return false;
+      }
+
+      const pointer = resolveCanvasPointFromClient(clientX, clientY) ?? cell;
+      if (floatingPasteRef.current && selection && pointInSelection(cell, selection)) {
+        beginPendingFloatingMove(pointer, { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y }, {
+          liftSelectionOnMove: false
+        });
+        return true;
+      }
+
+      if (selection && pointInSelection(cell, selection)) {
+        beginPendingFloatingMove(pointer, { x: selection.x, y: selection.y }, {
+          liftSelectionOnMove: true
+        });
+        return true;
+      }
+
+      startSelectionInteraction(cell, {
+        clearSelectionOnMouseUp: selection !== null && !pointInSelection(cell, selection),
+        startedFromVisibleMargin: false
+      });
+      return true;
+    },
+    [
+      beginPendingFloatingMove,
+      floatingPasteRef,
+      resolveCanvasClampedCellFromClient,
+      resolveCanvasPointFromClient,
+      selection,
+      startSelectionInteraction
+    ]
+  );
+
+  const beginSelectInteractionFromVisibleMargin = useCallback(
+    (clientX: number, clientY: number): boolean => {
+      const cell = resolveCanvasClampedCellFromClient(clientX, clientY);
+      if (!cell) {
+        return false;
+      }
+
+      startSelectionInteraction(cell, {
+        clearSelectionOnMouseUp: selection !== null,
+        startedFromVisibleMargin: true
+      });
+      return true;
+    },
+    [
+      resolveCanvasClampedCellFromClient,
+      selection,
+      startSelectionInteraction
+    ]
+  );
+
+  const updateSelectInteractionFromClient = useCallback(
+    (clientX: number, clientY: number): boolean => {
+      if (tool !== 'select') {
+        return false;
+      }
+      if (!drawStateRef.current.active || drawStateRef.current.moveStartPoint !== null || floatingResizeRef.current) {
+        return false;
+      }
+
+      const start = drawStateRef.current.selectionStart;
+      const pendingMovePoint = drawStateRef.current.pendingMovePoint;
+      const pendingMoveOrigin = drawStateRef.current.pendingMoveOrigin;
+      if (pendingMovePoint && pendingMoveOrigin) {
+        const pointer = resolveCanvasPointFromClient(clientX, clientY);
+        if (!pointer) {
+          return true;
+        }
+
+        const nextX = Math.round(pendingMoveOrigin.x + (pointer.x - pendingMovePoint.x));
+        const nextY = Math.round(pendingMoveOrigin.y + (pointer.y - pendingMovePoint.y));
+        if (nextX === pendingMoveOrigin.x && nextY === pendingMoveOrigin.y) {
+          return true;
+        }
+
+        if (drawStateRef.current.pendingLiftSelection) {
+          const floating = liftSelectionToFloatingPaste();
+          if (!floating) {
+            return true;
+          }
+        } else if (!floatingPasteRef.current) {
+          return true;
+        }
+
+        beginFloatingMove(pendingMovePoint, pendingMoveOrigin);
+        setStatusText('選択範囲を移動中', 'info');
+        return updateFloatingInteractionFromClient(clientX, clientY);
+      }
+      if (!start) {
+        return false;
+      }
+
+      const cell = resolveCanvasClampedCellFromClient(clientX, clientY);
+      if (!cell) {
+        return false;
+      }
+
+      if (cell.x !== start.x || cell.y !== start.y) {
+        drawStateRef.current.selectionMoved = true;
+        drawStateRef.current.clearSelectionOnMouseUp = false;
+      }
+      setSelection(normalizeSelection(start.x, start.y, cell.x, cell.y));
+      return true;
+    },
+    [
+      beginFloatingMove,
+      drawStateRef,
+      floatingPasteRef,
+      floatingResizeRef,
+      liftSelectionToFloatingPaste,
+      normalizeSelection,
+      resolveCanvasClampedCellFromClient,
+      resolveCanvasPointFromClient,
+      setSelection,
+      setStatusText,
+      tool,
+      updateFloatingInteractionFromClient
+    ]
+  );
 
   const onMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -172,24 +369,12 @@ export function useCanvasPointerInteractions({
         return;
       }
 
+      if (tool === 'select' && beginSelectInteractionFromClient(event.clientX, event.clientY)) {
+        return;
+      }
+
       const cell = getCellFromEvent(event);
       if (!cell) {
-        return;
-      }
-      const pointer = resolveCanvasPointFromClient(event.clientX, event.clientY) ?? cell;
-
-      if (tool === 'select' && floatingPasteRef.current && pointInSelection(cell, selection)) {
-        beginFloatingMove(pointer, { x: floatingPasteRef.current.x, y: floatingPasteRef.current.y });
-        setStatusText('選択範囲を移動中', 'info');
-        return;
-      }
-
-      if (tool === 'select' && selection && pointInSelection(cell, selection)) {
-        const floating = liftSelectionToFloatingPaste();
-        if (floating) {
-          beginFloatingMove(pointer, { x: floating.x, y: floating.y });
-          setStatusText('選択範囲を移動中', 'info');
-        }
         return;
       }
 
@@ -209,43 +394,29 @@ export function useCanvasPointerInteractions({
       clearFloatingPaste();
       pushUndo();
       drawStateRef.current.active = true;
-
-      if (tool === 'select') {
-        const shouldClearOnClick =
-          selection !== null && !pointInSelection(cell, selection) && !floatingPasteRef.current;
-        drawStateRef.current.selectionStart = cell;
-        drawStateRef.current.selectionMoved = false;
-        drawStateRef.current.clearSelectionOnMouseUp = shouldClearOnClick;
-        drawStateRef.current.lastDrawCell = null;
-        drawStateRef.current.moveStartPoint = null;
-        drawStateRef.current.moveStartOrigin = null;
-        if (!shouldClearOnClick && gridSpacing > 0) {
-          setSelection({ x: cell.x, y: cell.y, w: 1, h: 1 });
-        }
-      } else {
-        applyStrokeSegment(cell, cell, tool === 'eraser');
-        drawStateRef.current.selectionMoved = false;
-        drawStateRef.current.clearSelectionOnMouseUp = false;
-        drawStateRef.current.lastDrawCell = cell;
-        drawStateRef.current.moveStartPoint = null;
-        drawStateRef.current.moveStartOrigin = null;
-      }
+      applyStrokeSegment(cell, cell, tool === 'eraser');
+      drawStateRef.current.selectionMoved = false;
+      drawStateRef.current.clearSelectionOnMouseUp = false;
+      drawStateRef.current.startedFromVisibleMargin = false;
+      drawStateRef.current.pendingMovePoint = null;
+      drawStateRef.current.pendingMoveOrigin = null;
+      drawStateRef.current.pendingLiftSelection = false;
+      drawStateRef.current.lastDrawCell = cell;
+      drawStateRef.current.moveStartPoint = null;
+      drawStateRef.current.moveStartOrigin = null;
     },
     [
       applyStrokeSegment,
-      beginFloatingMove,
+      beginSelectInteractionFromClient,
       beginFloatingResize,
       beginPan,
       clearFloatingPaste,
       createFloodFillResult,
       drawStateRef,
       getCellFromEvent,
-      gridSpacing,
       isSpacePressed,
-      liftSelectionToFloatingPaste,
       pixels,
       pushUndo,
-      resolveCanvasPointFromClient,
       resolveFloatingResizeHandleFromClientPoint,
       resetDrawState,
       selection,
@@ -280,21 +451,13 @@ export function useCanvasPointerInteractions({
         return;
       }
 
-      const cell = hoveredCell;
-      if (!cell) {
+      if (tool === 'select') {
+        updateSelectInteractionFromClient(event.clientX, event.clientY);
         return;
       }
 
-      if (tool === 'select') {
-        const start = drawStateRef.current.selectionStart;
-        if (!start) {
-          return;
-        }
-        if (cell.x !== start.x || cell.y !== start.y) {
-          drawStateRef.current.selectionMoved = true;
-          drawStateRef.current.clearSelectionOnMouseUp = false;
-        }
-        setSelection(normalizeSelection(start.x, start.y, cell.x, cell.y));
+      const cell = hoveredCell;
+      if (!cell) {
         return;
       }
 
@@ -343,11 +506,11 @@ export function useCanvasPointerInteractions({
       selectStart !== null &&
       !drawStateRef.current.selectionMoved &&
       !drawStateRef.current.clearSelectionOnMouseUp &&
+      !drawStateRef.current.startedFromVisibleMargin &&
       !wasResizingPaste;
 
     if (shouldClearSelection) {
-      setSelection(null);
-      setStatusText('選択を解除しました', 'success');
+      clearSelectionState();
     }
     if (shouldSelectSingleTile && selectStart) {
       if (gridSpacing > 0) {
@@ -373,6 +536,7 @@ export function useCanvasPointerInteractions({
     panStateRef,
     resetDrawState,
     resolveSingleTileSelection,
+    clearSelectionState,
     setSelection,
     setStatusText,
     tool
@@ -380,28 +544,30 @@ export function useCanvasPointerInteractions({
 
   const onMouseLeaveCanvas = useCallback(() => {
     canvasPointerRef.current = null;
-    const hasFloatingInteractionActive =
-      floatingPasteRef.current !== null &&
-      (drawStateRef.current.moveStartPoint !== null || floatingResizeRef.current !== null);
-    if (!hasFloatingInteractionActive && !panStateRef.current.active) {
+    const shouldKeepInteractionAlive = panStateRef.current.active || (tool === 'select' && drawStateRef.current.active);
+    if (!shouldKeepInteractionAlive) {
       onMouseUp();
     }
     clearHoveredPixelInfo();
-  }, [canvasPointerRef, clearHoveredPixelInfo, drawStateRef, floatingPasteRef, floatingResizeRef, onMouseUp, panStateRef]);
+  }, [canvasPointerRef, clearHoveredPixelInfo, drawStateRef, onMouseUp, panStateRef, tool]);
 
   useEffect(() => {
     const onWindowMouseMove = (event: MouseEvent) => {
+      if (panStateRef.current.active) {
+        updatePan(event.clientX, event.clientY);
+        return;
+      }
       if (!drawStateRef.current.active) {
         return;
       }
-      updateFloatingInteractionFromClient(event.clientX, event.clientY);
+      if (updateFloatingInteractionFromClient(event.clientX, event.clientY)) {
+        return;
+      }
+      updateSelectInteractionFromClient(event.clientX, event.clientY);
     };
 
     const onWindowMouseUp = () => {
-      const hasFloatingInteractionActive =
-        floatingPasteRef.current !== null &&
-        (drawStateRef.current.moveStartPoint !== null || floatingResizeRef.current !== null);
-      if (!hasFloatingInteractionActive) {
+      if (!drawStateRef.current.active && !panStateRef.current.active) {
         return;
       }
       onMouseUp();
@@ -414,7 +580,7 @@ export function useCanvasPointerInteractions({
       window.removeEventListener('mousemove', onWindowMouseMove);
       window.removeEventListener('mouseup', onWindowMouseUp);
     };
-  }, [drawStateRef, floatingPasteRef, floatingResizeRef, onMouseUp, updateFloatingInteractionFromClient]);
+  }, [drawStateRef, onMouseUp, panStateRef, updateFloatingInteractionFromClient, updatePan, updateSelectInteractionFromClient]);
 
   const onCanvasStageMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -424,15 +590,42 @@ export function useCanvasPointerInteractions({
       if (isSpacePressed || isPanning) {
         return;
       }
-      if (tool !== 'select' || !selection || floatingPasteRef.current) {
+      if (tool !== 'select') {
+        return;
+      }
+
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const isWithinVisibleMargin = isClientWithinCanvasMargin(
+          rect,
+          event.clientX,
+          event.clientY,
+          canvasStageVisibleMarginPx
+        );
+        if (isWithinVisibleMargin && beginSelectInteractionFromVisibleMargin(event.clientX, event.clientY)) {
+          event.preventDefault();
+          return;
+        }
+      }
+
+      if (!selection) {
         return;
       }
 
       event.preventDefault();
-      setSelection(null);
-      setStatusText('選択を解除しました', 'success');
+      clearSelectionState();
     },
-    [floatingPasteRef, isPanning, isSpacePressed, selection, setSelection, setStatusText, tool]
+    [
+      beginSelectInteractionFromVisibleMargin,
+      canvasRef,
+      canvasStageVisibleMarginPx,
+      clearSelectionState,
+      isPanning,
+      isSpacePressed,
+      selection,
+      tool
+    ]
   );
 
   return {
