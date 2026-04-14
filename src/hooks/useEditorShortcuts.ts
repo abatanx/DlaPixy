@@ -15,6 +15,7 @@ type UseEditorShortcutsOptions = {
   selectionRotateRequestActive: boolean;
   hasSelection: boolean;
   hasSelectedSlices: boolean;
+  hasMultiSelectedSlices: boolean;
   floatingPasteRef: { current: unknown };
   tool: Tool;
   setTool: Dispatch<SetStateAction<Tool>>;
@@ -71,6 +72,7 @@ export function useEditorShortcuts({
   selectionRotateRequestActive,
   hasSelection,
   hasSelectedSlices,
+  hasMultiSelectedSlices,
   floatingPasteRef,
   tool,
   setTool,
@@ -115,11 +117,16 @@ export function useEditorShortcuts({
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isEditableElement(event.target) || selectionRotateRequestActive) {
+      const withSystemKey = event.metaKey || event.ctrlKey;
+      const isPlainDeleteKey =
+        !withSystemKey && !event.altKey && (event.key === 'Delete' || event.key === 'Backspace');
+      const allowMultiSliceDeleteFromEditable =
+        isPlainDeleteKey && tool === 'slice' && hasMultiSelectedSlices;
+
+      if ((isEditableElement(event.target) && !allowMultiSliceDeleteFromEditable) || selectionRotateRequestActive) {
         return;
       }
 
-      const withSystemKey = event.metaKey || event.ctrlKey;
       if (withSystemKey && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         doUndo();
@@ -408,6 +415,7 @@ export function useEditorShortcuts({
     floatingPasteRef,
     focusHoveredPixel,
     freezeHoveredPixelInfo,
+    hasMultiSelectedSlices,
     hasSelection,
     hasSelectedSlices,
     activateSliceTool,

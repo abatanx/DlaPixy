@@ -177,6 +177,8 @@ PNG の隣に `<filename>.dla-pixy.json` として保存する。
 - グリッドは「線間隔」であって、キャンバス解像度ではない。
 - キャンバスサイズ変更は左上基準で既存ピクセルを保持する。
 - サイズ変更時は選択状態と floating 状態を解除する。
+- 新規 slice / 自動 slice の export variant は全未選択で始まるが、`baseVariant` 自体は export サイズ計算の基準として持つ。
+- `variants` を持たない古い sidecar を読むときは、従来挙動維持のため resolved 後の `baseVariant` を有効扱いにする。
 - 透過背景モードはアプリ UI 状態であり、PNG メタ情報ではない。
 - パレット caption 最大長は `shared/palette.ts` で管理する。
 - TypeScript 設定は実行環境ごとに分割している。

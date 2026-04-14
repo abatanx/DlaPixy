@@ -72,3 +72,7 @@
 - Existing sidecars without export settings still load by normalizing missing values to defaults.
 - Slice sidebar export controls now edit slice state directly instead of keeping renderer-only temporary state.
 - As a result, undo / save / load / duplicate / paste preserve export settings.
+
+## Update (2026-04-14)
+- New slices and auto slices now start with all export variants unchecked for every target group.
+- When loading older sidecars that omit `variants`, the resolved `baseVariant` is treated as enabled so previously implied selections still restore.

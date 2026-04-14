@@ -591,6 +591,7 @@ export function App() {
     selectionRotateRequestActive: selectionRotateRequest !== null,
     hasSelection: selection !== null,
     hasSelectedSlices: selectedSliceIds.length > 0,
+    hasMultiSelectedSlices: selectedSliceIds.length > 1,
     floatingPasteRef,
     tool,
     setTool,

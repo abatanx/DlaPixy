@@ -177,6 +177,8 @@ Rules:
 - Grid means overlay spacing, not canvas resolution.
 - Canvas resize keeps existing pixels anchored to top-left.
 - Resize clears current selection and floating state.
+- New slices and auto slices start with all export variants unchecked; `baseVariant` still defines export size calculations.
+- When loading older sidecars that omit `variants`, the resolved `baseVariant` is treated as enabled to preserve legacy export behavior.
 - Transparent background mode is app-level UI state, not PNG document metadata.
 - Palette caption max length is managed in `shared/palette.ts`.
 - TypeScript config is split by runtime:

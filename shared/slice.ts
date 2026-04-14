@@ -169,7 +169,7 @@ function createDefaultSliceExportTargetSettings(
     baseVariant,
     baseAxis: 'width',
     baseSizeInput: String(Math.max(1, Math.trunc(axisSize))),
-    variants: Object.fromEntries(variants.map((variant) => [variant.key, variant.key === baseVariant])),
+    variants: createSliceExportVariantSelectionMap(variants),
     directoryTemplates
   };
 }
@@ -187,6 +187,10 @@ function normalizeSliceExportTargetSettings(
       ? candidate.baseVariant
       : defaults.baseVariant;
   const baseAxis = candidate.baseAxis === 'height' ? 'height' : defaults.baseAxis;
+  const hasExplicitVariantValue = variants.some((variant) => typeof candidateVariants[variant.key] === 'boolean');
+  // Older sidecars may omit `variants`; in that case preserve the historical
+  // behavior where the resolved base variant was implicitly enabled.
+  const legacyFallbackVariants = createSliceExportVariantSelectionMap(variants, [baseVariant]);
 
   return {
     baseVariant,
@@ -198,7 +202,9 @@ function normalizeSliceExportTargetSettings(
         variant.key,
         typeof candidateVariants[variant.key] === 'boolean'
           ? candidateVariants[variant.key]
-          : defaults.variants[variant.key]
+          : hasExplicitVariantValue
+            ? defaults.variants[variant.key]
+            : legacyFallbackVariants[variant.key]
       ])
     ) as Record<string, boolean>,
     directoryTemplates:
@@ -213,6 +219,14 @@ function cloneSliceExportTargetSettings(settings: SliceExportTargetSettings): Sl
     ...settings,
     variants: { ...settings.variants }
   };
+}
+
+function createSliceExportVariantSelectionMap(
+  variants: SliceExportVariantDefinition[],
+  selectedKeys: Iterable<string> = []
+): Record<string, boolean> {
+  const selectedKeySet = new Set(selectedKeys);
+  return Object.fromEntries(variants.map((variant) => [variant.key, selectedKeySet.has(variant.key)]));
 }
 
 function isSliceExportTargetSettings(

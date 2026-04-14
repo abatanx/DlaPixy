@@ -72,3 +72,7 @@
 - export settings が無い既存 sidecar も、既定値へ正規化して読み込める。
 - slice sidebar の export controls は renderer-only の一時 state をやめ、slice 本体 state を直接編集するようにした。
 - その結果、undo / save / load / duplicate / paste でも export settings を維持する。
+
+## 更新メモ (2026-04-14)
+- 新規 slice / 自動 slice は、全 target の export variant が未選択で始まる。
+- `variants` を持たない古い sidecar を読むときは、従来の暗黙選択を保つため resolved 後の `baseVariant` を有効扱いにする。
