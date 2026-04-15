@@ -8,6 +8,7 @@ import type { MenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
 import type { EditorSidecar } from '../shared/sidecar';
+import type { SliceExportWriteRequest } from '../shared/slice-export-ipc';
 import type { TransparentBackgroundMode } from '../shared/transparent-background';
 
 contextBridge.exposeInMainWorld('pixelApi', {
@@ -23,7 +24,7 @@ contextBridge.exposeInMainWorld('pixelApi', {
     paletteName?: string;
   }) =>
     ipcRenderer.invoke('palette:export-gpl', args),
-  exportSliceFiles: (args: { files: Array<{ relativePath: string; base64Png: string }> }) =>
+  exportSliceFiles: (args: SliceExportWriteRequest) =>
     ipcRenderer.invoke('slice:export-files', args),
   setTransparentBackgroundMode: (mode: TransparentBackgroundMode) =>
     ipcRenderer.invoke('editor:set-transparent-background-mode', mode) as Promise<{ ok: boolean }>,

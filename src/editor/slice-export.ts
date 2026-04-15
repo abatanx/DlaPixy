@@ -8,6 +8,7 @@ import {
   GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS,
   ICO_SLICE_EXPORT_VARIANTS,
   ICNS_SLICE_EXPORT_VARIANTS,
+  SLICE_EXPORT_BUNDLE_TARGET_KEYS,
   SLICE_EXPORT_PNG_TARGET_KEYS,
   SLICE_EXPORT_TARGET_LABELS,
   SLICE_EXPORT_VARIANTS_BY_TARGET,
@@ -22,6 +23,11 @@ import {
   type SliceExportTargetSettings,
   type SliceExportVariantDefinition
 } from '../../shared/slice';
+import type {
+  SliceExportWriteBundleFile,
+  SliceExportWriteBundleMember,
+  SliceExportWritePngFile
+} from '../../shared/slice-export-ipc';
 
 type SliceExportVariantDisplayState = {
   checked: boolean;
@@ -56,6 +62,22 @@ export type SliceExportRenderPlan = SliceExportSimulation & {
   y: number;
   sourceWidth: number;
   sourceHeight: number;
+};
+
+export type SliceExportBundleMemberPlan = {
+  variantKey: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  sourceWidth: number;
+  sourceHeight: number;
+};
+
+export type SliceExportBundlePlan = {
+  target: SliceExportBundleTargetKey;
+  relativePath: string;
+  members: SliceExportBundleMemberPlan[];
 };
 
 const INVALID_SLICE_NAME_PATTERN = /[<>:"/\\|?*\u0000-\u001f]/;
@@ -208,14 +230,16 @@ export function buildSimulatedBundlePaths(args: {
   });
 }
 
-export function buildSliceExportPlans(slices: EditorSlice[]): { plans: SliceExportRenderPlan[] } | { error: string } {
+export function buildSliceExportPlans(
+  slices: EditorSlice[]
+): { plans: SliceExportRenderPlan[]; bundles: SliceExportBundlePlan[] } | { error: string } {
   if (slices.length === 0) {
     return { error: '書き出し対象のスライスがありません' };
   }
 
-  const seenNames = new Set<string>();
   const seenPaths = new Set<string>();
   const plans: SliceExportRenderPlan[] = [];
+  const bundlePlansByKey = new Map<string, SliceExportBundlePlan>();
 
   for (const slice of slices) {
     const baseName = slice.name.trim();
@@ -228,12 +252,6 @@ export function buildSliceExportPlans(slices: EditorSlice[]): { plans: SliceExpo
     if (INVALID_SLICE_NAME_PATTERN.test(baseName)) {
       return { error: `スライス名「${baseName}」に使用できない文字が含まれています` };
     }
-
-    const nameKey = baseName.toLowerCase();
-    if (seenNames.has(nameKey)) {
-      return { error: `スライス名「${baseName}」が重複しています` };
-    }
-    seenNames.add(nameKey);
 
     const exportSettings = resolveSliceExportSettings(slice);
     let hasEnabledVariant = false;
@@ -274,23 +292,88 @@ export function buildSliceExportPlans(slices: EditorSlice[]): { plans: SliceExpo
       }
     }
 
+    for (const target of SLICE_EXPORT_BUNDLE_TARGET_KEYS) {
+      const bundleSimulations = buildSimulatedBundlePaths({
+        target,
+        slice,
+        settings: exportSettings[target],
+        baseName
+      });
+      const variants = SLICE_EXPORT_VARIANTS_BY_TARGET[target];
+
+      for (const simulation of bundleSimulations) {
+        hasEnabledVariant = true;
+        const normalizedPath = normalizeRelativeOutputPath(simulation.relativePath);
+        if (!normalizedPath.ok) {
+          return {
+            error: `${SLICE_EXPORT_TARGET_LABELS[target]} の出力先が不正です: ${normalizedPath.reason}`
+          };
+        }
+
+        const bundleKey = `${target}:${normalizedPath.path.toLowerCase()}`;
+        const existingBundle = bundlePlansByKey.get(bundleKey);
+        const bundlePlan =
+          existingBundle ??
+          {
+            target,
+            relativePath: normalizedPath.path,
+            members: []
+          };
+
+        for (const variant of variants) {
+          if (!exportSettings[target].variants[variant.key]) {
+            continue;
+          }
+
+          const alreadyExists = bundlePlan.members.some((member) => member.variantKey === variant.key);
+          if (alreadyExists) {
+            return {
+              error: `${SLICE_EXPORT_TARGET_LABELS[target]} の合成対象が重複しています: ${normalizedPath.path} / ${variant.label}`
+            };
+          }
+
+          const computed = resolveComputedVariantSize(slice, exportSettings[target], variant, variants);
+          bundlePlan.members.push({
+            variantKey: variant.key,
+            width: computed.width,
+            height: computed.height,
+            x: slice.x,
+            y: slice.y,
+            sourceWidth: slice.w,
+            sourceHeight: slice.h
+          });
+        }
+
+        if (!existingBundle) {
+          const pathKey = normalizedPath.path.toLowerCase();
+          if (seenPaths.has(pathKey)) {
+            return { error: `エクスポート先が重複しています: ${normalizedPath.path}` };
+          }
+          seenPaths.add(pathKey);
+          bundlePlansByKey.set(bundleKey, bundlePlan);
+        }
+      }
+    }
+
     if (!hasEnabledVariant) {
       return { error: `スライス「${baseName}」に書き出し対象のバリアントがありません` };
     }
   }
 
-  if (plans.length === 0) {
+  const bundles = Array.from(bundlePlansByKey.values());
+  if (plans.length === 0 && bundles.length === 0) {
     return { error: '書き出し対象のバリアントがありません' };
   }
 
-  return { plans };
+  return { plans, bundles };
 }
 
 export async function renderSliceExportFiles(args: {
   canvasSize: number;
   pixels: Uint8ClampedArray;
   plans: SliceExportRenderPlan[];
-}): Promise<Array<{ relativePath: string; base64Png: string }>> {
+  bundles: SliceExportBundlePlan[];
+}): Promise<Array<SliceExportWritePngFile | SliceExportWriteBundleFile>> {
   const sourceCanvas = document.createElement('canvas');
   sourceCanvas.width = args.canvasSize;
   sourceCanvas.height = args.canvasSize;
@@ -300,7 +383,33 @@ export async function renderSliceExportFiles(args: {
   }
   sourceContext.putImageData(new ImageData(args.pixels.slice(), args.canvasSize, args.canvasSize), 0, 0);
 
-  return args.plans.map((plan) => {
+  const files: Array<SliceExportWritePngFile | SliceExportWriteBundleFile> = args.plans.map((plan) => ({
+    kind: 'png',
+    relativePath: plan.relativePath,
+    base64Png: renderPlanToBase64Png(sourceCanvas, plan)
+  }));
+
+  for (const bundle of args.bundles) {
+    const members: SliceExportWriteBundleMember[] = bundle.members.map((member) => ({
+      variantKey: member.variantKey,
+      base64Png: renderPlanToBase64Png(sourceCanvas, member)
+    }));
+
+    files.push({
+      kind: 'bundle',
+      format: bundle.target,
+      relativePath: bundle.relativePath,
+      members
+    });
+  }
+
+  return files;
+}
+
+function renderPlanToBase64Png(
+  sourceCanvas: HTMLCanvasElement,
+  plan: Pick<SliceExportBundleMemberPlan, 'x' | 'y' | 'sourceWidth' | 'sourceHeight' | 'width' | 'height'>
+): string {
     const targetCanvas = document.createElement('canvas');
     targetCanvas.width = plan.width;
     targetCanvas.height = plan.height;
@@ -323,11 +432,7 @@ export async function renderSliceExportFiles(args: {
       plan.height
     );
 
-    return {
-      relativePath: plan.relativePath,
-      base64Png: targetCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '')
-    };
-  });
+    return targetCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
 }
 
 export function getSliceExportScopeSlices(slices: EditorSlice[], selectedSliceIds: string[]): EditorSlice[] {

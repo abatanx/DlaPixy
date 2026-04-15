@@ -7,6 +7,7 @@ import type { MenuAction } from '../shared/ipc';
 import type { GplExportFormat } from '../shared/palette-gpl';
 import type { PaletteEntry } from '../shared/palette';
 import type { EditorSidecar } from '../shared/sidecar';
+import type { SliceExportWriteRequest } from '../shared/slice-export-ipc';
 import type { TransparentBackgroundMode } from '../shared/transparent-background';
 export {};
 
@@ -45,13 +46,11 @@ declare global {
         error?: 'serialize-failed' | 'write-failed';
         message?: string;
       }>;
-      exportSliceFiles: (args: {
-        files: Array<{ relativePath: string; base64Png: string }>;
-      }) => Promise<{
+      exportSliceFiles: (args: SliceExportWriteRequest) => Promise<{
         canceled: boolean;
         directoryPath?: string;
         fileCount?: number;
-        error?: 'invalid-args' | 'invalid-path' | 'duplicate-path' | 'write-failed';
+        error?: 'invalid-args' | 'invalid-path' | 'duplicate-path' | 'bundle-build-failed' | 'write-failed';
         message?: string;
       }>;
       setTransparentBackgroundMode: (mode: TransparentBackgroundMode) => Promise<{ ok: boolean }>;

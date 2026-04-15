@@ -9,6 +9,8 @@ import type { MessageBoxOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import os from 'node:os';
+import toIco from 'to-ico';
+import { Icns, IcnsImage, type OSType } from '@fiahfy/icns';
 import extractChunks from 'png-chunks-extract';
 import encodeChunks from 'png-chunks-encode';
 import type { MenuAction } from '../shared/ipc';
@@ -19,6 +21,7 @@ import {
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import { isPaletteEntryId, type PaletteEntry } from '../shared/palette';
 import { isEditorSliceId, type EditorSlice } from '../shared/slice';
+import type { SliceExportWriteBundleFile, SliceExportWriteFile, SliceExportWriteRequest } from '../shared/slice-export-ipc';
 import { SIDECAR_SCHEMA_VERSION, type EditorSidecar } from '../shared/sidecar';
 import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
@@ -35,6 +38,18 @@ const RECENT_MAX = 10;
 const PREFERENCES_FILE = 'preferences.json';
 const SIDECAR_SUFFIX = '.dla-pixy.json';
 const CLIPBOARD_MARKER_FORMAT = 'application/x-dlapixy-selection-token';
+const ICNS_OS_TYPE_BY_VARIANT_KEY: Record<string, OSType> = {
+  '16': 'icp4',
+  '16@2x': 'ic11',
+  '32': 'icp5',
+  '32@2x': 'ic12',
+  '128': 'ic07',
+  '128@2x': 'ic13',
+  '256': 'ic08',
+  '256@2x': 'ic14',
+  '512': 'ic09',
+  '512@2x': 'ic10'
+};
 
 let mainWindow: BrowserWindow | null = null;
 let preferences: AppPreferences = {
@@ -72,6 +87,74 @@ async function readFileIfExists(targetPath: string): Promise<Buffer | null> {
     }
     throw error;
   }
+}
+
+function isSliceExportWriteBundleFile(value: SliceExportWriteFile): value is SliceExportWriteBundleFile {
+  return value.kind === 'bundle';
+}
+
+function isValidSliceExportWriteFile(value: unknown): value is SliceExportWriteFile {
+  if (!isRecord(value) || typeof value.relativePath !== 'string' || typeof value.kind !== 'string') {
+    return false;
+  }
+
+  if (value.kind === 'png') {
+    return typeof value.base64Png === 'string';
+  }
+
+  if (value.kind === 'bundle') {
+    return (
+      (value.format === 'ico' || value.format === 'icns') &&
+      Array.isArray(value.members) &&
+      value.members.every(
+        (member) =>
+          isRecord(member) &&
+          typeof member.variantKey === 'string' &&
+          typeof member.base64Png === 'string'
+      )
+    );
+  }
+
+  return false;
+}
+
+async function buildSliceExportBundleBuffer(bundle: SliceExportWriteBundleFile): Promise<Buffer> {
+  if (bundle.members.length === 0) {
+    throw new Error(`${bundle.format.toUpperCase()} の合成対象がありません`);
+  }
+
+  if (bundle.format === 'ico') {
+    return toIco(
+      bundle.members.map((member) => Buffer.from(member.base64Png, 'base64')),
+      { resize: false }
+    );
+  }
+
+  return buildIcnsBuffer(bundle);
+}
+
+function buildIcnsBuffer(bundle: SliceExportWriteBundleFile): Buffer {
+  const icns = new Icns();
+  const sortedMembers = [...bundle.members].sort(
+    (left, right) => getIcnsVariantOrder(left.variantKey) - getIcnsVariantOrder(right.variantKey)
+  );
+
+  for (const member of sortedMembers) {
+    const osType = ICNS_OS_TYPE_BY_VARIANT_KEY[member.variantKey];
+    if (!osType) {
+      throw new Error(`ICNS の variant が不明です: ${member.variantKey}`);
+    }
+
+    icns.append(IcnsImage.fromPNG(Buffer.from(member.base64Png, 'base64'), osType));
+  }
+
+  return icns.data;
+}
+
+function getIcnsVariantOrder(variantKey: string): number {
+  const keys = Object.keys(ICNS_OS_TYPE_BY_VARIANT_KEY);
+  const index = keys.indexOf(variantKey);
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
 }
 
 async function resolveInitialDirectory(): Promise<string> {
@@ -636,12 +719,15 @@ ipcMain.handle(
 
 ipcMain.handle(
   'slice:export-files',
-  async (
-    _,
-    args: {
-      files: Array<{ relativePath: string; base64Png: string }>;
+  async (_, args: SliceExportWriteRequest) => {
+    if (!args || !Array.isArray(args.files)) {
+      return {
+        canceled: false,
+        error: 'invalid-args' as const,
+        message: '書き出しファイル情報が不正です'
+      };
     }
-  ) => {
+
     const initialDir = await resolveInitialDirectory();
     const result = await dialog.showOpenDialog({
       defaultPath: initialDir,
@@ -655,12 +741,12 @@ ipcMain.handle(
     const rootDirectory = result.filePaths[0];
     const normalizedRoot = path.resolve(rootDirectory);
     const seenPaths = new Set<string>();
-    const plannedWrites: Array<{ outputPath: string; base64Png: string }> = [];
+    const plannedWrites: Array<{ outputPath: string; data: Buffer }> = [];
     const rollbackEntries: Array<{ outputPath: string; previousContent: Buffer | null }> = [];
 
     try {
       for (const file of args.files) {
-        if (!file || typeof file.relativePath !== 'string' || typeof file.base64Png !== 'string') {
+        if (!isValidSliceExportWriteFile(file)) {
           return {
             canceled: false,
             error: 'invalid-args' as const,
@@ -691,10 +777,21 @@ ipcMain.handle(
           };
         }
         seenPaths.add(dedupeKey);
-        plannedWrites.push({
-          outputPath,
-          base64Png: file.base64Png
-        });
+
+        try {
+          plannedWrites.push({
+            outputPath,
+            data: isSliceExportWriteBundleFile(file)
+              ? await buildSliceExportBundleBuffer(file)
+              : Buffer.from(file.base64Png, 'base64')
+          });
+        } catch (error) {
+          return {
+            canceled: false,
+            error: 'bundle-build-failed' as const,
+            message: error instanceof Error ? error.message : 'アイコン bundle の生成に失敗しました'
+          };
+        }
       }
 
       for (const plannedWrite of plannedWrites) {
@@ -703,7 +800,7 @@ ipcMain.handle(
           previousContent: await readFileIfExists(plannedWrite.outputPath)
         });
         await fs.mkdir(path.dirname(plannedWrite.outputPath), { recursive: true });
-        await fs.writeFile(plannedWrite.outputPath, Buffer.from(plannedWrite.base64Png, 'base64'));
+        await fs.writeFile(plannedWrite.outputPath, plannedWrite.data);
       }
 
       preferences.lastDirectory = rootDirectory;

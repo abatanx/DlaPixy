@@ -390,7 +390,8 @@ export function useDocumentFileActions({
       const files = await renderSliceExportFiles({
         canvasSize,
         pixels,
-        plans: planResult.plans
+        plans: planResult.plans,
+        bundles: planResult.bundles
       });
       const result = await window.pixelApi.exportSliceFiles({ files });
       if (result.canceled) {

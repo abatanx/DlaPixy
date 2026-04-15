@@ -45,13 +45,15 @@
     }
   },
   "dependencies": {
+    "@fiahfy/icns": "^0.0.7",
     "@fortawesome/fontawesome-free": "^6.7.2",
     "bootstrap": "^5.3.3",
     "png-chunk-text": "^1.0.0",
     "png-chunks-encode": "^1.0.0",
     "png-chunks-extract": "^1.0.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "to-ico": "^1.1.5"
   },
   "devDependencies": {
     "@types/bootstrap": "^5.2.10",

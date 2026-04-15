@@ -131,31 +131,46 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     () => new Map(slices.map((slice) => [slice.id, getEnabledSliceExportTargets(slice)])),
     [slices]
   );
-  const allSimulatedPaths = useMemo(
-    () =>
-      SLICE_EXPORT_TARGET_SECTIONS.flatMap(([target]) =>
-        exportScopeSlices.flatMap((slice) =>
-          (isBundleTarget(target)
-            ? buildSimulatedBundlePaths({
-                target,
-                slice,
-                settings: resolveSliceExportSettings(slice)[target],
-                baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
-              })
-            : buildSimulatedExportPaths({
-                target,
-                slice,
-                settings: resolveSliceExportSettings(slice)[target],
-                baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
-              })
-          ).map((simulation) => ({
+  const allSimulatedPaths = useMemo(() => {
+    const files: Array<{ target: SliceExportTargetKey; relativePath: string; width: number; height: number }> = [];
+    const seenBundlePaths = new Set<string>();
+
+    for (const [target] of SLICE_EXPORT_TARGET_SECTIONS) {
+      for (const slice of exportScopeSlices) {
+        const baseName = (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice';
+        const simulations = isBundleTarget(target)
+          ? buildSimulatedBundlePaths({
+              target,
+              slice,
+              settings: resolveSliceExportSettings(slice)[target],
+              baseName
+            })
+          : buildSimulatedExportPaths({
+              target,
+              slice,
+              settings: resolveSliceExportSettings(slice)[target],
+              baseName
+            });
+
+        for (const simulation of simulations) {
+          if (isBundleTarget(target)) {
+            const bundleKey = `${target}:${simulation.relativePath.toLowerCase()}`;
+            if (seenBundlePaths.has(bundleKey)) {
+              continue;
+            }
+            seenBundlePaths.add(bundleKey);
+          }
+
+          files.push({
             target,
             ...simulation
-          }))
-        )
-      ),
-    [activeSlice?.id, exportScopeSlices, nameInput]
-  );
+          });
+        }
+      }
+    }
+
+    return files;
+  }, [activeSlice?.id, exportScopeSlices, nameInput]);
 
   const getCheckedVariantCountLabel = (
     target: SliceExportTargetKey,
@@ -298,7 +313,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
       <div key={target} className="p-1 d-flex flex-column gap-2 slice-sidebar-export-target small">
         {isBundleTarget(target) ? (
           <div className="slice-sidebar-export-bundle-note">
-            有効な variant を同じスライス名かつ同じ Dir ごとに 1 つの <span className="font-monospace">.{target}</span> へまとめる想定だよ
+            有効な variant を同じスライス名かつ同じ Dir ごとに 1 つの <span className="font-monospace">.{target}</span> へまとめて書き出すよ
           </div>
         ) : null}
 
