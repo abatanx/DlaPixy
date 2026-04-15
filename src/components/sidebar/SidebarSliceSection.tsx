@@ -36,6 +36,28 @@ const SLICE_EXPORT_TARGET_SECTIONS: Array<[SliceExportTargetKey, SliceExportVari
   ['icns', ICNS_SLICE_EXPORT_VARIANTS]
 ];
 
+type SliceExportFilePreviewBundleMember = {
+  sliceName: string;
+  variantLabel: string;
+  width: number;
+  height: number;
+};
+
+type SliceExportFilePreviewItem =
+  | {
+      kind: 'file';
+      target: SliceExportTargetKey;
+      relativePath: string;
+      width: number;
+      height: number;
+    }
+  | {
+      kind: 'bundle';
+      target: SliceExportBundleTargetKey;
+      relativePath: string;
+      members: SliceExportFilePreviewBundleMember[];
+    };
+
 export const SidebarSliceSection = memo(function SidebarSliceSection({
   canvasSize,
   slices,
@@ -132,36 +154,63 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     [slices]
   );
   const allSimulatedPaths = useMemo(() => {
-    const files: Array<{ target: SliceExportTargetKey; relativePath: string; width: number; height: number }> = [];
-    const seenBundlePaths = new Set<string>();
+    const files: SliceExportFilePreviewItem[] = [];
+    const bundleFilesByKey = new Map<string, Extract<SliceExportFilePreviewItem, { kind: 'bundle' }>>();
 
-    for (const [target] of SLICE_EXPORT_TARGET_SECTIONS) {
+    for (const [target, variants] of SLICE_EXPORT_TARGET_SECTIONS) {
       for (const slice of exportScopeSlices) {
         const baseName = (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice';
-        const simulations = isBundleTarget(target)
-          ? buildSimulatedBundlePaths({
-              target,
-              slice,
-              settings: resolveSliceExportSettings(slice)[target],
-              baseName
-            })
-          : buildSimulatedExportPaths({
-              target,
-              slice,
-              settings: resolveSliceExportSettings(slice)[target],
-              baseName
+        const targetSettings = resolveSliceExportSettings(slice)[target];
+
+        if (isBundleTarget(target)) {
+          const simulations = buildSimulatedBundlePaths({
+            target,
+            slice,
+            settings: targetSettings,
+            baseName
+          });
+          const bundleMembers = variants
+            .filter((variant) => targetSettings.variants[variant.key])
+            .map((variant) => {
+              const computed = resolveComputedVariantSize(slice, targetSettings, variant, variants);
+              return {
+                sliceName: baseName,
+                variantLabel: variant.label,
+                width: computed.width,
+                height: computed.height
+              };
             });
 
-        for (const simulation of simulations) {
-          if (isBundleTarget(target)) {
+          for (const simulation of simulations) {
             const bundleKey = `${target}:${simulation.relativePath.toLowerCase()}`;
-            if (seenBundlePaths.has(bundleKey)) {
+            const existingBundle = bundleFilesByKey.get(bundleKey);
+            if (existingBundle) {
+              existingBundle.members.push(...bundleMembers.map((member) => ({ ...member })));
               continue;
             }
-            seenBundlePaths.add(bundleKey);
-          }
 
+            const bundleItem: Extract<SliceExportFilePreviewItem, { kind: 'bundle' }> = {
+              kind: 'bundle',
+              target,
+              relativePath: simulation.relativePath,
+              members: bundleMembers.map((member) => ({ ...member }))
+            };
+            bundleFilesByKey.set(bundleKey, bundleItem);
+            files.push(bundleItem);
+          }
+          continue;
+        }
+
+        const simulations = buildSimulatedExportPaths({
+          target,
+          slice,
+          settings: targetSettings,
+          baseName
+        });
+
+        for (const simulation of simulations) {
           files.push({
+            kind: 'file',
             target,
             ...simulation
           });
@@ -657,16 +706,33 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
             </div>
             <div className="small font-monospace text-body-secondary d-flex flex-column gap-1">
               {allSimulatedPaths.length > 0 ? (
-                allSimulatedPaths.map(({ target, relativePath, width, height }, index) => (
+                allSimulatedPaths.map((item, index) => (
                   <div
-                    key={`${index}:${target}:${relativePath}-${width}x${height}`}
-                    className="slice-sidebar-export-file-item"
+                    key={`${index}:${item.target}:${item.relativePath}`}
+                    className="slice-sidebar-export-file-entry"
                   >
-                    <SliceExportTargetMark target={target} className="slice-sidebar-export-file-icon" />
-                    <span>
-                      {relativePath}
-                      {width > 0 && height > 0 ? ` (${width}x${height})` : ''}
-                    </span>
+                    <div className="slice-sidebar-export-file-item">
+                      <SliceExportTargetMark target={item.target} className="slice-sidebar-export-file-icon" />
+                      <span>
+                        {item.relativePath}
+                        {item.kind === 'file' && item.width > 0 && item.height > 0
+                          ? ` (${item.width}x${item.height})`
+                          : ''}
+                      </span>
+                    </div>
+                    {item.kind === 'bundle' ? (
+                      <div className="slice-sidebar-export-bundle-members text-body-tertiary">
+                        {groupBundlePreviewMembers(item.members).map((member) => (
+                          <div
+                            key={`${item.relativePath}:${member.sliceName}`}
+                            className="slice-sidebar-export-bundle-member"
+                          >
+                            <span className="slice-sidebar-export-bundle-member-name">{member.sliceName}</span>
+                            <span>{member.sizes.join(', ')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))
               ) : (
@@ -683,6 +749,21 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
 function formatScalePercent(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+}
+
+function groupBundlePreviewMembers(
+  members: SliceExportFilePreviewBundleMember[]
+): Array<{ sliceName: string; sizes: string[] }> {
+  const groups = new Map<string, string[]>();
+
+  for (const member of members) {
+    const details = `${member.variantLabel} (${member.width}x${member.height})`;
+    const current = groups.get(member.sliceName) ?? [];
+    current.push(details);
+    groups.set(member.sliceName, current);
+  }
+
+  return Array.from(groups.entries()).map(([sliceName, sizes]) => ({ sliceName, sizes }));
 }
 
 function isBundleTarget(target: SliceExportTargetKey): target is SliceExportBundleTargetKey {

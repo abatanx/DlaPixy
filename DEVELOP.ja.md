@@ -97,6 +97,7 @@ npm run dist
 - Slice の export target は、有効 variant があるときだけタブ・一覧中央・canvas 上のラベル下にプラットフォームマークを出す
 - Slice export のサイズ行には出力倍率も表示し、`100%` 超の拡大は赤で強調する
 - Slice export の `File(s)` プレビューは、アクティブなタブだけでなく全ターゲット分の想定出力をまとめて表示する
+- Slice export の `ICO` / `ICNS` 行は、bundle に含まれるスライス名とターゲットサイズを展開表示しつつ、コピー時はパス一覧だけを維持する
 - Slice export は `ICO` / `ICNS` の bundle 書き出しにも対応し、同じスライス名かつ同じ Dir の有効 variant を target ごとに 1 つの icon file へまとめる
 - 透過背景モードは編集キャンバス、各種プレビュー、モーダルプレビューで共通利用する
 - 状態表示は toast ベースで、常設の sidebar 状態欄はない
