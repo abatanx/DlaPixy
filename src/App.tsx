@@ -33,6 +33,10 @@ import {
   type FloatingCompositeMode
 } from '../shared/floating-composite';
 import {
+  DEFAULT_FLOATING_SCALE_MODE,
+  type FloatingScaleMode
+} from '../shared/floating-scale-mode';
+import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
   type TransparentBackgroundMode
 } from '../shared/transparent-background';
@@ -76,6 +80,9 @@ export function App() {
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
   const [floatingCompositeMode, setFloatingCompositeMode] = useState<FloatingCompositeMode>(
     DEFAULT_FLOATING_COMPOSITE_MODE
+  );
+  const [floatingScaleMode, setFloatingScaleMode] = useState<FloatingScaleMode>(
+    DEFAULT_FLOATING_SCALE_MODE
   );
   const [transparentBackgroundMode, setTransparentBackgroundMode] = useState<TransparentBackgroundMode>(
     DEFAULT_TRANSPARENT_BACKGROUND_MODE
@@ -353,6 +360,7 @@ export function App() {
   } = useFloatingPaste({
     canvasSize,
     floatingCompositeMode,
+    floatingScaleMode,
     zoom,
     pixels,
     selection,
@@ -528,6 +536,7 @@ export function App() {
     canvasSize,
     currentFilePath,
     floatingCompositeMode,
+    floatingScaleMode,
     gridSpacing,
     hasUnsavedChanges,
     palette,
@@ -548,6 +557,7 @@ export function App() {
     setLastTilePreviewSelection,
     setCurrentFilePath,
     setFloatingCompositeMode,
+    setFloatingScaleMode,
     setPalette,
     setSlices,
     setSelectedColor,
@@ -834,6 +844,8 @@ export function App() {
               isFloatingPasteActive={isFloatingPasteActive}
               floatingCompositeMode={floatingCompositeMode}
               setFloatingCompositeMode={setFloatingCompositeMode}
+              floatingScaleMode={floatingScaleMode}
+              setFloatingScaleMode={setFloatingScaleMode}
               zoom={zoom}
               floatingHandleOrder={FLOATING_HANDLE_ORDER}
               getFloatingHandleStyle={getFloatingHandleStyle}

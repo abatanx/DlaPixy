@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, type MutableRefObject } from 'react';
 import type { FloatingCompositeMode } from '../../shared/floating-composite';
+import type { FloatingScaleMode } from '../../shared/floating-scale-mode';
 import type { ClipboardPixelBlock, FloatingPasteState } from '../editor/floating-paste';
 import type { Selection, Tool } from '../editor/types';
 import {
@@ -12,7 +13,7 @@ import {
   clampSelectionToCanvas,
   clonePixels,
   cloneSelection,
-  resizePixelBlockNearest
+  resizePixelBlock
 } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
@@ -22,6 +23,7 @@ type PasteSourceMode = 'internal' | 'external';
 type UseFloatingPasteOptions = {
   canvasSize: number;
   floatingCompositeMode: FloatingCompositeMode;
+  floatingScaleMode: FloatingScaleMode;
   zoom: number;
   pixels: Uint8ClampedArray;
   selection: Selection;
@@ -43,6 +45,7 @@ type UseFloatingPasteOptions = {
 export function useFloatingPaste({
   canvasSize,
   floatingCompositeMode,
+  floatingScaleMode,
   zoom,
   pixels,
   selection,
@@ -92,14 +95,17 @@ export function useFloatingPaste({
   const applyFloatingPasteBlock = useCallback(
     (floating: FloatingPasteState, nextX: number, nextY: number, nextWidth: number, nextHeight: number) => {
       const nextPixels =
-        nextWidth === floating.width && nextHeight === floating.height
+        nextWidth === floating.width &&
+        nextHeight === floating.height &&
+        floating.renderedScaleMode === floatingScaleMode
           ? floating.pixels
-          : resizePixelBlockNearest(
+          : resizePixelBlock(
               floating.sourcePixels,
               floating.sourceWidth,
               floating.sourceHeight,
               nextWidth,
-              nextHeight
+              nextHeight,
+              floatingScaleMode
             );
       const composited = blitBlockOnCanvas(
         floating.basePixels,
@@ -117,10 +123,11 @@ export function useFloatingPaste({
       floating.width = nextWidth;
       floating.height = nextHeight;
       floating.pixels = nextPixels;
+      floating.renderedScaleMode = floatingScaleMode;
       setPixels(composited);
       setSelection({ x: nextX, y: nextY, w: nextWidth, h: nextHeight });
     },
-    [canvasSize, floatingCompositeMode, setPixels, setSelection]
+    [canvasSize, floatingCompositeMode, floatingScaleMode, setPixels, setSelection]
   );
 
   const loadPixelBlockFromDataUrl = useCallback(async (dataUrl: string): Promise<ClipboardPixelBlock | null> => {
@@ -204,6 +211,7 @@ export function useFloatingPaste({
         width: clip.width,
         height: clip.height,
         pixels: pastedPixels,
+        renderedScaleMode: floatingScaleMode,
         sourceWidth: clip.width,
         sourceHeight: clip.height,
         sourcePixels: clonePixels(pastedPixels),
@@ -262,6 +270,7 @@ export function useFloatingPaste({
       width: selection.w,
       height: selection.h,
       pixels: selectedPixels,
+      renderedScaleMode: floatingScaleMode,
       sourceWidth: selection.w,
       sourceHeight: selection.h,
       sourcePixels: clonePixels(selectedPixels),
@@ -283,7 +292,7 @@ export function useFloatingPaste({
     }
 
     applyFloatingPasteBlock(floating, floating.x, floating.y, floating.width, floating.height);
-  }, [applyFloatingPasteBlock, floatingCompositeMode, floatingPasteRef]);
+  }, [applyFloatingPasteBlock, floatingCompositeMode, floatingPasteRef, floatingScaleMode]);
 
   const finalizeFloatingPaste = useCallback(() => {
     const floating = floatingPasteRef.current;
