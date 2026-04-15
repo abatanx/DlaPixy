@@ -3,7 +3,9 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-export type SliceExportTargetKey = 'generic' | 'apple' | 'android';
+export type SliceExportPngTargetKey = 'generic' | 'apple' | 'android';
+export type SliceExportBundleTargetKey = 'ico' | 'icns';
+export type SliceExportTargetKey = SliceExportPngTargetKey | SliceExportBundleTargetKey;
 export type SliceExportAxis = 'width' | 'height';
 
 export type SliceExportVariantDefinition = {
@@ -32,7 +34,9 @@ export type EditorSlice = {
   exportSettings?: SliceExportSettings;
 };
 
-export const SLICE_EXPORT_TARGET_KEYS: SliceExportTargetKey[] = ['generic', 'apple', 'android'];
+export const SLICE_EXPORT_TARGET_KEYS: SliceExportTargetKey[] = ['generic', 'apple', 'android', 'ico', 'icns'];
+export const SLICE_EXPORT_PNG_TARGET_KEYS: SliceExportPngTargetKey[] = ['generic', 'apple', 'android'];
+export const SLICE_EXPORT_BUNDLE_TARGET_KEYS: SliceExportBundleTargetKey[] = ['ico', 'icns'];
 export const GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS: SliceExportVariantDefinition[] = [
   { key: '1x', label: '1x', scale: 1 },
   { key: '@2x', label: '@2x', scale: 2 },
@@ -47,15 +51,39 @@ export const ANDROID_SLICE_EXPORT_VARIANTS: SliceExportVariantDefinition[] = [
   { key: 'xxhdpi', label: 'xxhdpi', scale: 3 },
   { key: 'xxxhdpi', label: 'xxxhdpi', scale: 4 }
 ];
+export const ICO_SLICE_EXPORT_VARIANTS: SliceExportVariantDefinition[] = [
+  { key: '16', label: '16px', scale: 16 },
+  { key: '32', label: '32px', scale: 32 },
+  { key: '48', label: '48px', scale: 48 },
+  { key: '64', label: '64px', scale: 64 },
+  { key: '128', label: '128px', scale: 128 },
+  { key: '256', label: '256px', scale: 256 }
+];
+export const ICNS_SLICE_EXPORT_VARIANTS: SliceExportVariantDefinition[] = [
+  { key: '16', label: '16x16', scale: 16 },
+  { key: '16@2x', label: '16x16@2x', scale: 32 },
+  { key: '32', label: '32x32', scale: 32 },
+  { key: '32@2x', label: '32x32@2x', scale: 64 },
+  { key: '128', label: '128x128', scale: 128 },
+  { key: '128@2x', label: '128x128@2x', scale: 256 },
+  { key: '256', label: '256x256', scale: 256 },
+  { key: '256@2x', label: '256x256@2x', scale: 512 },
+  { key: '512', label: '512x512', scale: 512 },
+  { key: '512@2x', label: '512x512@2x', scale: 1024 }
+];
 export const SLICE_EXPORT_VARIANTS_BY_TARGET: Record<SliceExportTargetKey, SliceExportVariantDefinition[]> = {
   generic: GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS,
   apple: GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS,
-  android: ANDROID_SLICE_EXPORT_VARIANTS
+  android: ANDROID_SLICE_EXPORT_VARIANTS,
+  ico: ICO_SLICE_EXPORT_VARIANTS,
+  icns: ICNS_SLICE_EXPORT_VARIANTS
 };
 export const SLICE_EXPORT_TARGET_LABELS: Record<SliceExportTargetKey, string> = {
   generic: 'Generic',
   apple: 'iOS',
-  android: 'Android'
+  android: 'Android',
+  ico: 'ICO',
+  icns: 'ICNS'
 };
 
 export const SLICE_NAME_MAX_LENGTH = 100;
@@ -77,7 +105,9 @@ export function createDefaultSliceExportSettings(slice: Pick<EditorSlice, 'w'>):
   return {
     generic: createDefaultSliceExportTargetSettings(slice.w, '1x', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS, 'generic'),
     apple: createDefaultSliceExportTargetSettings(slice.w, '1x', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS, 'ios'),
-    android: createDefaultSliceExportTargetSettings(slice.w, 'mdpi', ANDROID_SLICE_EXPORT_VARIANTS, 'drawable-{density}')
+    android: createDefaultSliceExportTargetSettings(slice.w, 'mdpi', ANDROID_SLICE_EXPORT_VARIANTS, 'drawable-{density}'),
+    ico: createDefaultSliceExportTargetSettings(slice.w, '32', ICO_SLICE_EXPORT_VARIANTS),
+    icns: createDefaultSliceExportTargetSettings(slice.w, '32', ICNS_SLICE_EXPORT_VARIANTS)
   };
 }
 
@@ -93,7 +123,9 @@ export function normalizeSliceExportSettings(
   return {
     generic: normalizeSliceExportTargetSettings(value.generic, defaults.generic, GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS),
     apple: normalizeSliceExportTargetSettings(value.apple, defaults.apple, GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS),
-    android: normalizeSliceExportTargetSettings(value.android, defaults.android, ANDROID_SLICE_EXPORT_VARIANTS)
+    android: normalizeSliceExportTargetSettings(value.android, defaults.android, ANDROID_SLICE_EXPORT_VARIANTS),
+    ico: normalizeSliceExportTargetSettings(value.ico, defaults.ico, ICO_SLICE_EXPORT_VARIANTS),
+    icns: normalizeSliceExportTargetSettings(value.icns, defaults.icns, ICNS_SLICE_EXPORT_VARIANTS)
   };
 }
 
@@ -101,7 +133,9 @@ export function cloneSliceExportSettings(settings: SliceExportSettings): SliceEx
   return {
     generic: cloneSliceExportTargetSettings(settings.generic),
     apple: cloneSliceExportTargetSettings(settings.apple),
-    android: cloneSliceExportTargetSettings(settings.android)
+    android: cloneSliceExportTargetSettings(settings.android),
+    ico: cloneSliceExportTargetSettings(settings.ico),
+    icns: cloneSliceExportTargetSettings(settings.icns)
   };
 }
 

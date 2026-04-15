@@ -4,9 +4,12 @@
  **/
 
 import type { SliceExportTargetKey } from '../../shared/slice';
+import type { SliceExportBundleTargetKey } from '../../shared/slice';
+
+export type SliceExportTargetMarkKey = SliceExportTargetKey | SliceExportBundleTargetKey;
 
 type SliceExportTargetMarkProps = {
-  target: SliceExportTargetKey;
+  target: SliceExportTargetMarkKey;
   className?: string;
 };
 
@@ -15,16 +18,20 @@ type SliceExportTargetMarksProps = {
   className?: string;
 };
 
-const SLICE_EXPORT_TARGET_ICON_CLASS_NAMES: Record<SliceExportTargetKey, string> = {
+const SLICE_EXPORT_TARGET_ICON_CLASS_NAMES: Record<SliceExportTargetMarkKey, string> = {
   generic: 'fa-solid fa-cube',
   apple: 'fa-brands fa-apple',
-  android: 'fa-brands fa-android'
+  android: 'fa-brands fa-android',
+  ico: 'fa-brands fa-windows',
+  icns: 'fa-solid fa-file-image'
 };
 
-const SLICE_EXPORT_TARGET_ICON_LABELS: Record<SliceExportTargetKey, string> = {
+const SLICE_EXPORT_TARGET_ICON_LABELS: Record<SliceExportTargetMarkKey, string> = {
   generic: 'Generic',
   apple: 'iOS',
-  android: 'Android'
+  android: 'Android',
+  ico: 'Windows ICO',
+  icns: 'macOS ICNS'
 };
 
 export function SliceExportTargetMark({ target, className }: SliceExportTargetMarkProps) {

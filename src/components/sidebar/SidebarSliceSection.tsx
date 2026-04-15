@@ -7,7 +7,10 @@ import { memo, useCallback, useEffect, useMemo, useState, type KeyboardEvent as 
 import {
   ANDROID_SLICE_EXPORT_VARIANTS,
   GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS,
+  ICO_SLICE_EXPORT_VARIANTS,
+  ICNS_SLICE_EXPORT_VARIANTS,
   SLICE_EXPORT_TARGET_LABELS,
+  buildSimulatedBundlePaths,
   buildSimulatedExportPaths,
   resolveComputedVariantSize,
   resolveComputedVariantScalePercent,
@@ -16,6 +19,7 @@ import {
 } from '../../editor/slice-export';
 import type {
   SliceExportSettings,
+  SliceExportBundleTargetKey,
   SliceExportTargetKey,
   SliceExportTargetSettings,
   SliceExportVariantDefinition
@@ -27,7 +31,9 @@ import type { SidebarSliceSectionProps } from './types';
 const SLICE_EXPORT_TARGET_SECTIONS: Array<[SliceExportTargetKey, SliceExportVariantDefinition[]]> = [
   ['generic', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS],
   ['apple', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS],
-  ['android', ANDROID_SLICE_EXPORT_VARIANTS]
+  ['android', ANDROID_SLICE_EXPORT_VARIANTS],
+  ['ico', ICO_SLICE_EXPORT_VARIANTS],
+  ['icns', ICNS_SLICE_EXPORT_VARIANTS]
 ];
 
 export const SidebarSliceSection = memo(function SidebarSliceSection({
@@ -115,7 +121,9 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
         targetStates.map((state) => state.apple),
         GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS
       ),
-      android: resolveDisplayTargetUiState(targetStates.map((state) => state.android), ANDROID_SLICE_EXPORT_VARIANTS)
+      android: resolveDisplayTargetUiState(targetStates.map((state) => state.android), ANDROID_SLICE_EXPORT_VARIANTS),
+      ico: resolveDisplayTargetUiState(targetStates.map((state) => state.ico), ICO_SLICE_EXPORT_VARIANTS),
+      icns: resolveDisplayTargetUiState(targetStates.map((state) => state.icns), ICNS_SLICE_EXPORT_VARIANTS)
     };
   }, [exportScopeSlices]);
 
@@ -127,12 +135,20 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     () =>
       SLICE_EXPORT_TARGET_SECTIONS.flatMap(([target]) =>
         exportScopeSlices.flatMap((slice) =>
-          buildSimulatedExportPaths({
-            target,
-            slice,
-            settings: resolveSliceExportSettings(slice)[target],
-            baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
-          }).map((simulation) => ({
+          (isBundleTarget(target)
+            ? buildSimulatedBundlePaths({
+                target,
+                slice,
+                settings: resolveSliceExportSettings(slice)[target],
+                baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
+              })
+            : buildSimulatedExportPaths({
+                target,
+                slice,
+                settings: resolveSliceExportSettings(slice)[target],
+                baseName: (slice.id === activeSlice?.id ? nameInput.trim() : slice.name.trim()) || 'slice'
+              })
+          ).map((simulation) => ({
             target,
             ...simulation
           }))
@@ -280,6 +296,12 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
 
     return (
       <div key={target} className="p-1 d-flex flex-column gap-2 slice-sidebar-export-target small">
+        {isBundleTarget(target) ? (
+          <div className="slice-sidebar-export-bundle-note">
+            有効な variant を同じスライス名かつ同じ Dir ごとに 1 つの <span className="font-monospace">.{target}</span> へまとめる想定だよ
+          </div>
+        ) : null}
+
         <div className="row g-2">
           <div className="col-12">
             <div className="input-group input-group-sm flex-nowrap">
@@ -592,27 +614,16 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
           </ul>
 
           <div className="tab-content overflow-auto pt-1">
-            <div
-              id="sidebar-slice-export-pane-generic"
-              className={`tab-pane fade ${activeExportTab === 'generic' ? 'show active' : ''}`}
-              role="tabpanel"
-            >
-              {renderExportTargetSection('generic', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS)}
-            </div>
-            <div
-              id="sidebar-slice-export-pane-apple"
-              className={`tab-pane fade ${activeExportTab === 'apple' ? 'show active' : ''}`}
-              role="tabpanel"
-            >
-              {renderExportTargetSection('apple', GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS)}
-            </div>
-            <div
-              id="sidebar-slice-export-pane-android"
-              className={`tab-pane fade ${activeExportTab === 'android' ? 'show active' : ''}`}
-              role="tabpanel"
-            >
-              {renderExportTargetSection('android', ANDROID_SLICE_EXPORT_VARIANTS)}
-            </div>
+            {SLICE_EXPORT_TARGET_SECTIONS.map(([target, variants]) => (
+              <div
+                key={target}
+                id={`sidebar-slice-export-pane-${target}`}
+                className={`tab-pane fade ${activeExportTab === target ? 'show active' : ''}`}
+                role="tabpanel"
+              >
+                {renderExportTargetSection(target, variants)}
+              </div>
+            ))}
           </div>
 
           <div className="d-flex flex-column gap-1 slice-sidebar-export-files">
@@ -638,7 +649,8 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                   >
                     <SliceExportTargetMark target={target} className="slice-sidebar-export-file-icon" />
                     <span>
-                      {relativePath} ({width}x{height})
+                      {relativePath}
+                      {width > 0 && height > 0 ? ` (${width}x${height})` : ''}
                     </span>
                   </div>
                 ))
@@ -656,4 +668,8 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
 function formatScalePercent(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+}
+
+function isBundleTarget(target: SliceExportTargetKey): target is SliceExportBundleTargetKey {
+  return target === 'ico' || target === 'icns';
 }

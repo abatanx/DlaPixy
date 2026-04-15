@@ -97,6 +97,7 @@ Notes:
 - Slice export targets show platform marks in tabs, centered list rows, and under the in-canvas slice name when that target has at least one enabled variant
 - Slice export size rows also show output scale percent; values above `100%` (upscale) are highlighted in red
 - Slice export `File(s)` preview lists simulated outputs from all targets at once, instead of only the active tab
+- Slice export includes `ICO` / `ICNS` tabs with the same base-size / variant-selection UI as other targets; their simulated files are bundle names grouped by matching slice name and directory for future app-icon export
 - Transparent background mode is shared across editor canvas, previews, and modal previews
 - Status messages are toast-based; persistent sidebar status row is removed
 - Footer shows canvas, grid, zoom, and current file status

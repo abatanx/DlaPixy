@@ -6,14 +6,18 @@
 import {
   ANDROID_SLICE_EXPORT_VARIANTS,
   GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS,
-  SLICE_EXPORT_TARGET_KEYS,
+  ICO_SLICE_EXPORT_VARIANTS,
+  ICNS_SLICE_EXPORT_VARIANTS,
+  SLICE_EXPORT_PNG_TARGET_KEYS,
   SLICE_EXPORT_TARGET_LABELS,
   SLICE_EXPORT_VARIANTS_BY_TARGET,
   createDefaultSliceExportSettings,
   normalizeSliceExportSettings,
   type EditorSlice,
   type SliceExportAxis,
+  type SliceExportBundleTargetKey,
   type SliceExportSettings,
+  type SliceExportPngTargetKey,
   type SliceExportTargetKey,
   type SliceExportTargetSettings,
   type SliceExportVariantDefinition
@@ -144,7 +148,7 @@ export function resolveComputedVariantScalePercent(
 }
 
 export function buildSimulatedExportPaths(args: {
-  target: SliceExportTargetKey;
+  target: SliceExportPngTargetKey;
   slice: Pick<EditorSlice, 'w' | 'h'>;
   settings: SliceExportTargetSettings;
   baseName: string;
@@ -173,6 +177,35 @@ export function buildSimulatedExportPaths(args: {
         };
       });
     });
+}
+
+export function buildSimulatedBundlePaths(args: {
+  target: SliceExportBundleTargetKey;
+  slice: Pick<EditorSlice, 'w' | 'h'>;
+  settings: SliceExportTargetSettings;
+  baseName: string;
+}): SliceExportSimulation[] {
+  const variants = SLICE_EXPORT_VARIANTS_BY_TARGET[args.target];
+  const hasEnabledVariant = variants.some((variant) => args.settings.variants[variant.key]);
+  if (!hasEnabledVariant) {
+    return [];
+  }
+
+  const directoryTemplates = args.settings.directoryTemplates
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  const directories = directoryTemplates.length > 0 ? directoryTemplates : [''];
+  const fileName = `${args.baseName}.${args.target}`;
+
+  return directories.map((directoryTemplate) => {
+    const relativeDirectory = directoryTemplate.replace(/^\/+|\/+$/g, '');
+    return {
+      relativePath: relativeDirectory.length > 0 ? `${relativeDirectory}/${fileName}` : fileName,
+      width: 0,
+      height: 0
+    };
+  });
 }
 
 export function buildSliceExportPlans(slices: EditorSlice[]): { plans: SliceExportRenderPlan[] } | { error: string } {
@@ -205,7 +238,7 @@ export function buildSliceExportPlans(slices: EditorSlice[]): { plans: SliceExpo
     const exportSettings = resolveSliceExportSettings(slice);
     let hasEnabledVariant = false;
 
-    for (const target of SLICE_EXPORT_TARGET_KEYS) {
+    for (const target of SLICE_EXPORT_PNG_TARGET_KEYS) {
       const simulations = buildSimulatedExportPaths({
         target,
         slice,
@@ -313,6 +346,8 @@ export function getDefaultSliceExportSettings(slice: Pick<EditorSlice, 'w'>): Sl
 export {
   ANDROID_SLICE_EXPORT_VARIANTS,
   GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS,
+  ICO_SLICE_EXPORT_VARIANTS,
+  ICNS_SLICE_EXPORT_VARIANTS,
   SLICE_EXPORT_TARGET_LABELS
 };
 

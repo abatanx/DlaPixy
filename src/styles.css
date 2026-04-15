@@ -1374,6 +1374,15 @@ body {
   background: transparent;
 }
 
+.slice-sidebar-export-bundle-note {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 0.55rem;
+  background: rgba(248, 250, 252, 0.82);
+  color: #475569;
+  line-height: 1.45;
+}
+
 .slice-sidebar-export-table td {
   padding-block: 0.32rem;
   vertical-align: middle;
