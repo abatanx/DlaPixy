@@ -19,6 +19,7 @@ import {
   type EditorSlice
 } from '../../shared/slice';
 import type { FloatingCompositeMode } from '../../shared/floating-composite';
+import type { FloatingScaleMode } from '../../shared/floating-scale-mode';
 import type { Selection } from './types';
 
 export { generatePaletteEntryId, isPaletteEntryId, normalizeColorHex, normalizePaletteCaption, normalizePaletteEntries };
@@ -224,6 +225,92 @@ export function resizePixelBlockNearest(
   }
 
   return next;
+}
+
+export function resizePixelBlock(
+  sourcePixels: Uint8ClampedArray,
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number,
+  scaleMode: FloatingScaleMode = 'crisp'
+): Uint8ClampedArray {
+  if (scaleMode === 'alpha-smooth') {
+    return resizePixelBlockAlphaSmooth(sourcePixels, sourceWidth, sourceHeight, targetWidth, targetHeight);
+  }
+
+  return resizePixelBlockNearest(sourcePixels, sourceWidth, sourceHeight, targetWidth, targetHeight);
+}
+
+function resizePixelBlockAlphaSmooth(
+  sourcePixels: Uint8ClampedArray,
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number
+): Uint8ClampedArray {
+  const normalizedTargetWidth = Math.max(1, Math.trunc(targetWidth));
+  const normalizedTargetHeight = Math.max(1, Math.trunc(targetHeight));
+  const next = new Uint8ClampedArray(normalizedTargetWidth * normalizedTargetHeight * 4);
+
+  for (let y = 0; y < normalizedTargetHeight; y += 1) {
+    const sourceY = mapResampleAxis(y, normalizedTargetHeight, sourceHeight);
+    const y0 = clamp(Math.floor(sourceY), 0, sourceHeight - 1);
+    const y1 = clamp(y0 + 1, 0, sourceHeight - 1);
+    const weightY = clamp(sourceY - y0, 0, 1);
+
+    for (let x = 0; x < normalizedTargetWidth; x += 1) {
+      const sourceX = mapResampleAxis(x, normalizedTargetWidth, sourceWidth);
+      const x0 = clamp(Math.floor(sourceX), 0, sourceWidth - 1);
+      const x1 = clamp(x0 + 1, 0, sourceWidth - 1);
+      const weightX = clamp(sourceX - x0, 0, 1);
+      const targetIndex = (y * normalizedTargetWidth + x) * 4;
+
+      const samples = [
+        { x: x0, y: y0, weight: (1 - weightX) * (1 - weightY) },
+        { x: x1, y: y0, weight: weightX * (1 - weightY) },
+        { x: x0, y: y1, weight: (1 - weightX) * weightY },
+        { x: x1, y: y1, weight: weightX * weightY }
+      ];
+
+      let outputAlpha = 0;
+      let outputPremultipliedRed = 0;
+      let outputPremultipliedGreen = 0;
+      let outputPremultipliedBlue = 0;
+
+      for (const sample of samples) {
+        const sourceIndex = (sample.y * sourceWidth + sample.x) * 4;
+        const sampleAlpha = sourcePixels[sourceIndex + 3] / 255;
+
+        outputAlpha += sample.weight * sampleAlpha;
+        outputPremultipliedRed += sample.weight * (sourcePixels[sourceIndex] / 255) * sampleAlpha;
+        outputPremultipliedGreen += sample.weight * (sourcePixels[sourceIndex + 1] / 255) * sampleAlpha;
+        outputPremultipliedBlue += sample.weight * (sourcePixels[sourceIndex + 2] / 255) * sampleAlpha;
+      }
+
+      next[targetIndex + 3] = Math.round(outputAlpha * 255);
+      if (outputAlpha <= 0) {
+        next[targetIndex] = 0;
+        next[targetIndex + 1] = 0;
+        next[targetIndex + 2] = 0;
+        continue;
+      }
+
+      next[targetIndex] = clamp(Math.round((outputPremultipliedRed / outputAlpha) * 255), 0, 255);
+      next[targetIndex + 1] = clamp(Math.round((outputPremultipliedGreen / outputAlpha) * 255), 0, 255);
+      next[targetIndex + 2] = clamp(Math.round((outputPremultipliedBlue / outputAlpha) * 255), 0, 255);
+    }
+  }
+
+  return next;
+}
+
+function mapResampleAxis(targetIndex: number, targetSize: number, sourceSize: number): number {
+  if (targetSize <= 1 || sourceSize <= 1) {
+    return 0;
+  }
+
+  return ((targetIndex + 0.5) * sourceSize) / targetSize - 0.5;
 }
 
 // 2点間を結ぶラスター線分の全ピクセル座標を返す（Bresenham系）。

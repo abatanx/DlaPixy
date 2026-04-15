@@ -6,11 +6,13 @@
 import type { PaletteEntry as SharedPaletteEntry } from '../../shared/palette';
 import type { EditorSlice as SharedEditorSlice } from '../../shared/slice';
 import type { FloatingCompositeMode as SharedFloatingCompositeMode } from '../../shared/floating-composite';
+import type { FloatingScaleMode as SharedFloatingScaleMode } from '../../shared/floating-scale-mode';
 import type { EditorSidecar, EditorTool } from '../../shared/sidecar';
 
 export type Tool = EditorTool;
 
 export type FloatingCompositeMode = SharedFloatingCompositeMode;
+export type FloatingScaleMode = SharedFloatingScaleMode;
 
 export type PaletteEntry = SharedPaletteEntry;
 export type EditorSlice = SharedEditorSlice;

@@ -48,7 +48,7 @@ Notes:
 - Floating paste / move supports:
   - drag move
   - 8 resize handles
-  - nearest-neighbor scaling with fixed aspect ratio
+  - fixed-aspect scaling in `Crisp` / `Alpha Smooth` modes
   - `Replace` / `Blend` preview mode
   - `Enter` to commit, `Esc` to cancel
 - Selected pixels can be lifted and moved as floating content

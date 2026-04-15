@@ -4,6 +4,7 @@
  **/
 
 import type { Selection, Tool } from './types';
+import type { FloatingScaleMode } from '../../shared/floating-scale-mode';
 
 export type ClipboardPixelBlock = {
   width: number;
@@ -20,6 +21,7 @@ export type FloatingPasteState = {
   width: number;
   height: number;
   pixels: Uint8ClampedArray;
+  renderedScaleMode: FloatingScaleMode;
   sourceWidth: number;
   sourceHeight: number;
   sourcePixels: Uint8ClampedArray;

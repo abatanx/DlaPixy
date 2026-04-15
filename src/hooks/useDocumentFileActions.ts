@@ -10,6 +10,10 @@ import {
   type FloatingCompositeMode
 } from '../../shared/floating-composite';
 import {
+  DEFAULT_FLOATING_SCALE_MODE,
+  type FloatingScaleMode
+} from '../../shared/floating-scale-mode';
+import {
   DEFAULT_TRANSPARENT_BACKGROUND_MODE,
   type TransparentBackgroundMode
 } from '../../shared/transparent-background';
@@ -41,6 +45,7 @@ type UseDocumentFileActionsOptions = {
   gridSpacing: number;
   hasUnsavedChanges: boolean;
   floatingCompositeMode: FloatingCompositeMode;
+  floatingScaleMode: FloatingScaleMode;
   palette: PaletteEntry[];
   slices: EditorSlice[];
   selectedSliceIds: string[];
@@ -59,6 +64,7 @@ type UseDocumentFileActionsOptions = {
   setLastTilePreviewSelection: Dispatch<SetStateAction<Selection>>;
   setCurrentFilePath: Dispatch<SetStateAction<string | undefined>>;
   setFloatingCompositeMode: Dispatch<SetStateAction<FloatingCompositeMode>>;
+  setFloatingScaleMode: Dispatch<SetStateAction<FloatingScaleMode>>;
   setPalette: Dispatch<SetStateAction<PaletteEntry[]>>;
   setSlices: Dispatch<SetStateAction<EditorSlice[]>>;
   setSelectedColor: Dispatch<SetStateAction<string>>;
@@ -82,6 +88,7 @@ export function useDocumentFileActions({
   gridSpacing,
   hasUnsavedChanges,
   floatingCompositeMode,
+  floatingScaleMode,
   palette,
   slices,
   selectedSliceIds,
@@ -100,6 +107,7 @@ export function useDocumentFileActions({
   setLastTilePreviewSelection,
   setCurrentFilePath,
   setFloatingCompositeMode,
+  setFloatingScaleMode,
   setPalette,
   setSlices,
   setSelectedColor,
@@ -142,6 +150,7 @@ export function useDocumentFileActions({
         },
         editor: {
           floatingCompositeMode,
+          floatingScaleMode,
           gridSpacing,
           transparentBackgroundMode,
           zoom,
@@ -155,7 +164,7 @@ export function useDocumentFileActions({
     };
 
     return { base64Png, metadata };
-  }, [canvasSize, canvasStageRef, floatingCompositeMode, gridSpacing, palette, pixels, slices, tool, transparentBackgroundMode, zoom]);
+  }, [canvasSize, canvasStageRef, floatingCompositeMode, floatingScaleMode, gridSpacing, palette, pixels, slices, tool, transparentBackgroundMode, zoom]);
 
   const performSave = useCallback(
     async (options: { saveAs: boolean; suppressCancelToast?: boolean }): Promise<'saved' | 'canceled' | 'failed'> => {
@@ -307,6 +316,7 @@ export function useDocumentFileActions({
         setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
         setTool(editorState?.lastTool ?? 'select');
         setFloatingCompositeMode(editorState?.floatingCompositeMode ?? DEFAULT_FLOATING_COMPOSITE_MODE);
+        setFloatingScaleMode(editorState?.floatingScaleMode ?? DEFAULT_FLOATING_SCALE_MODE);
 
         const loadedGridSpacing = editorState?.gridSpacing;
         if (typeof loadedGridSpacing === 'number' && Number.isFinite(loadedGridSpacing)) {
@@ -356,6 +366,7 @@ export function useDocumentFileActions({
       setCanvasSize,
       setCurrentFilePath,
       setFloatingCompositeMode,
+      setFloatingScaleMode,
       setGridSpacing,
       setHasUnsavedChanges,
       setLastTilePreviewSelection,

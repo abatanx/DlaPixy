@@ -16,6 +16,10 @@ import {
   DEFAULT_FLOATING_COMPOSITE_MODE,
   isFloatingCompositeMode
 } from '../shared/floating-composite';
+import {
+  DEFAULT_FLOATING_SCALE_MODE,
+  isFloatingScaleMode
+} from '../shared/floating-scale-mode';
 import { parseGplPalette, serializeGplPalette, type GplExportFormat } from '../shared/palette-gpl';
 import { isPaletteEntryId, type PaletteEntry } from '../shared/palette';
 import { isEditorSliceId, type EditorSlice } from '../shared/slice';
@@ -307,6 +311,9 @@ function parseEditorMeta(rawText: string): EditorMeta | null {
         floatingCompositeMode: isFloatingCompositeMode(candidateEditor.floatingCompositeMode)
           ? candidateEditor.floatingCompositeMode
           : DEFAULT_FLOATING_COMPOSITE_MODE,
+        floatingScaleMode: isFloatingScaleMode(candidateEditor.floatingScaleMode)
+          ? candidateEditor.floatingScaleMode
+          : DEFAULT_FLOATING_SCALE_MODE,
         gridSpacing: candidateEditor.gridSpacing,
         transparentBackgroundMode: candidateEditor.transparentBackgroundMode,
         zoom: candidateEditor.zoom,

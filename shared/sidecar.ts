@@ -6,6 +6,7 @@
 import type { PaletteEntry } from './palette';
 import type { EditorSlice } from './slice';
 import type { FloatingCompositeMode } from './floating-composite';
+import type { FloatingScaleMode } from './floating-scale-mode';
 import type { TransparentBackgroundMode } from './transparent-background';
 
 export const SIDECAR_SCHEMA_VERSION = 2;
@@ -23,6 +24,7 @@ export type EditorSidecar = {
     };
     editor: {
       floatingCompositeMode: FloatingCompositeMode;
+      floatingScaleMode: FloatingScaleMode;
       gridSpacing: number;
       transparentBackgroundMode: TransparentBackgroundMode;
       zoom: number;

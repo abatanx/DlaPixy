@@ -15,6 +15,10 @@ import {
   FLOATING_COMPOSITE_MODE_LABELS,
   FLOATING_COMPOSITE_MODES
 } from '../../shared/floating-composite';
+import {
+  FLOATING_SCALE_MODE_LABELS,
+  FLOATING_SCALE_MODES
+} from '../../shared/floating-scale-mode';
 import { EditorToolbar } from './EditorToolbar';
 import type { FloatingResizeHandle } from '../editor/floating-interaction';
 import {
@@ -26,7 +30,7 @@ import {
 } from '../editor/slices';
 import { getEnabledSliceExportTargets } from '../../shared/slice';
 import { SliceExportTargetMarks } from './SliceExportTargetMarks';
-import type { EditorSlice, FloatingCompositeMode, HoveredPixelInfo, Selection, Tool } from '../editor/types';
+import type { EditorSlice, FloatingCompositeMode, FloatingScaleMode, HoveredPixelInfo, Selection, Tool } from '../editor/types';
 
 type PixelInfoFields = {
   rgba: string;
@@ -61,6 +65,8 @@ type EditorCanvasWorkspaceProps = {
   isFloatingPasteActive: boolean;
   floatingCompositeMode: FloatingCompositeMode;
   setFloatingCompositeMode: (mode: FloatingCompositeMode) => void;
+  floatingScaleMode: FloatingScaleMode;
+  setFloatingScaleMode: (mode: FloatingScaleMode) => void;
   zoom: number;
   floatingHandleOrder: FloatingResizeHandle[];
   getFloatingHandleStyle: (handle: FloatingResizeHandle) => CSSProperties;
@@ -119,6 +125,8 @@ export function EditorCanvasWorkspace({
   isFloatingPasteActive,
   floatingCompositeMode,
   setFloatingCompositeMode,
+  floatingScaleMode,
+  setFloatingScaleMode,
   zoom,
   floatingHandleOrder,
   getFloatingHandleStyle,
@@ -152,7 +160,7 @@ export function EditorCanvasWorkspace({
   deleteSelection
 }: EditorCanvasWorkspaceProps) {
   const [isSliceCreateHotzoneHovered, setIsSliceCreateHotzoneHovered] = useState(false);
-  const stopFloatingCompositePointerDown = (event: ReactMouseEvent<HTMLElement>) => {
+  const stopFloatingOverlayControlPointerDown = (event: ReactMouseEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
   };
@@ -317,24 +325,47 @@ export function EditorCanvasWorkspace({
                   <span className="canvas-selection-size-label right">{selectionOverlaySelection.h}</span>
                   {isFloatingPasteActive ? (
                     <div
-                      className="btn-group btn-group-sm canvas-floating-composite-toggle"
-                      role="group"
-                      aria-label="floating-composite-mode"
-                      onMouseDown={stopFloatingCompositePointerDown}
+                      className="canvas-floating-overlay-controls"
+                      onMouseDown={stopFloatingOverlayControlPointerDown}
                     >
-                      {FLOATING_COMPOSITE_MODES.map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          className={`btn ${
-                            floatingCompositeMode === mode ? 'btn-danger active' : 'btn-light'
-                          }`}
-                          aria-pressed={floatingCompositeMode === mode}
-                          onClick={() => setFloatingCompositeMode(mode)}
-                        >
-                          {FLOATING_COMPOSITE_MODE_LABELS[mode]}
-                        </button>
-                      ))}
+                      <div
+                        className="btn-group btn-group-sm canvas-floating-mode-toggle"
+                        role="group"
+                        aria-label="floating-composite-mode"
+                      >
+                        {FLOATING_COMPOSITE_MODES.map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            className={`btn ${
+                              floatingCompositeMode === mode ? 'btn-danger active' : 'btn-light'
+                            }`}
+                            aria-pressed={floatingCompositeMode === mode}
+                            onClick={() => setFloatingCompositeMode(mode)}
+                          >
+                            {FLOATING_COMPOSITE_MODE_LABELS[mode]}
+                          </button>
+                        ))}
+                      </div>
+                      <div
+                        className="btn-group btn-group-sm canvas-floating-mode-toggle canvas-floating-scale-toggle"
+                        role="group"
+                        aria-label="floating-scale-mode"
+                      >
+                        {FLOATING_SCALE_MODES.map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            className={`btn ${
+                              floatingScaleMode === mode ? 'btn-danger active' : 'btn-light'
+                            }`}
+                            aria-pressed={floatingScaleMode === mode}
+                            onClick={() => setFloatingScaleMode(mode)}
+                          >
+                            {FLOATING_SCALE_MODE_LABELS[mode]}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
                 </div>
