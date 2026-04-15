@@ -3,8 +3,10 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
+import type { CanvasSize } from '../editor/types';
+
 type EditorStatusFooterProps = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   gridSpacing: number;
   zoom: number;
   currentFilePath?: string;
@@ -34,7 +36,7 @@ export function EditorStatusFooter({
           aria-label="キャンバスサイズ変更を開く (⌘I)"
           title="キャンバスサイズ変更を開く (⌘I)"
         >
-          キャンバス(⌘I):{canvasSize}x{canvasSize}
+          キャンバス(⌘I):{canvasSize.width}x{canvasSize.height}
         </button>
         <button
           type="button"

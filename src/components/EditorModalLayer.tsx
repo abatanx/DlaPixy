@@ -18,7 +18,7 @@ import type { QuantizeSelectionResult, QuantizeSelectionSource } from '../editor
 import type { PaletteTextImportPreview } from '../editor/palette-text-import';
 import type { UnusedPaletteCleanupOptions } from '../editor/palette-sync';
 import type { SelectionPixelBlock } from '../editor/selection-rotate';
-import type { Selection } from '../editor/types';
+import type { CanvasSize, Selection } from '../editor/types';
 import type { StatusToastType } from '../hooks/useEditorShellUi';
 import type {
   PaletteRemovalRequest,
@@ -34,15 +34,15 @@ type ToastState = {
 
 type CanvasSizeModalState = {
   isOpen: boolean;
-  canvasSize: number;
-  onApply: (normalized: number) => void;
+  canvasSize: CanvasSize;
+  onApply: (normalized: CanvasSize) => void;
   onClose: () => void;
 };
 
 type GridSpacingModalState = {
   isOpen: boolean;
   gridSpacing: number;
-  canvasSize: number;
+  canvasSize: CanvasSize;
   onApply: (value: number) => void;
   onClose: () => void;
 };
@@ -53,7 +53,7 @@ type AutoSliceModalState = {
     width: number;
     height: number;
   } | null;
-  canvasSize: number;
+  canvasSize: CanvasSize;
   onApply: (args: { baseName: string; width: number; height: number }) => boolean;
   onClose: () => void;
 };

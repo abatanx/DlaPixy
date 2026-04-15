@@ -3,7 +3,7 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import type { AnimationFrame, EditorSlice, PaletteEntry, Selection, TilePreviewLayer, Tool } from '../../editor/types';
+import type { AnimationFrame, CanvasSize, EditorSlice, PaletteEntry, Selection, TilePreviewLayer, Tool } from '../../editor/types';
 import type { PaletteUsageEntry } from '../../editor/palette-sync';
 import type { PaletteAutoSortKey, PaletteOrderMode } from '../../editor/palette-order';
 import type { SliceExportSettings } from '../../../shared/slice';
@@ -20,7 +20,7 @@ export type TilePreviewLayerSummary = Pick<TilePreviewLayer, 'id' | 'width' | 'h
 
 export type EditorSidebarProps = {
   tool: Tool;
-  canvasSize: number;
+  canvasSize: CanvasSize;
   transparentBackgroundMode: TransparentBackgroundMode;
   previewDataUrl: string;
   tilePreviewDataUrl: string;

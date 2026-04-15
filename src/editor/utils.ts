@@ -20,7 +20,7 @@ import {
 } from '../../shared/slice';
 import type { FloatingCompositeMode } from '../../shared/floating-composite';
 import type { FloatingScaleMode } from '../../shared/floating-scale-mode';
-import type { Selection } from './types';
+import type { CanvasSize, Selection } from './types';
 
 export { generatePaletteEntryId, isPaletteEntryId, normalizeColorHex, normalizePaletteCaption, normalizePaletteEntries };
 export { generateEditorSliceId, isEditorSliceId, normalizeSliceName };
@@ -165,8 +165,8 @@ export function clampCanvasSize(size: number, minCanvasSize: number, maxCanvasSi
 }
 
 // 指定サイズの透明キャンバス用ピクセル配列を作成する。
-export function createEmptyPixels(canvasSize: number): Uint8ClampedArray {
-  return new Uint8ClampedArray(canvasSize * canvasSize * 4);
+export function createEmptyPixels(canvasSize: CanvasSize): Uint8ClampedArray {
+  return new Uint8ClampedArray(canvasSize.width * canvasSize.height * 4);
 }
 
 // ピクセル配列をディープコピーしてイミュータブル更新に使う。
@@ -177,16 +177,17 @@ export function clonePixels(pixels: Uint8ClampedArray): Uint8ClampedArray {
 // 左上基準で既存ピクセルを新しいキャンバスサイズへコピーする。
 export function resizeCanvasPixels(
   sourcePixels: Uint8ClampedArray,
-  sourceCanvasSize: number,
-  targetCanvasSize: number
+  sourceCanvasSize: CanvasSize,
+  targetCanvasSize: CanvasSize
 ): Uint8ClampedArray {
   const next = createEmptyPixels(targetCanvasSize);
-  const copySize = Math.min(sourceCanvasSize, targetCanvasSize);
+  const copyWidth = Math.min(sourceCanvasSize.width, targetCanvasSize.width);
+  const copyHeight = Math.min(sourceCanvasSize.height, targetCanvasSize.height);
 
-  for (let y = 0; y < copySize; y += 1) {
-    const sourceStart = y * sourceCanvasSize * 4;
-    const targetStart = y * targetCanvasSize * 4;
-    const rowWidth = copySize * 4;
+  for (let y = 0; y < copyHeight; y += 1) {
+    const sourceStart = y * sourceCanvasSize.width * 4;
+    const targetStart = y * targetCanvasSize.width * 4;
+    const rowWidth = copyWidth * 4;
     next.set(sourcePixels.subarray(sourceStart, sourceStart + rowWidth), targetStart);
   }
 
@@ -357,16 +358,16 @@ export function pointInSelection(point: { x: number; y: number }, selection: Sel
 }
 
 // 選択範囲をキャンバス内に収まるように補正し、無効ならnullを返す。
-export function clampSelectionToCanvas(selection: Selection, canvasSize: number): Selection {
+export function clampSelectionToCanvas(selection: Selection, canvasSize: CanvasSize): Selection {
   if (!selection) {
     return null;
   }
-  if (selection.x >= canvasSize || selection.y >= canvasSize) {
+  if (selection.x >= canvasSize.width || selection.y >= canvasSize.height) {
     return null;
   }
 
-  const w = Math.min(selection.w, canvasSize - selection.x);
-  const h = Math.min(selection.h, canvasSize - selection.y);
+  const w = Math.min(selection.w, canvasSize.width - selection.x);
+  const h = Math.min(selection.h, canvasSize.height - selection.y);
   if (w <= 0 || h <= 0) {
     return null;
   }
@@ -385,7 +386,7 @@ export function cloneSelection(selection: Selection): Selection {
 // ブロック画像をベース画像へ合成して、新しいピクセル配列を返す。
 export function blitBlockOnCanvas(
   basePixels: Uint8ClampedArray,
-  canvasSize: number,
+  canvasSize: CanvasSize,
   blockPixels: Uint8ClampedArray,
   blockWidth: number,
   blockHeight: number,
@@ -396,16 +397,16 @@ export function blitBlockOnCanvas(
   const next = clonePixels(basePixels);
   for (let y = 0; y < blockHeight; y += 1) {
     const targetY = destY + y;
-    if (targetY < 0 || targetY >= canvasSize) {
+    if (targetY < 0 || targetY >= canvasSize.height) {
       continue;
     }
     for (let x = 0; x < blockWidth; x += 1) {
       const targetX = destX + x;
-      if (targetX < 0 || targetX >= canvasSize) {
+      if (targetX < 0 || targetX >= canvasSize.width) {
         continue;
       }
       const srcIdx = (y * blockWidth + x) * 4;
-      const dstIdx = (targetY * canvasSize + targetX) * 4;
+      const dstIdx = (targetY * canvasSize.width + targetX) * 4;
       if (compositeMode === 'replace') {
         next[dstIdx] = blockPixels[srcIdx];
         next[dstIdx + 1] = blockPixels[srcIdx + 1];

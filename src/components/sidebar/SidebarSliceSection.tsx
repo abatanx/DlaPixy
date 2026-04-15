@@ -681,7 +681,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                 type="number"
                 className="form-control text-end"
                 min={0}
-                max={canvasSize - 1}
+                max={canvasSize.width - 1}
                 value={xInput}
                 disabled={!activeSlice}
                 onChange={(event) => setXInput(event.target.value)}
@@ -695,7 +695,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
                 type="number"
                 className="form-control text-end"
                 min={0}
-                max={canvasSize - 1}
+                max={canvasSize.height - 1}
                 value={yInput}
                 disabled={!activeSlice}
                 onChange={(event) => setYInput(event.target.value)}
@@ -713,7 +713,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               type="number"
               className="form-control text-end"
               min={1}
-              max={canvasSize}
+              max={canvasSize.width}
               value={wInput}
               disabled={exportScopeSlices.length === 0}
               placeholder={selectedSizeDisplay.mixedWidth ? '混在' : undefined}
@@ -728,7 +728,7 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               type="number"
               className="form-control text-end"
               min={1}
-              max={canvasSize}
+              max={canvasSize.height}
               value={hInput}
               disabled={exportScopeSlices.length === 0}
               placeholder={selectedSizeDisplay.mixedHeight ? '混在' : undefined}

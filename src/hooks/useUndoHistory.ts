@@ -5,13 +5,13 @@
 
 import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { MAX_UNDO } from '../editor/constants';
-import type { EditorSlice, PaletteEntry, Selection } from '../editor/types';
+import type { CanvasSize, EditorSlice, PaletteEntry, Selection } from '../editor/types';
 import { clonePaletteEntries, clonePixels, cloneSelection, cloneSlices } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
 type UndoSnapshot = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   pixels: Uint8ClampedArray;
   selection: Selection;
   palette: PaletteEntry[];
@@ -22,7 +22,7 @@ type UndoSnapshot = {
 };
 
 type UseUndoHistoryOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   pixels: Uint8ClampedArray;
   selection: Selection;
   palette: PaletteEntry[];
@@ -32,7 +32,7 @@ type UseUndoHistoryOptions = {
   selectedColor: string;
   clearFloatingPaste: () => void;
   resetAnimationFrames: () => void;
-  setCanvasSize: Dispatch<SetStateAction<number>>;
+  setCanvasSize: Dispatch<SetStateAction<CanvasSize>>;
   setPixels: Dispatch<SetStateAction<Uint8ClampedArray>>;
   setSelection: Dispatch<SetStateAction<Selection>>;
   setLastTilePreviewSelection: Dispatch<SetStateAction<Selection>>;
@@ -107,7 +107,7 @@ export function useUndoHistory({
     setSelectedSliceIds([...previous.selectedSliceIds]);
     setActiveSliceId(previous.activeSliceId);
     setSelectedColor(previous.selectedColor);
-    if (previous.canvasSize !== canvasSize) {
+    if (previous.canvasSize.width !== canvasSize.width || previous.canvasSize.height !== canvasSize.height) {
       resetAnimationFrames();
     }
     clearFloatingPaste();

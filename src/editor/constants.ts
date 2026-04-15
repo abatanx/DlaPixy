@@ -14,10 +14,13 @@ export const PALETTE_CAPTION_MAX_LENGTH = SHARED_PALETTE_CAPTION_MAX_LENGTH;
 
 // 初期グリッド間隔（なし）。
 export const DEFAULT_GRID_SPACING = 0;
-// 初期キャンバスサイズ（正方形）。
-export const DEFAULT_CANVAS_SIZE = 256;
+// 初期キャンバスサイズ。
+export const DEFAULT_CANVAS_SIZE = {
+  width: 256,
+  height: 256
+} as const;
 // 初期表示倍率。
-export const DEFAULT_ZOOM = 3;
+export const DEFAULT_ZOOM = 1;
 // 表示倍率の下限。
 export const MIN_ZOOM = 1;
 // 表示倍率の上限。
@@ -26,9 +29,9 @@ export const MAX_ZOOM = 12;
 export const CANVAS_STAGE_VISIBLE_MARGIN_PX = 48;
 // Undo履歴の保持上限件数。
 export const MAX_UNDO = 40;
-// キャンバスサイズの下限。
+// キャンバス各辺サイズの下限。
 export const MIN_CANVAS_SIZE = 8;
-// キャンバスサイズの上限。
+// キャンバス各辺サイズの上限。
 export const MAX_CANVAS_SIZE = 1024;
 const WEB_SAFE_CHANNELS = ['00', '33', '66', '99', 'CC', 'FF'] as const;
 

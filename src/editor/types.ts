@@ -16,6 +16,10 @@ export type FloatingScaleMode = SharedFloatingScaleMode;
 
 export type PaletteEntry = SharedPaletteEntry;
 export type EditorSlice = SharedEditorSlice;
+export type CanvasSize = {
+  width: number;
+  height: number;
+};
 
 export type Selection = { x: number; y: number; w: number; h: number } | null;
 

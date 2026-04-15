@@ -14,7 +14,7 @@ import {
   type FloatingResizeHandle,
   type FloatingResizeSession
 } from '../editor/floating-interaction';
-import type { Selection, Tool } from '../editor/types';
+import type { CanvasSize, Selection, Tool } from '../editor/types';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -33,7 +33,7 @@ type DrawState = {
 };
 
 type UseFloatingInteractionOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   zoom: number;
   selection: Selection;
   tool: Tool;

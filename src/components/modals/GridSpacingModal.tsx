@@ -4,12 +4,13 @@
  **/
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import type { CanvasSize } from '../../editor/types';
 import { useBootstrapModal } from './useBootstrapModal';
 
 type GridSpacingModalProps = {
   isOpen: boolean;
   gridSpacing: number;
-  canvasSize: number;
+  canvasSize: CanvasSize;
   onApply: (value: number) => void;
   onClose: () => void;
   onValidationError: (message: string) => void;
@@ -23,6 +24,7 @@ export function GridSpacingModal({
   onClose,
   onValidationError
 }: GridSpacingModalProps) {
+  const maxGridSpacing = Math.max(canvasSize.width, canvasSize.height);
   const [pendingGridSpacing, setPendingGridSpacing] = useState<string>(String(gridSpacing));
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -67,14 +69,14 @@ export function GridSpacingModal({
         onValidationError('グリッド線間隔は数値で指定してください');
         return;
       }
-      if (parsed < 0 || parsed > canvasSize) {
-        onValidationError(`グリッド線間隔は 0 から ${canvasSize} の範囲で指定してください（0 はなし）`);
+      if (parsed < 0 || parsed > maxGridSpacing) {
+        onValidationError(`グリッド線間隔は 0 から ${maxGridSpacing} の範囲で指定してください（0 はなし）`);
         return;
       }
 
       applyAndClose(parsed);
     },
-    [applyAndClose, canvasSize, onValidationError, pendingGridSpacing]
+    [applyAndClose, maxGridSpacing, onValidationError, pendingGridSpacing]
   );
 
   return (
@@ -104,13 +106,13 @@ export function GridSpacingModal({
                 id="grid-spacing-input"
                 type="number"
                 min={0}
-                max={canvasSize}
+                max={maxGridSpacing}
                 className="form-control"
                 value={pendingGridSpacing}
                 onChange={(event) => setPendingGridSpacing(event.target.value)}
               />
               <div className="form-text">
-                現在値: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px`} / 範囲: 0 - {canvasSize} / 0 はなし / Enter で適用 / Esc でキャンセル
+                現在値: {gridSpacing === 0 ? 'なし' : `${gridSpacing}px`} / 範囲: 0 - {maxGridSpacing} / 0 はなし / Enter で適用 / Esc でキャンセル
               </div>
             </div>
             <div className="modal-footer">

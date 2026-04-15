@@ -3,6 +3,8 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
+import type { CanvasSize } from './types';
+
 type PreviewRegion = {
   x: number;
   y: number;
@@ -64,7 +66,7 @@ export function createImagePreviewDataUrl(
 // キャンバス全体から指定矩形だけ切り出して PNG Data URL を生成する。
 export function createRegionPreviewDataUrl(
   pixels: Uint8ClampedArray,
-  canvasSize: number,
+  canvasSize: CanvasSize,
   region: PreviewRegion,
   repeatX = 1,
   repeatY = 1
@@ -76,7 +78,7 @@ export function createRegionPreviewDataUrl(
   const regionPixels = new Uint8ClampedArray(region.w * region.h * 4);
   for (let y = 0; y < region.h; y += 1) {
     for (let x = 0; x < region.w; x += 1) {
-      const sourceIndex = ((region.y + y) * canvasSize + (region.x + x)) * 4;
+      const sourceIndex = ((region.y + y) * canvasSize.width + (region.x + x)) * 4;
       const targetIndex = (y * region.w + x) * 4;
       regionPixels[targetIndex] = pixels[sourceIndex];
       regionPixels[targetIndex + 1] = pixels[sourceIndex + 1];

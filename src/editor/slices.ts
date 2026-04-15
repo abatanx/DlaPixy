@@ -4,6 +4,7 @@
  **/
 
 import type { CSSProperties } from 'react';
+import type { CanvasSize } from './types';
 import {
   cloneSliceExportSettings,
   createDefaultSliceExportSettings,
@@ -82,15 +83,15 @@ export function createDefaultSliceName(index: number): string {
 }
 
 export function generateAutoSlicesForCanvas(
-  canvasSize: number,
+  canvasSize: CanvasSize,
   baseName: string,
   sliceWidth: number,
   sliceHeight: number
 ): EditorSlice[] {
   const normalizedWidth = Math.max(1, Math.trunc(sliceWidth));
   const normalizedHeight = Math.max(1, Math.trunc(sliceHeight));
-  const columns = Math.floor(canvasSize / normalizedWidth);
-  const rows = Math.floor(canvasSize / normalizedHeight);
+  const columns = Math.floor(canvasSize.width / normalizedWidth);
+  const rows = Math.floor(canvasSize.height / normalizedHeight);
   const total = columns * rows;
   if (total <= 0) {
     return [];
@@ -124,12 +125,12 @@ export function normalizeSliceRect(
   startY: number,
   endX: number,
   endY: number,
-  canvasSize: number
+  canvasSize: CanvasSize
 ): { x: number; y: number; w: number; h: number } {
-  const x1 = clamp(Math.min(startX, endX), 0, canvasSize - 1);
-  const y1 = clamp(Math.min(startY, endY), 0, canvasSize - 1);
-  const x2 = clamp(Math.max(startX, endX), 0, canvasSize - 1);
-  const y2 = clamp(Math.max(startY, endY), 0, canvasSize - 1);
+  const x1 = clamp(Math.min(startX, endX), 0, canvasSize.width - 1);
+  const y1 = clamp(Math.min(startY, endY), 0, canvasSize.height - 1);
+  const x2 = clamp(Math.max(startX, endX), 0, canvasSize.width - 1);
+  const y2 = clamp(Math.max(startY, endY), 0, canvasSize.height - 1);
 
   return {
     x: x1,
@@ -139,7 +140,7 @@ export function normalizeSliceRect(
   };
 }
 
-export function normalizeEditorSlices(slices: EditorSlice[], canvasSize: number): EditorSlice[] {
+export function normalizeEditorSlices(slices: EditorSlice[], canvasSize: CanvasSize): EditorSlice[] {
   const seenIds = new Set<string>();
   const normalized: EditorSlice[] = [];
 
@@ -185,7 +186,7 @@ export function moveSlicesWithinCanvas(
   selectedIds: string[],
   dx: number,
   dy: number,
-  canvasSize: number
+  canvasSize: CanvasSize
 ): EditorSlice[] {
   if (selectedIds.length === 0 || (dx === 0 && dy === 0)) {
     return slices;
@@ -202,8 +203,8 @@ export function moveSlicesWithinCanvas(
   const maxX = Math.max(...selectedSlices.map((slice) => slice.x + slice.w));
   const maxY = Math.max(...selectedSlices.map((slice) => slice.y + slice.h));
 
-  const clampedDx = clamp(dx, -minX, canvasSize - maxX);
-  const clampedDy = clamp(dy, -minY, canvasSize - maxY);
+  const clampedDx = clamp(dx, -minX, canvasSize.width - maxX);
+  const clampedDy = clamp(dy, -minY, canvasSize.height - maxY);
   if (clampedDx === 0 && clampedDy === 0) {
     return slices;
   }
@@ -219,7 +220,7 @@ export function resizeSliceFromHandle(
   slice: EditorSlice,
   handle: SliceResizeHandle,
   point: { x: number; y: number },
-  canvasSize: number
+  canvasSize: CanvasSize
 ): EditorSlice {
   let left = slice.x;
   let top = slice.y;
@@ -230,13 +231,13 @@ export function resizeSliceFromHandle(
     left = clamp(point.x, 0, right);
   }
   if (handle.includes('r')) {
-    right = clamp(point.x, left, canvasSize - 1);
+    right = clamp(point.x, left, canvasSize.width - 1);
   }
   if (handle.includes('t')) {
     top = clamp(point.y, 0, bottom);
   }
   if (handle.includes('b')) {
-    bottom = clamp(point.y, top, canvasSize - 1);
+    bottom = clamp(point.y, top, canvasSize.height - 1);
   }
 
   return {

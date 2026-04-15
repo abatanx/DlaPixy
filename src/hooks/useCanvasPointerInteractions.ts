@@ -8,14 +8,14 @@ import type { DrawState } from '../editor/canvas-pointer';
 import type { FloatingPasteState } from '../editor/floating-paste';
 import type { FloatingResizeSession } from '../editor/floating-interaction';
 import { isClientWithinCanvasMargin } from '../editor/slices';
-import type { Selection, Tool } from '../editor/types';
+import type { CanvasSize, Selection, Tool } from '../editor/types';
 import { pointInSelection } from '../editor/utils';
 import { useFloatingInteraction } from './useFloatingInteraction';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
 type UseCanvasPointerInteractionsOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   gridSpacing: number;
   zoom: number;
   pixels: Uint8ClampedArray;
@@ -122,8 +122,8 @@ export function useCanvasPointerInteractions({
       const tileSize = gridSpacing > 0 ? gridSpacing : 1;
       const startX = Math.floor(cell.x / tileSize) * tileSize;
       const startY = Math.floor(cell.y / tileSize) * tileSize;
-      const w = Math.min(tileSize, canvasSize - startX);
-      const h = Math.min(tileSize, canvasSize - startY);
+      const w = Math.min(tileSize, canvasSize.width - startX);
+      const h = Math.min(tileSize, canvasSize.height - startY);
       return { x: startX, y: startY, w, h };
     },
     [canvasSize, gridSpacing]

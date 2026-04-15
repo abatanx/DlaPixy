@@ -21,7 +21,7 @@ import {
   type SliceResizeHandle
 } from '../editor/slices';
 import { hasSameSliceExportSettings, type SliceExportSettings } from '../../shared/slice';
-import type { Selection, Tool } from '../editor/types';
+import type { CanvasSize, Selection, Tool } from '../editor/types';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -60,7 +60,7 @@ type SliceInteractionSession =
     };
 
 type UseSliceModeOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   tool: Tool;
   slices: EditorSlice[];
   selectedSliceIds: string[];
@@ -115,11 +115,11 @@ function resolveNextActiveSliceId(nextSlices: EditorSlice[], preferredIds: strin
   return nextSlices[0]?.id ?? null;
 }
 
-function normalizeSliceBounds(slice: EditorSlice, canvasSize: number): EditorSlice {
-  const x = Math.max(0, Math.min(canvasSize - 1, Math.trunc(slice.x)));
-  const y = Math.max(0, Math.min(canvasSize - 1, Math.trunc(slice.y)));
-  const w = Math.max(1, Math.min(canvasSize - x, Math.trunc(slice.w)));
-  const h = Math.max(1, Math.min(canvasSize - y, Math.trunc(slice.h)));
+function normalizeSliceBounds(slice: EditorSlice, canvasSize: CanvasSize): EditorSlice {
+  const x = Math.max(0, Math.min(canvasSize.width - 1, Math.trunc(slice.x)));
+  const y = Math.max(0, Math.min(canvasSize.height - 1, Math.trunc(slice.y)));
+  const w = Math.max(1, Math.min(canvasSize.width - x, Math.trunc(slice.w)));
+  const h = Math.max(1, Math.min(canvasSize.height - y, Math.trunc(slice.h)));
 
   return {
     ...slice,

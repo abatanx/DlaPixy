@@ -50,6 +50,7 @@ import {
   MIN_CANVAS_SIZE
 } from './editor/constants';
 import type {
+  CanvasSize,
   EditorSlice,
   PaletteEntry,
   Selection,
@@ -75,7 +76,7 @@ const CANVAS_FRAME_PX = 1;
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
   // ---- UI / editor state ----
-  const [canvasSize, setCanvasSize] = useState<number>(DEFAULT_CANVAS_SIZE);
+  const [canvasSize, setCanvasSize] = useState<CanvasSize>(DEFAULT_CANVAS_SIZE);
   const [gridSpacing, setGridSpacing] = useState<number>(DEFAULT_GRID_SPACING);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
   const [floatingCompositeMode, setFloatingCompositeMode] = useState<FloatingCompositeMode>(
@@ -141,7 +142,13 @@ export function App() {
     setFloatingInteractionActive(false);
   }, [clearFloatingPaste]);
 
-  const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
+  const displaySize = useMemo(
+    () => ({
+      width: canvasSize.width * zoom,
+      height: canvasSize.height * zoom
+    }),
+    [canvasSize.height, canvasSize.width, zoom]
+  );
   const canvasDisplayPixels = floatingPreviewPixels ?? pixels;
   const editorPreviewPixels = isFloatingInteractionActive ? pixels : floatingPreviewPixels ?? pixels;
   const {
@@ -603,13 +610,12 @@ export function App() {
   });
 
   const openAutoSliceModal = useCallback(() => {
-    const fallbackSize = gridSpacing > 0 ? gridSpacing : canvasSize;
     setAutoSliceRequest({
       baseName: activeSlice?.name || 'slice',
-      width: activeSlice?.w ?? fallbackSize,
-      height: activeSlice?.h ?? fallbackSize
+      width: activeSlice?.w ?? (gridSpacing > 0 ? Math.min(gridSpacing, canvasSize.width) : canvasSize.width),
+      height: activeSlice?.h ?? (gridSpacing > 0 ? Math.min(gridSpacing, canvasSize.height) : canvasSize.height)
     });
-  }, [activeSlice, canvasSize, gridSpacing]);
+  }, [activeSlice, canvasSize.height, canvasSize.width, gridSpacing]);
 
   const closeAutoSliceModal = useCallback(() => {
     setAutoSliceRequest(null);

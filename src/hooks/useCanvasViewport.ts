@@ -14,6 +14,7 @@ import {
   type SetStateAction
 } from 'react';
 import { MAX_ZOOM, MIN_ZOOM } from '../editor/constants';
+import type { CanvasSize } from '../editor/types';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -25,7 +26,7 @@ type ZoomAnchor = {
 };
 
 type UseCanvasViewportOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   zoom: number;
   setZoom: Dispatch<SetStateAction<number>>;
   canvasRef: MutableRefObject<HTMLCanvasElement | null>;
@@ -118,11 +119,13 @@ export function useCanvasViewport({
     }
   }, []);
 
-  const clampCanvasCoordinate = useCallback(
-    (value: number) => {
-      return Math.max(0, Math.min(value, canvasSize));
-    },
-    [canvasSize]
+  const clampCanvasCoordinateX = useCallback(
+    (value: number) => Math.max(0, Math.min(value, canvasSize.width)),
+    [canvasSize.width]
+  );
+  const clampCanvasCoordinateY = useCallback(
+    (value: number) => Math.max(0, Math.min(value, canvasSize.height)),
+    [canvasSize.height]
   );
 
   const resolveZoomAnchorFromClientPoint = useCallback(
@@ -145,13 +148,13 @@ export function useCanvasViewport({
 
       const stageRect = stage.getBoundingClientRect();
       return {
-        canvasX: clampCanvasCoordinate((clientX - canvasRect.left) / zoom),
-        canvasY: clampCanvasCoordinate((clientY - canvasRect.top) / zoom),
+        canvasX: clampCanvasCoordinateX((clientX - canvasRect.left) / zoom),
+        canvasY: clampCanvasCoordinateY((clientY - canvasRect.top) / zoom),
         viewportX: clientX - stageRect.left,
         viewportY: clientY - stageRect.top
       };
     },
-    [canvasRef, canvasStageRef, clampCanvasCoordinate, zoom]
+    [canvasRef, canvasStageRef, clampCanvasCoordinateX, clampCanvasCoordinateY, zoom]
   );
 
   const resolveViewportCenterZoomAnchor = useCallback((): ZoomAnchor | null => {
@@ -164,12 +167,12 @@ export function useCanvasViewport({
     const viewportX = stage.clientWidth / 2;
     const viewportY = stage.clientHeight / 2;
     return {
-      canvasX: clampCanvasCoordinate((stage.scrollLeft + viewportX - canvas.offsetLeft) / zoom),
-      canvasY: clampCanvasCoordinate((stage.scrollTop + viewportY - canvas.offsetTop) / zoom),
+      canvasX: clampCanvasCoordinateX((stage.scrollLeft + viewportX - canvas.offsetLeft) / zoom),
+      canvasY: clampCanvasCoordinateY((stage.scrollTop + viewportY - canvas.offsetTop) / zoom),
       viewportX,
       viewportY
     };
-  }, [canvasRef, canvasStageRef, clampCanvasCoordinate, zoom]);
+  }, [canvasRef, canvasStageRef, clampCanvasCoordinateX, clampCanvasCoordinateY, zoom]);
 
   const resolveZoomAnchor = useCallback(
     (clientPoint?: { clientX: number; clientY: number } | null): ZoomAnchor | null => {

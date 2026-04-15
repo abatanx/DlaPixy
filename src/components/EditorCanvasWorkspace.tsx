@@ -30,7 +30,7 @@ import {
 } from '../editor/slices';
 import { getEnabledSliceExportTargets } from '../../shared/slice';
 import { SliceExportTargetMarks } from './SliceExportTargetMarks';
-import type { EditorSlice, FloatingCompositeMode, FloatingScaleMode, HoveredPixelInfo, Selection, Tool } from '../editor/types';
+import type { CanvasSize, EditorSlice, FloatingCompositeMode, FloatingScaleMode, HoveredPixelInfo, Selection, Tool } from '../editor/types';
 
 type PixelInfoFields = {
   rgba: string;
@@ -43,7 +43,7 @@ type PixelInfoFields = {
 type EditorCanvasWorkspaceProps = {
   canvasStageRef: MutableRefObject<HTMLDivElement | null>;
   canvasRef: MutableRefObject<HTMLCanvasElement | null>;
-  displaySize: number;
+  displaySize: CanvasSize;
   canvasStageVisibleMarginPx: number;
   transparentBackgroundClassName: string;
   isPanning: boolean;
@@ -212,8 +212,8 @@ export function EditorCanvasWorkspace({
           <div className="canvas-surface">
             <canvas
               ref={canvasRef}
-              width={displaySize}
-              height={displaySize}
+              width={displaySize.width}
+              height={displaySize.height}
               className={`pixel-canvas ${transparentBackgroundClassName} ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
               onMouseDown={onMouseDown}
               onMouseMove={onMouseMove}

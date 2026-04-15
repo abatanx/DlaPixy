@@ -4,11 +4,12 @@
  **/
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import type { CanvasSize } from '../../editor/types';
 import { useBootstrapModal } from './useBootstrapModal';
 
 type AutoSliceModalProps = {
   isOpen: boolean;
-  canvasSize: number;
+  canvasSize: CanvasSize;
   initialBaseName: string;
   initialWidth: number;
   initialHeight: number;
@@ -74,8 +75,8 @@ export function AutoSliceModal({
         onValidationError('スライスの幅 / 高さは 1 以上にしてください');
         return;
       }
-      if (parsedWidth > canvasSize || parsedHeight > canvasSize) {
-        onValidationError(`スライスの幅 / 高さはキャンバスサイズ (${canvasSize}) 以下にしてください`);
+      if (parsedWidth > canvasSize.width || parsedHeight > canvasSize.height) {
+        onValidationError(`スライスの幅 / 高さはキャンバスサイズ (${canvasSize.width}x${canvasSize.height}) 以下にしてください`);
         return;
       }
 
@@ -88,7 +89,7 @@ export function AutoSliceModal({
         onClose();
       }
     },
-    [baseName, canvasSize, height, onApply, onClose, onValidationError, width]
+    [baseName, canvasSize.height, canvasSize.width, height, onApply, onClose, onValidationError, width]
   );
 
   return (
@@ -130,7 +131,7 @@ export function AutoSliceModal({
                     id="auto-slice-width-input"
                     type="number"
                     min={1}
-                    max={canvasSize}
+                    max={canvasSize.width}
                     className="form-control"
                     value={width}
                     onChange={(event) => setWidth(event.target.value)}
@@ -144,7 +145,7 @@ export function AutoSliceModal({
                     id="auto-slice-height-input"
                     type="number"
                     min={1}
-                    max={canvasSize}
+                    max={canvasSize.height}
                     className="form-control"
                     value={height}
                     onChange={(event) => setHeight(event.target.value)}

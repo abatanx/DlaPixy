@@ -4,11 +4,11 @@
  **/
 
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import type { Selection } from '../editor/types';
+import type { CanvasSize, Selection } from '../editor/types';
 import { clonePixels, hexToRgba, pointInSelection, rasterLinePoints } from '../editor/utils';
 
 type UseCanvasEditingCoreOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   gridSpacing: number;
   zoom: number;
   pixels: Uint8ClampedArray;
@@ -24,7 +24,8 @@ type CanvasRenderBuffer = {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   imageData: ImageData;
-  size: number;
+  width: number;
+  height: number;
 };
 
 export function useCanvasEditingCore({
@@ -54,10 +55,10 @@ export function useCanvasEditingCore({
       }
 
       let renderBuffer = renderBufferRef.current;
-      if (!renderBuffer || renderBuffer.size !== canvasSize) {
+      if (!renderBuffer || renderBuffer.width !== canvasSize.width || renderBuffer.height !== canvasSize.height) {
         const bufferCanvas = document.createElement('canvas');
-        bufferCanvas.width = canvasSize;
-        bufferCanvas.height = canvasSize;
+        bufferCanvas.width = canvasSize.width;
+        bufferCanvas.height = canvasSize.height;
         const bufferCtx = bufferCanvas.getContext('2d');
         if (!bufferCtx) {
           return;
@@ -65,8 +66,9 @@ export function useCanvasEditingCore({
         renderBuffer = {
           canvas: bufferCanvas,
           ctx: bufferCtx,
-          imageData: new ImageData(canvasSize, canvasSize),
-          size: canvasSize
+          imageData: new ImageData(canvasSize.width, canvasSize.height),
+          width: canvasSize.width,
+          height: canvasSize.height
         };
         renderBufferRef.current = renderBuffer;
       }
@@ -82,13 +84,16 @@ export function useCanvasEditingCore({
       if (gridSpacing > 0) {
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
         ctx.lineWidth = 1;
-        for (let i = 0; i <= canvasSize; i += gridSpacing) {
+        for (let i = 0; i <= canvasSize.width; i += gridSpacing) {
           const p = i * zoom + 0.5;
           ctx.beginPath();
           ctx.moveTo(p, 0);
           ctx.lineTo(p, canvas.height);
           ctx.stroke();
+        }
 
+        for (let i = 0; i <= canvasSize.height; i += gridSpacing) {
+          const p = i * zoom + 0.5;
           ctx.beginPath();
           ctx.moveTo(0, p);
           ctx.lineTo(canvas.width, p);
@@ -132,7 +137,7 @@ export function useCanvasEditingCore({
 
       const x = Math.floor(point.x);
       const y = Math.floor(point.y);
-      if (x < 0 || y < 0 || x >= canvasSize || y >= canvasSize) {
+      if (x < 0 || y < 0 || x >= canvasSize.width || y >= canvasSize.height) {
         return null;
       }
       return { x, y };
@@ -147,8 +152,8 @@ export function useCanvasEditingCore({
         return null;
       }
 
-      const x = Math.max(0, Math.min(canvasSize - 1, Math.floor(point.x)));
-      const y = Math.max(0, Math.min(canvasSize - 1, Math.floor(point.y)));
+      const x = Math.max(0, Math.min(canvasSize.width - 1, Math.floor(point.x)));
+      const y = Math.max(0, Math.min(canvasSize.height - 1, Math.floor(point.y)));
       return { x, y };
     },
     [canvasSize, resolveCanvasPointFromClient]
@@ -167,7 +172,7 @@ export function useCanvasEditingCore({
           if (selection && !pointInSelection(point, selection)) {
             continue;
           }
-          const idx = (point.y * canvasSize + point.x) * 4;
+          const idx = (point.y * canvasSize.width + point.x) * 4;
           if (erase) {
             if (next[idx + 3] === 0) {
               continue;
@@ -211,7 +216,7 @@ export function useCanvasEditingCore({
         return null;
       }
       const next = clonePixels(source);
-      const startIdx = (start.y * canvasSize + start.x) * 4;
+      const startIdx = (start.y * canvasSize.width + start.x) * 4;
       const target = [
         source[startIdx],
         source[startIdx + 1],
@@ -240,7 +245,7 @@ export function useCanvasEditingCore({
         if (selection && !pointInSelection(node, selection)) {
           continue;
         }
-        const idx = (node.y * canvasSize + node.x) * 4;
+        const idx = (node.y * canvasSize.width + node.x) * 4;
         if (
           next[idx] !== target[0] ||
           next[idx + 1] !== target[1] ||
@@ -261,7 +266,7 @@ export function useCanvasEditingCore({
           stack.push({ x: node.x - 1, y: node.y });
         }
         if (
-          node.x + 1 < canvasSize &&
+          node.x + 1 < canvasSize.width &&
           (!selection || pointInSelection({ x: node.x + 1, y: node.y }, selection))
         ) {
           stack.push({ x: node.x + 1, y: node.y });
@@ -270,7 +275,7 @@ export function useCanvasEditingCore({
           stack.push({ x: node.x, y: node.y - 1 });
         }
         if (
-          node.y + 1 < canvasSize &&
+          node.y + 1 < canvasSize.height &&
           (!selection || pointInSelection({ x: node.x, y: node.y + 1 }, selection))
         ) {
           stack.push({ x: node.x, y: node.y + 1 });

@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createRegionPreviewDataUrl, createTilePreviewLayerDataUrl, createTilePreviewLayerThumbnailDataUrl } from '../editor/preview';
 import { extractSelectionPixelBlock } from '../editor/selection-rotate';
-import type { AnimationFrame, Selection, TilePreviewLayer } from '../editor/types';
+import type { AnimationFrame, CanvasSize, Selection, TilePreviewLayer } from '../editor/types';
 import { clampSelectionToCanvas } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
@@ -16,7 +16,7 @@ const MIN_ANIMATION_PREVIEW_FPS = 1;
 const MAX_ANIMATION_PREVIEW_FPS = 24;
 
 type UseEditorPreviewsOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   pixels: Uint8ClampedArray;
   selection: Selection;
   isFloatingPasteActive: boolean;
@@ -52,13 +52,13 @@ export function useEditorPreviews({
 
   const previewDataUrl = useMemo(() => {
     const previewCanvas = document.createElement('canvas');
-    previewCanvas.width = canvasSize;
-    previewCanvas.height = canvasSize;
+    previewCanvas.width = canvasSize.width;
+    previewCanvas.height = canvasSize.height;
     const pctx = previewCanvas.getContext('2d');
     if (!pctx) {
       return '';
     }
-    pctx.putImageData(new ImageData(pixels.slice(), canvasSize, canvasSize), 0, 0);
+    pctx.putImageData(new ImageData(pixels.slice(), canvasSize.width, canvasSize.height), 0, 0);
     return previewCanvas.toDataURL('image/png');
   }, [canvasSize, pixels]);
 

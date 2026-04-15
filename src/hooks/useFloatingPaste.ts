@@ -7,7 +7,7 @@ import { useCallback, useEffect, type MutableRefObject } from 'react';
 import type { FloatingCompositeMode } from '../../shared/floating-composite';
 import type { FloatingScaleMode } from '../../shared/floating-scale-mode';
 import type { ClipboardPixelBlock, FloatingPasteState } from '../editor/floating-paste';
-import type { Selection, Tool } from '../editor/types';
+import type { CanvasSize, Selection, Tool } from '../editor/types';
 import {
   blitBlockOnCanvas,
   clampSelectionToCanvas,
@@ -22,7 +22,7 @@ type PasteSourceMode = 'internal' | 'external';
 type FloatingPasteRenderQuality = 'interactive' | 'final';
 
 type UseFloatingPasteOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   floatingCompositeMode: FloatingCompositeMode;
   floatingScaleMode: FloatingScaleMode;
   isFloatingInteractionActive: boolean;
@@ -78,8 +78,8 @@ export function useFloatingPaste({
 
       if (mode === 'internal') {
         return {
-          x: Math.min(clip.sourceX + 1, canvasSize - 1),
-          y: Math.min(clip.sourceY + 1, canvasSize - 1)
+          x: Math.min(clip.sourceX + 1, canvasSize.width - 1),
+          y: Math.min(clip.sourceY + 1, canvasSize.height - 1)
         };
       }
 
@@ -215,8 +215,8 @@ export function useFloatingPaste({
 
       const origin = resolveDefaultPasteOrigin(clip, mode);
       const nextRect = {
-        x: Math.max(1 - clip.width, Math.min(origin.x, canvasSize - 1)),
-        y: Math.max(1 - clip.height, Math.min(origin.y, canvasSize - 1)),
+        x: Math.max(1 - clip.width, Math.min(origin.x, canvasSize.width - 1)),
+        y: Math.max(1 - clip.height, Math.min(origin.y, canvasSize.height - 1)),
         width: clip.width,
         height: clip.height
       };
@@ -268,11 +268,11 @@ export function useFloatingPaste({
 
     pushUndo();
     const basePixels = clonePixels(pixels);
-    const selectedPixels = new Uint8ClampedArray(selection.w * selection.h * 4);
-    for (let y = 0; y < selection.h; y += 1) {
-      for (let x = 0; x < selection.w; x += 1) {
-        const srcIdx = ((selection.y + y) * canvasSize + (selection.x + x)) * 4;
-        const dstIdx = (y * selection.w + x) * 4;
+      const selectedPixels = new Uint8ClampedArray(selection.w * selection.h * 4);
+      for (let y = 0; y < selection.h; y += 1) {
+        for (let x = 0; x < selection.w; x += 1) {
+          const srcIdx = ((selection.y + y) * canvasSize.width + (selection.x + x)) * 4;
+          const dstIdx = (y * selection.w + x) * 4;
         selectedPixels[dstIdx] = pixels[srcIdx];
         selectedPixels[dstIdx + 1] = pixels[srcIdx + 1];
         selectedPixels[dstIdx + 2] = pixels[srcIdx + 2];
@@ -397,8 +397,8 @@ export function useFloatingPaste({
         return false;
       }
 
-      const nextX = Math.max(1 - floating.width, Math.min(floating.x + dx, canvasSize - 1));
-      const nextY = Math.max(1 - floating.height, Math.min(floating.y + dy, canvasSize - 1));
+      const nextX = Math.max(1 - floating.width, Math.min(floating.x + dx, canvasSize.width - 1));
+      const nextY = Math.max(1 - floating.height, Math.min(floating.y + dy, canvasSize.height - 1));
       if (nextX === floating.x && nextY === floating.y) {
         return false;
       }
@@ -430,7 +430,7 @@ export function useFloatingPaste({
     const imageData = ctx.createImageData(selection.w, selection.h);
     for (let y = 0; y < selection.h; y += 1) {
       for (let x = 0; x < selection.w; x += 1) {
-        const srcIdx = ((selection.y + y) * canvasSize + (selection.x + x)) * 4;
+        const srcIdx = ((selection.y + y) * canvasSize.width + (selection.x + x)) * 4;
         const dstIdx = (y * selection.w + x) * 4;
         imageData.data[dstIdx] = pixels[srcIdx];
         imageData.data[dstIdx + 1] = pixels[srcIdx + 1];

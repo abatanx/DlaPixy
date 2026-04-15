@@ -14,7 +14,7 @@ import {
 } from 'react';
 import type { PaletteColorModalRequest } from '../components/sidebar/types';
 import type { PaletteUsageEntry } from '../editor/palette-sync';
-import type { HoveredPixelInfo, PaletteEntry, Selection } from '../editor/types';
+import type { CanvasSize, HoveredPixelInfo, PaletteEntry, Selection } from '../editor/types';
 import { generatePaletteEntryId, hexToRgba, rgbaToHex8, rgbaToHsva } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
@@ -22,7 +22,7 @@ type StatusType = 'success' | 'warning' | 'error' | 'info';
 type SelectionRect = Exclude<Selection, null>;
 
 type UsePixelReferencesOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   pixels: Uint8ClampedArray;
   zoom: number;
   palette: PaletteEntry[];
@@ -131,8 +131,8 @@ export function usePixelReferences({
 
   const syncReferencePixelInfo = useCallback(
     (info: NonNullable<HoveredPixelInfo>): NonNullable<HoveredPixelInfo> => {
-      if (info.x >= 0 && info.y >= 0 && info.x < canvasSize && info.y < canvasSize) {
-        const idx = (info.y * canvasSize + info.x) * 4;
+      if (info.x >= 0 && info.y >= 0 && info.x < canvasSize.width && info.y < canvasSize.height) {
+        const idx = (info.y * canvasSize.width + info.x) * 4;
         const r = pixels[idx];
         const g = pixels[idx + 1];
         const b = pixels[idx + 2];
@@ -184,7 +184,7 @@ export function usePixelReferences({
         return;
       }
 
-      const idx = (cell.y * canvasSize + cell.x) * 4;
+      const idx = (cell.y * canvasSize.width + cell.x) * 4;
       const r = pixels[idx];
       const g = pixels[idx + 1];
       const b = pixels[idx + 2];

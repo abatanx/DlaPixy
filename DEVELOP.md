@@ -35,7 +35,9 @@ Notes:
 ### 4.1 Canvas Editing
 - Tools: Select, Pencil, Eraser, Fill
 - Default canvas size: `256x256`
-- Grid is independent overlay spacing (`0..canvasSize`, `0` = off)
+- Canvas width / height are independent; non-square canvases are supported through editing, selection, floating paste, preview, slice, save, and reload flows
+- Grid is independent overlay spacing (`0..max(width,height)`, `0` = off)
+- Initial zoom is `1x`
 - Stroke interpolation prevents gaps during fast drag
 - Undo supported
 - Space-drag pans the stage; Space-wheel zooms around cursor when possible
@@ -95,6 +97,7 @@ Notes:
 - Editor state is stored in sidecar JSON next to the PNG
 - Existing PNG metadata chunks are preserved on save, but DlaPixy state is restored only from sidecar JSON
 - Invalid sidecar shows warning and falls back to plain PNG load
+- PNG load keeps non-square sizes, and when editor min/max limits require rescaling it preserves aspect ratio as much as possible
 - Native `Canvas` menu opens canvas-size, grid-spacing, and zoom flows
 - OSS licenses dialog is available from the app/help menu and is backed by a generated JSON manifest
 - Slice export targets show platform marks in tabs, centered list rows, and under the in-canvas slice name when that target has at least one enabled variant

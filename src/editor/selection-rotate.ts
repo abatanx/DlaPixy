@@ -3,6 +3,8 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
+import type { CanvasSize } from './types';
+
 export type SelectionPixelBlock = {
   pixels: Uint8ClampedArray;
   width: number;
@@ -22,14 +24,14 @@ type SelectionRegion = {
 
 export function extractSelectionPixelBlock(
   pixels: Uint8ClampedArray,
-  canvasSize: number,
+  canvasSize: CanvasSize,
   selection: SelectionRegion
 ): SelectionPixelBlock {
   const blockPixels = new Uint8ClampedArray(selection.w * selection.h * 4);
 
   for (let y = 0; y < selection.h; y += 1) {
     for (let x = 0; x < selection.w; x += 1) {
-      const sourceIndex = ((selection.y + y) * canvasSize + (selection.x + x)) * 4;
+      const sourceIndex = ((selection.y + y) * canvasSize.width + (selection.x + x)) * 4;
       const targetIndex = (y * selection.w + x) * 4;
       blockPixels[targetIndex] = pixels[sourceIndex];
       blockPixels[targetIndex + 1] = pixels[sourceIndex + 1];
@@ -131,7 +133,7 @@ export function flipSelectionPixelBlock(
 
 export function applySelectionPixelBlock(
   canvasPixels: Uint8ClampedArray,
-  canvasSize: number,
+  canvasSize: CanvasSize,
   selection: SelectionRegion,
   blockPixels: Uint8ClampedArray
 ): Uint8ClampedArray {
@@ -140,7 +142,7 @@ export function applySelectionPixelBlock(
   for (let y = 0; y < selection.h; y += 1) {
     for (let x = 0; x < selection.w; x += 1) {
       const sourceIndex = (y * selection.w + x) * 4;
-      const targetIndex = ((selection.y + y) * canvasSize + (selection.x + x)) * 4;
+      const targetIndex = ((selection.y + y) * canvasSize.width + (selection.x + x)) * 4;
       next[targetIndex] = blockPixels[sourceIndex];
       next[targetIndex + 1] = blockPixels[sourceIndex + 1];
       next[targetIndex + 2] = blockPixels[sourceIndex + 2];

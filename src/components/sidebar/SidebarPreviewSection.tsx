@@ -259,8 +259,8 @@ export const SidebarPreviewSection = memo(function SidebarPreviewSection({
                   src={previewDataUrl}
                   alt="PNG Preview"
                   className="preview-image preview-scroll-image"
-                  width={canvasSize}
-                  height={canvasSize}
+                  width={canvasSize.width}
+                  height={canvasSize.height}
                   draggable={false}
                 />
               </div>

@@ -34,13 +34,13 @@ import {
   renderSliceExportFiles
 } from '../editor/slice-export';
 import { normalizeEditorSlices } from '../editor/slices';
-import type { EditorMeta, EditorSlice, PaletteEntry, Selection, Tool } from '../editor/types';
+import type { CanvasSize, EditorMeta, EditorSlice, PaletteEntry, Selection, Tool } from '../editor/types';
 import { clampCanvasSize, clonePaletteEntries, cloneSlices, normalizePaletteEntries } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
 type UseDocumentFileActionsOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   currentFilePath?: string;
   gridSpacing: number;
   hasUnsavedChanges: boolean;
@@ -58,7 +58,7 @@ type UseDocumentFileActionsOptions = {
   pendingZoomAnchorRef: MutableRefObject<unknown>;
   pendingViewportRestoreRef: MutableRefObject<{ scrollLeft: number; scrollTop: number } | null>;
   undoStackRef: MutableRefObject<unknown[]>;
-  setCanvasSize: Dispatch<SetStateAction<number>>;
+  setCanvasSize: Dispatch<SetStateAction<CanvasSize>>;
   setPixels: Dispatch<SetStateAction<Uint8ClampedArray>>;
   setSelection: Dispatch<SetStateAction<Selection>>;
   setLastTilePreviewSelection: Dispatch<SetStateAction<Selection>>;
@@ -81,6 +81,33 @@ type UseDocumentFileActionsOptions = {
   clearFloatingPaste: () => void;
   setStatusText: (text: string, type: StatusType) => void;
 };
+
+function resolveLoadedCanvasSize(sourceWidth: number, sourceHeight: number): CanvasSize {
+  const normalizedSourceWidth = Math.max(1, Math.trunc(sourceWidth || DEFAULT_CANVAS_SIZE.width));
+  const normalizedSourceHeight = Math.max(1, Math.trunc(sourceHeight || DEFAULT_CANVAS_SIZE.height));
+  const minScale = Math.max(
+    MIN_CANVAS_SIZE / normalizedSourceWidth,
+    MIN_CANVAS_SIZE / normalizedSourceHeight
+  );
+  const maxScale = Math.min(
+    MAX_CANVAS_SIZE / normalizedSourceWidth,
+    MAX_CANVAS_SIZE / normalizedSourceHeight
+  );
+
+  let scale = 1;
+  if (minScale <= maxScale) {
+    scale = Math.min(maxScale, Math.max(minScale, 1));
+  } else if (scale > maxScale) {
+    scale = maxScale;
+  } else if (scale < minScale) {
+    scale = minScale;
+  }
+
+  return {
+    width: clampCanvasSize(Math.max(1, Math.round(normalizedSourceWidth * scale)), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE),
+    height: clampCanvasSize(Math.max(1, Math.round(normalizedSourceHeight * scale)), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE)
+  };
+}
 
 export function useDocumentFileActions({
   canvasSize,
@@ -127,15 +154,15 @@ export function useDocumentFileActions({
   const createSavePayload = useCallback(() => {
     const canvas = document.createElement('canvas');
     const stage = canvasStageRef.current;
-    canvas.width = canvasSize;
-    canvas.height = canvasSize;
+    canvas.width = canvasSize.width;
+    canvas.height = canvasSize.height;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       return null;
     }
 
-    ctx.putImageData(new ImageData(pixels.slice(), canvasSize, canvasSize), 0, 0);
+    ctx.putImageData(new ImageData(pixels.slice(), canvasSize.width, canvasSize.height), 0, 0);
     const dataUrl = canvas.toDataURL('image/png');
     const base64Png = dataUrl.replace(/^data:image\/png;base64,/, '');
 
@@ -268,13 +295,12 @@ export function useDocumentFileActions({
           img.src = `data:image/png;base64,${result.base64Png}`;
         });
 
-        const fallbackSize = img.width === img.height ? img.width : DEFAULT_CANVAS_SIZE;
-        const targetCanvasSize = clampCanvasSize(fallbackSize, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+        const targetCanvasSize = resolveLoadedCanvasSize(img.width, img.height);
         const editorState = result.metadata?.dlaPixy.editor;
 
         const canvas = document.createElement('canvas');
-        canvas.width = targetCanvasSize;
-        canvas.height = targetCanvasSize;
+        canvas.width = targetCanvasSize.width;
+        canvas.height = targetCanvasSize.height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           setStatusText('読み込みに失敗しました: キャンバスの初期化に失敗しました', 'error');
@@ -282,10 +308,10 @@ export function useDocumentFileActions({
         }
 
         ctx.imageSmoothingEnabled = false;
-        ctx.clearRect(0, 0, targetCanvasSize, targetCanvasSize);
-        ctx.drawImage(img, 0, 0, targetCanvasSize, targetCanvasSize);
+        ctx.clearRect(0, 0, targetCanvasSize.width, targetCanvasSize.height);
+        ctx.drawImage(img, 0, 0, targetCanvasSize.width, targetCanvasSize.height);
 
-        const imageData = ctx.getImageData(0, 0, targetCanvasSize, targetCanvasSize);
+        const imageData = ctx.getImageData(0, 0, targetCanvasSize.width, targetCanvasSize.height);
         const loadedPixels = new Uint8ClampedArray(imageData.data);
         const usageFromLoadedPixels = collectPaletteUsageFromPixels(loadedPixels, targetCanvasSize);
 
@@ -323,7 +349,7 @@ export function useDocumentFileActions({
           if (loadedGridSpacing <= 0) {
             setGridSpacing(DEFAULT_GRID_SPACING);
           } else {
-            setGridSpacing(Math.max(1, Math.min(targetCanvasSize, Math.trunc(loadedGridSpacing))));
+            setGridSpacing(Math.max(1, Math.min(Math.max(targetCanvasSize.width, targetCanvasSize.height), Math.trunc(loadedGridSpacing))));
           }
         } else {
           setGridSpacing(DEFAULT_GRID_SPACING);
@@ -345,9 +371,7 @@ export function useDocumentFileActions({
         setViewportRestoreSequence((prev) => prev + 1);
 
         setHasUnsavedChanges(false);
-
-        const nonSquareNote = img.width !== img.height ? ' / 非正方形PNGは正方形キャンバスに合わせて変換' : '';
-        setStatusText(`読み込みました: ${result.filePath} (${img.width}x${img.height})${nonSquareNote}`, 'success');
+        setStatusText(`読み込みました: ${result.filePath} (${img.width}x${img.height})`, 'success');
       } catch (error) {
         const message = error instanceof Error ? error.message : '不明なエラー';
         setStatusText(`読み込みに失敗しました: ${message}`, 'error');

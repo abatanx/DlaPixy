@@ -5,20 +5,20 @@
 
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { normalizeEditorSlices } from '../editor/slices';
-import type { EditorSlice, Selection } from '../editor/types';
+import type { CanvasSize, EditorSlice, Selection } from '../editor/types';
 import { resizeCanvasPixels } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
 type UseCanvasSettingsOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   slices: EditorSlice[];
   pushUndo: () => void;
   clearFloatingPaste: () => void;
   resetTilePreviewLayers: () => void;
   resetAnimationFrames: () => void;
   resetSliceUiState: () => void;
-  setCanvasSize: Dispatch<SetStateAction<number>>;
+  setCanvasSize: Dispatch<SetStateAction<CanvasSize>>;
   setPixels: Dispatch<SetStateAction<Uint8ClampedArray>>;
   setSlices: Dispatch<SetStateAction<EditorSlice[]>>;
   setSelection: Dispatch<SetStateAction<Selection>>;
@@ -50,8 +50,8 @@ export function useCanvasSettings({
   const [isZoomModalOpen, setIsZoomModalOpen] = useState<boolean>(false);
 
   const applyCanvasSize = useCallback(
-    (normalized: number) => {
-      if (normalized === canvasSize) {
+    (normalized: CanvasSize) => {
+      if (normalized.width === canvasSize.width && normalized.height === canvasSize.height) {
         setIsCanvasSizeModalOpen(false);
         return;
       }
@@ -66,7 +66,7 @@ export function useCanvasSettings({
       resetAnimationFrames();
       resetSliceUiState();
       clearFloatingPaste();
-      setStatusText(`キャンバスを ${normalized}x${normalized} に変更しました`, 'success');
+      setStatusText(`キャンバスを ${normalized.width}x${normalized.height} に変更しました`, 'success');
       setHasUnsavedChanges(true);
       setIsCanvasSizeModalOpen(false);
     },

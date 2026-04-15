@@ -192,7 +192,7 @@ function buildColorKey(color: RgbColor): string {
 
 export function extractSelectionPixels(
   pixels: Uint8ClampedArray,
-  canvasSize: number,
+  canvasSize: CanvasSize,
   selection: { x: number; y: number; w: number; h: number }
 ): QuantizeSelectionSource {
   const blockPixels = new Uint8ClampedArray(selection.w * selection.h * 4);
@@ -201,7 +201,7 @@ export function extractSelectionPixels(
 
   for (let y = 0; y < selection.h; y += 1) {
     for (let x = 0; x < selection.w; x += 1) {
-      const sourceIndex = ((selection.y + y) * canvasSize + (selection.x + x)) * 4;
+      const sourceIndex = ((selection.y + y) * canvasSize.width + (selection.x + x)) * 4;
       const targetIndex = (y * selection.w + x) * 4;
       blockPixels[targetIndex] = pixels[sourceIndex];
       blockPixels[targetIndex + 1] = pixels[sourceIndex + 1];
@@ -345,3 +345,4 @@ export function quantizeSelectionWithKMeans(
     appliedColorCount
   };
 }
+import type { CanvasSize } from './types';

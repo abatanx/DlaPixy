@@ -4,6 +4,7 @@
  **/
 
 import { generatePaletteEntryId, normalizePaletteEntries, type PaletteEntry } from '../../shared/palette';
+import type { CanvasSize } from './types';
 import { rgbaToHex8 } from './utils';
 
 export type PaletteUsageEntry = {
@@ -30,7 +31,7 @@ export type UnusedPaletteCleanupOptions = {
 
 export function collectPaletteUsageFromPixels(
   pixels: Uint8ClampedArray,
-  canvasSize: number
+  canvasSize: CanvasSize
 ): PaletteUsageAnalysis {
   const orderedColors: string[] = [];
   const byColor: Record<string, PaletteUsageEntry> = {};
@@ -49,8 +50,8 @@ export function collectPaletteUsageFromPixels(
     }
 
     const pixelIndex = index / 4;
-    const firstY = Math.floor(pixelIndex / canvasSize);
-    const firstX = pixelIndex % canvasSize;
+    const firstY = Math.floor(pixelIndex / canvasSize.width);
+    const firstX = pixelIndex % canvasSize.width;
 
     byColor[color] = {
       color,
@@ -105,7 +106,7 @@ export function syncPaletteEntriesWithUsage(
 export function syncPaletteEntriesFromPixels(
   currentPalette: PaletteEntry[],
   pixels: Uint8ClampedArray,
-  canvasSize: number,
+  canvasSize: CanvasSize,
   options: PaletteSyncOptions = {}
 ): { palette: PaletteEntry[]; usage: PaletteUsageAnalysis } {
   const usage = collectPaletteUsageFromPixels(pixels, canvasSize);

@@ -26,6 +26,7 @@ import {
   normalizePaletteCaption,
   normalizePaletteEntries
 } from '../editor/utils';
+import type { CanvasSize } from '../editor/types';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -45,7 +46,7 @@ export type PaletteTextImportRequest = {
 };
 
 type UsePaletteManagementOptions = {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   currentFilePath?: string;
   palette: PaletteEntry[];
   selectedColor: string;

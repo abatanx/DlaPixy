@@ -381,19 +381,19 @@ export function buildSliceExportPlans(
 }
 
 export async function renderSliceExportFiles(args: {
-  canvasSize: number;
+  canvasSize: CanvasSize;
   pixels: Uint8ClampedArray;
   plans: SliceExportRenderPlan[];
   bundles: SliceExportBundlePlan[];
 }): Promise<Array<SliceExportWritePngFile | SliceExportWriteBundleFile>> {
   const sourceCanvas = document.createElement('canvas');
-  sourceCanvas.width = args.canvasSize;
-  sourceCanvas.height = args.canvasSize;
+  sourceCanvas.width = args.canvasSize.width;
+  sourceCanvas.height = args.canvasSize.height;
   const sourceContext = sourceCanvas.getContext('2d');
   if (!sourceContext) {
     throw new Error('書き出し用キャンバスの初期化に失敗しました');
   }
-  sourceContext.putImageData(new ImageData(args.pixels.slice(), args.canvasSize, args.canvasSize), 0, 0);
+  sourceContext.putImageData(new ImageData(args.pixels.slice(), args.canvasSize.width, args.canvasSize.height), 0, 0);
 
   const files: Array<SliceExportWritePngFile | SliceExportWriteBundleFile> = args.plans.map((plan) => ({
     kind: 'png',
@@ -529,3 +529,4 @@ function normalizeRelativeOutputPath(
 
   return { ok: true, path: segments.join('/') };
 }
+import type { CanvasSize } from './types';
