@@ -51,6 +51,7 @@ Notes:
   - fixed-aspect scaling in `Crisp` / `Alpha Smooth` modes
   - `Replace` / `Blend` preview mode
   - `Enter` to commit, `Esc` to cancel
+- During floating drag / resize, the canvas uses a temporary preview buffer so overlay labels still track live while committed `pixels`, palette usage, and heavy previews stay deferred until interaction end / commit
 - Selected pixels can be lifted and moved as floating content
 - Rotation modal supports wraparound pixel shifting, `90deg` rotate for square selections, and horizontal / vertical flip
 - Editing tools respect active selection bounds

@@ -48,8 +48,10 @@ type UseFloatingInteractionOptions = {
     nextX: number,
     nextY: number,
     nextWidth: number,
-    nextHeight: number
+    nextHeight: number,
+    quality?: 'interactive' | 'final'
   ) => void;
+  startFloatingInteractionPreview: () => void;
   setStatusText: (text: string, type: StatusType) => void;
 };
 
@@ -65,6 +67,7 @@ export function useFloatingInteraction({
   floatingInteractionStagePaddingCells,
   resolveCanvasPointFromClient,
   applyFloatingPasteBlock,
+  startFloatingInteractionPreview,
   setStatusText
 }: UseFloatingInteractionOptions) {
   const resolveFloatingResizeHandleFromClientPoint = useCallback(
@@ -112,8 +115,9 @@ export function useFloatingInteraction({
       drawStateRef.current.moveStartPoint = point;
       drawStateRef.current.moveStartOrigin = origin;
       floatingResizeRef.current = null;
+      startFloatingInteractionPreview();
     },
-    [drawStateRef, floatingResizeRef]
+    [drawStateRef, floatingResizeRef, startFloatingInteractionPreview]
   );
 
   const beginFloatingResize = useCallback(
@@ -139,8 +143,9 @@ export function useFloatingInteraction({
           height: selectionRect.h
         }
       };
+      startFloatingInteractionPreview();
     },
-    [drawStateRef, floatingResizeRef]
+    [drawStateRef, floatingResizeRef, startFloatingInteractionPreview]
   );
 
   const updateFloatingInteractionFromClient = useCallback(
@@ -168,7 +173,7 @@ export function useFloatingInteraction({
           nextRect.width !== floating.width ||
           nextRect.height !== floating.height
         ) {
-          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, nextRect.width, nextRect.height);
+          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, nextRect.width, nextRect.height, 'interactive');
         }
         return true;
       }
@@ -193,7 +198,7 @@ export function useFloatingInteraction({
         );
 
         if (nextRect.x !== floating.x || nextRect.y !== floating.y) {
-          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, floating.width, floating.height);
+          applyFloatingPasteBlock(floating, nextRect.x, nextRect.y, floating.width, floating.height, 'interactive');
         }
         return true;
       }

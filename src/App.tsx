@@ -88,6 +88,8 @@ export function App() {
     DEFAULT_TRANSPARENT_BACKGROUND_MODE
   );
   const [pixels, setPixels] = useState<Uint8ClampedArray>(() => createEmptyPixels(DEFAULT_CANVAS_SIZE));
+  const [floatingPreviewPixels, setFloatingPreviewPixels] = useState<Uint8ClampedArray | null>(null);
+  const [isFloatingInteractionActive, setFloatingInteractionActive] = useState<boolean>(false);
   const [palette, setPalette] = useState<PaletteEntry[]>(INITIAL_PALETTE);
   const [slices, setSlices] = useState<EditorSlice[]>([]);
   const [selectedSliceIds, setSelectedSliceIds] = useState<string[]>([]);
@@ -133,8 +135,15 @@ export function App() {
   const { selectionClipboardRef, floatingPasteRef, floatingResizeRef, clearFloatingPaste } = useFloatingSelectionState({
     drawStateRef
   });
+  const clearFloatingPasteState = useCallback(() => {
+    clearFloatingPaste();
+    setFloatingPreviewPixels(null);
+    setFloatingInteractionActive(false);
+  }, [clearFloatingPaste]);
 
   const displaySize = useMemo(() => canvasSize * zoom, [canvasSize, zoom]);
+  const canvasDisplayPixels = floatingPreviewPixels ?? pixels;
+  const editorPreviewPixels = isFloatingInteractionActive ? pixels : floatingPreviewPixels ?? pixels;
   const {
     isSpacePressed,
     isPanning,
@@ -199,7 +208,7 @@ export function App() {
     updateAnimationPreviewFps
   } = useEditorPreviews({
     canvasSize,
-    pixels,
+    pixels: editorPreviewPixels,
     selection,
     isFloatingPasteActive,
     disabled: tool === 'slice',
@@ -216,6 +225,7 @@ export function App() {
     gridSpacing,
     zoom,
     pixels,
+    displayPixels: canvasDisplayPixels,
     selectedColor,
     selection,
     canvasRef,
@@ -231,7 +241,7 @@ export function App() {
     selectedSliceIds,
     activeSliceId,
     selectedColor,
-    clearFloatingPaste,
+    clearFloatingPaste: clearFloatingPasteState,
     resetAnimationFrames,
     setCanvasSize,
     setPixels,
@@ -280,7 +290,7 @@ export function App() {
     selectedSliceIds,
     activeSliceId,
     pushUndo,
-    clearFloatingPaste,
+    clearFloatingPaste: clearFloatingPasteState,
     setSlices,
     setSelectedSliceIds,
     setActiveSliceId,
@@ -361,6 +371,8 @@ export function App() {
 
   const {
     applyFloatingPasteBlock,
+    startFloatingInteractionPreview,
+    completeFloatingInteractionPreview,
     liftSelectionToFloatingPaste,
     copySelection,
     pasteSelection,
@@ -371,6 +383,7 @@ export function App() {
     canvasSize,
     floatingCompositeMode,
     floatingScaleMode,
+    isFloatingInteractionActive,
     zoom,
     pixels,
     selection,
@@ -380,8 +393,10 @@ export function App() {
     selectionClipboardRef,
     floatingPasteRef,
     pushUndo,
-    clearFloatingPaste,
+    clearFloatingPaste: clearFloatingPasteState,
     syncPaletteAfterPaste,
+    setFloatingPreviewPixels,
+    setFloatingInteractionActive,
     setPixels,
     setSelection,
     setTool,
@@ -447,7 +462,7 @@ export function App() {
     selection,
     floatingPasteRef,
     pushUndo,
-    clearFloatingPaste,
+    clearFloatingPaste: clearFloatingPasteState,
     setPalette,
     setPixels,
     setSelectedColor,
@@ -489,11 +504,13 @@ export function App() {
     resolveCanvasCellFromClient,
     resolveCanvasClampedCellFromClient,
     applyFloatingPasteBlock,
+    startFloatingInteractionPreview,
+    completeFloatingInteractionPreview,
     liftSelectionToFloatingPaste,
     applyStrokeSegment,
     createFloodFillResult,
     pushUndo,
-    clearFloatingPaste,
+    clearFloatingPaste: clearFloatingPasteState,
     updateHoveredPixelInfo,
     clearHoveredPixelInfo,
     setPixels,
@@ -517,7 +534,7 @@ export function App() {
     canvasSize,
     slices,
     pushUndo,
-    clearFloatingPaste,
+    clearFloatingPaste: clearFloatingPasteState,
     resetTilePreviewLayers,
     resetAnimationFrames,
     resetSliceUiState,
@@ -581,7 +598,7 @@ export function App() {
     resetAnimationFrames,
     resetPaletteOrderViewState,
     resetSliceUiState,
-    clearFloatingPaste,
+    clearFloatingPaste: clearFloatingPasteState,
     setStatusText
   });
 

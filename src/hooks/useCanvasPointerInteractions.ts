@@ -48,8 +48,11 @@ type UseCanvasPointerInteractionsOptions = {
     nextX: number,
     nextY: number,
     nextWidth: number,
-    nextHeight: number
+    nextHeight: number,
+    quality?: 'interactive' | 'final'
   ) => void;
+  startFloatingInteractionPreview: () => void;
+  completeFloatingInteractionPreview: () => void;
   liftSelectionToFloatingPaste: () => FloatingPasteState | null;
   applyStrokeSegment: (from: { x: number; y: number }, to: { x: number; y: number }, erase?: boolean) => void;
   createFloodFillResult: (source: Uint8ClampedArray, start: { x: number; y: number }) => Uint8ClampedArray | null;
@@ -87,6 +90,8 @@ export function useCanvasPointerInteractions({
   resolveCanvasCellFromClient,
   resolveCanvasClampedCellFromClient,
   applyFloatingPasteBlock,
+  startFloatingInteractionPreview,
+  completeFloatingInteractionPreview,
   liftSelectionToFloatingPaste,
   applyStrokeSegment,
   createFloodFillResult,
@@ -218,6 +223,7 @@ export function useCanvasPointerInteractions({
     floatingInteractionStagePaddingCells,
     resolveCanvasPointFromClient,
     applyFloatingPasteBlock,
+    startFloatingInteractionPreview,
     setStatusText
   });
 
@@ -521,6 +527,9 @@ export function useCanvasPointerInteractions({
       }
     }
     resetDrawState();
+    if (wasMovingPaste || wasResizingPaste) {
+      completeFloatingInteractionPreview();
+    }
     if (wasMovingPaste && !shouldSelectSingleTile) {
       setStatusText('選択範囲を配置しました', 'success');
     }
@@ -530,6 +539,7 @@ export function useCanvasPointerInteractions({
   }, [
     drawStateRef,
     endPan,
+    completeFloatingInteractionPreview,
     floatingPasteRef,
     floatingResizeRef,
     gridSpacing,

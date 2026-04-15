@@ -12,6 +12,7 @@ type UseCanvasEditingCoreOptions = {
   gridSpacing: number;
   zoom: number;
   pixels: Uint8ClampedArray;
+  displayPixels: Uint8ClampedArray;
   selectedColor: string;
   selection: Selection;
   canvasRef: MutableRefObject<HTMLCanvasElement | null>;
@@ -31,6 +32,7 @@ export function useCanvasEditingCore({
   gridSpacing,
   zoom,
   pixels,
+  displayPixels,
   selectedColor,
   selection,
   canvasRef,
@@ -98,8 +100,8 @@ export function useCanvasEditingCore({
   );
 
   useEffect(() => {
-    drawCanvas(pixels);
-  }, [drawCanvas, pixels]);
+    drawCanvas(displayPixels);
+  }, [displayPixels, drawCanvas]);
 
   const colorBytes = useMemo(() => hexToRgba(selectedColor), [selectedColor]);
 
