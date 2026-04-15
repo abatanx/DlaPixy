@@ -68,6 +68,7 @@ export type EditorSidebarProps = {
   paletteUsageByColor: Record<string, PaletteUsageEntry>;
   setHoveredPaletteColor: (value: { id: string } | null) => void;
   addPaletteColor: (value: PaletteEntry) => void;
+  openPaletteTextImportModal: () => boolean;
   removeSelectedColorFromPalette: () => void;
   jumpToPaletteUsage: (color: string) => boolean;
   paletteOrderMode: PaletteOrderMode;
@@ -143,6 +144,7 @@ export type SidebarPaletteSectionProps = Pick<
   | 'paletteUsageByColor'
   | 'setHoveredPaletteColor'
   | 'addPaletteColor'
+  | 'openPaletteTextImportModal'
   | 'removeSelectedColorFromPalette'
   | 'jumpToPaletteUsage'
   | 'paletteOrderMode'

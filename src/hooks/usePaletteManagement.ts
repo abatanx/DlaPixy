@@ -8,13 +8,24 @@ import type { GplExportFormat } from '../../shared/palette-gpl';
 import { getFileNameFromPath, hasSamePaletteEntries, replaceFileExtension, resolveNextSelectedColor } from '../editor/app-utils';
 import { mergePaletteColorsIntoDestination } from '../editor/palette-merge';
 import {
+  resolvePaletteTextImportPreview as buildPaletteTextImportPreview,
+  type PaletteTextImportPreview
+} from '../editor/palette-text-import';
+import {
   collectUnusedPaletteEntries,
   syncPaletteEntriesFromPixels,
   type PaletteUsageEntry,
   type UnusedPaletteCleanupOptions
 } from '../editor/palette-sync';
 import type { PaletteEntry } from '../editor/types';
-import { clonePaletteEntries, clonePixels, generatePaletteEntryId, hexToRgba, normalizePaletteEntries } from '../editor/utils';
+import {
+  clonePaletteEntries,
+  clonePixels,
+  generatePaletteEntryId,
+  hexToRgba,
+  normalizePaletteCaption,
+  normalizePaletteEntries
+} from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -25,6 +36,12 @@ export type PaletteRemovalRequest = {
 
 export type UnusedPaletteCleanupRequest = {
   initialOptions: UnusedPaletteCleanupOptions;
+};
+
+export type PaletteTextImportRequest = {
+  initialText: string;
+  initialCaption: string;
+  initialLocked: boolean;
 };
 
 type UsePaletteManagementOptions = {
@@ -58,6 +75,7 @@ export function usePaletteManagement({
 }: UsePaletteManagementOptions) {
   const [paletteRemovalRequest, setPaletteRemovalRequest] = useState<PaletteRemovalRequest | null>(null);
   const [unusedPaletteCleanupRequest, setUnusedPaletteCleanupRequest] = useState<UnusedPaletteCleanupRequest | null>(null);
+  const [paletteTextImportRequest, setPaletteTextImportRequest] = useState<PaletteTextImportRequest | null>(null);
 
   const syncPaletteAfterPaste = useCallback(
     (nextPixels: Uint8ClampedArray) => {
@@ -250,6 +268,54 @@ export function usePaletteManagement({
     });
     return true;
   }, [resolveUnusedPaletteCandidates, setStatusText]);
+
+  const openPaletteTextImportModal = useCallback((): boolean => {
+    setPaletteTextImportRequest({
+      initialText: '',
+      initialCaption: '',
+      initialLocked: false
+    });
+    return true;
+  }, []);
+
+  const resolvePaletteTextImportPreview = useCallback(
+    (text: string): PaletteTextImportPreview => buildPaletteTextImportPreview(text, palette),
+    [palette]
+  );
+
+  const applyPaletteTextImport = useCallback(
+    ({ text, caption, locked }: { text: string; caption: string; locked: boolean }): boolean => {
+      const preview = resolvePaletteTextImportPreview(text);
+      if (preview.addableColors.length === 0) {
+        setStatusText(
+          preview.extractedColors.length === 0 ? '追加できる色がありません' : '追加できる新しい色がありません',
+          'warning'
+        );
+        return false;
+      }
+
+      const normalizedCaption = normalizePaletteCaption(caption);
+      const nextEntries = preview.addableColors.map((color) => ({
+        id: generatePaletteEntryId(),
+        color,
+        caption: normalizedCaption,
+        locked
+      }));
+
+      pushUndo();
+      setPalette((prev) => [...prev, ...nextEntries]);
+      setHasUnsavedChanges(true);
+      setPaletteTextImportRequest(null);
+      setStatusText(
+        preview.existingColors.length > 0
+          ? `パレットに追加しました: ${nextEntries.length}色 / 既存 ${preview.existingColors.length}色`
+          : `パレットに追加しました: ${nextEntries.length}色`,
+        'success'
+      );
+      return true;
+    },
+    [pushUndo, resolvePaletteTextImportPreview, setHasUnsavedChanges, setPalette, setStatusText]
+  );
 
   const applyUnusedPaletteCleanup = useCallback(
     (options: UnusedPaletteCleanupOptions): boolean => {
@@ -517,9 +583,14 @@ export function usePaletteManagement({
     setUnusedPaletteCleanupRequest(null);
   }, []);
 
+  const closePaletteTextImportModal = useCallback(() => {
+    setPaletteTextImportRequest(null);
+  }, []);
+
   return {
     paletteRemovalRequest,
     unusedPaletteCleanupRequest,
+    paletteTextImportRequest,
     syncPaletteAfterPaste,
     addPaletteColor,
     removeSelectedColorFromPalette,
@@ -527,12 +598,16 @@ export function usePaletteManagement({
     resolveUnusedPaletteCleanupPreview,
     openUnusedPaletteCleanupModal,
     applyUnusedPaletteCleanup,
+    resolvePaletteTextImportPreview,
+    openPaletteTextImportModal,
+    applyPaletteTextImport,
     mergePaletteColors,
     applySelectedColorChange,
     importGplPalette,
     exportGplPalette,
     confirmPaletteRemoval,
     closePaletteRemovalModal,
-    closeUnusedPaletteCleanupModal
+    closeUnusedPaletteCleanupModal,
+    closePaletteTextImportModal
   };
 }

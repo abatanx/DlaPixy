@@ -65,6 +65,7 @@ Notes:
 - Multi-select merge is supported with inline destination selection
 - Locked swatches survive cleanup even when their usage becomes `0`
 - Native `Palette` menu opens a cleanup modal for unused swatches, with options to also remove locked or captioned unused entries, and the operation is undoable
+- Native `Palette` menu and sidebar can open a text-import modal that extracts accepted hex color strings from arbitrary text, previews them live, and bulk-adds only new colors with shared caption / lock settings
 - GPL import/export:
   - replace all
   - append

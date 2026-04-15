@@ -293,12 +293,16 @@ export function App() {
   const {
     paletteRemovalRequest,
     unusedPaletteCleanupRequest,
+    paletteTextImportRequest,
     addPaletteColor,
     removeSelectedColorFromPalette,
     removePaletteColors,
     resolveUnusedPaletteCleanupPreview,
     openUnusedPaletteCleanupModal,
     applyUnusedPaletteCleanup,
+    resolvePaletteTextImportPreview,
+    openPaletteTextImportModal,
+    applyPaletteTextImport,
     mergePaletteColors,
     applySelectedColorChange,
     importGplPalette,
@@ -306,6 +310,7 @@ export function App() {
     confirmPaletteRemoval,
     closePaletteRemovalModal,
     closeUnusedPaletteCleanupModal,
+    closePaletteTextImportModal,
     syncPaletteAfterPaste
   } = usePaletteManagement({
     canvasSize,
@@ -656,6 +661,7 @@ export function App() {
     openAutoSliceModal,
     openKMeansQuantizeModal,
     openUnusedPaletteCleanupModal,
+    openPaletteTextImportModal,
     importGplPalette,
     exportGplPalette,
     exportSlices
@@ -795,6 +801,7 @@ export function App() {
             paletteUsageByColor={paletteUsage.byColor}
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
+            openPaletteTextImportModal={openPaletteTextImportModal}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
             jumpToPaletteUsage={jumpToPaletteUsage}
             paletteOrderMode={paletteOrderMode}
@@ -938,6 +945,12 @@ export function App() {
             resolvePreview: resolveUnusedPaletteCleanupPreview,
             onApply: applyUnusedPaletteCleanup,
             onClose: closeUnusedPaletteCleanupModal
+          }}
+          paletteTextImportModal={{
+            request: paletteTextImportRequest,
+            resolvePreview: resolvePaletteTextImportPreview,
+            onApply: applyPaletteTextImport,
+            onClose: closePaletteTextImportModal
           }}
           ossLicensesModal={{
             isOpen: isOssLicensesModalOpen,

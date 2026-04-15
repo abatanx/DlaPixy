@@ -362,8 +362,9 @@ export function PaletteColorModal({
               <div className="row g-3 mb-4">
                 <div className="col-12">
                   <div className="input-group">
-                    <span id="palette-color-caption-prefix" className="input-group-text">
-                      名前
+                    <span id="palette-color-caption-prefix" className="input-group-text" title="名前">
+                      <i className="fa-solid fa-tag" aria-hidden="true" />
+                      <span className="visually-hidden">名前</span>
                     </span>
                     <input
                       id="palette-color-caption-input"

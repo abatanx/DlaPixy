@@ -10,15 +10,21 @@ import { GridSpacingModal } from './modals/GridSpacingModal';
 import { KMeansQuantizeModal } from './modals/KMeansQuantizeModal';
 import { OssLicensesModal } from './modals/OssLicensesModal';
 import { PaletteCleanupModal } from './modals/PaletteCleanupModal';
+import { PaletteTextImportModal } from './modals/PaletteTextImportModal';
 import { SelectionRotateModal } from './modals/SelectionRotateModal';
 import { ZoomModal } from './modals/ZoomModal';
 import type { TransparentBackgroundMode } from '../../shared/transparent-background';
 import type { QuantizeSelectionResult, QuantizeSelectionSource } from '../editor/kmeans-quantize';
+import type { PaletteTextImportPreview } from '../editor/palette-text-import';
 import type { UnusedPaletteCleanupOptions } from '../editor/palette-sync';
 import type { SelectionPixelBlock } from '../editor/selection-rotate';
 import type { Selection } from '../editor/types';
 import type { StatusToastType } from '../hooks/useEditorShellUi';
-import type { PaletteRemovalRequest, UnusedPaletteCleanupRequest } from '../hooks/usePaletteManagement';
+import type {
+  PaletteRemovalRequest,
+  PaletteTextImportRequest,
+  UnusedPaletteCleanupRequest
+} from '../hooks/usePaletteManagement';
 
 type ToastState = {
   text: string;
@@ -91,6 +97,13 @@ type UnusedPaletteCleanupModalState = {
   onClose: () => void;
 };
 
+type PaletteTextImportModalState = {
+  request: PaletteTextImportRequest | null;
+  resolvePreview: (text: string) => PaletteTextImportPreview;
+  onApply: (args: { text: string; caption: string; locked: boolean }) => boolean;
+  onClose: () => void;
+};
+
 type OssLicensesModalState = {
   isOpen: boolean;
   onClose: () => void;
@@ -107,6 +120,7 @@ type EditorModalLayerProps = {
   selectionRotateModal: SelectionRotateModalState;
   paletteRemovalModal: PaletteRemovalModalState;
   unusedPaletteCleanupModal: UnusedPaletteCleanupModalState;
+  paletteTextImportModal: PaletteTextImportModalState;
   ossLicensesModal: OssLicensesModalState;
   onValidationError: (message: string) => void;
 };
@@ -122,6 +136,7 @@ export function EditorModalLayer({
   selectionRotateModal,
   paletteRemovalModal,
   unusedPaletteCleanupModal,
+  paletteTextImportModal,
   ossLicensesModal,
   onValidationError
 }: EditorModalLayerProps) {
@@ -222,6 +237,16 @@ export function EditorModalLayer({
         resolvePreview={unusedPaletteCleanupModal.resolvePreview}
         onApply={unusedPaletteCleanupModal.onApply}
         onClose={unusedPaletteCleanupModal.onClose}
+      />
+      <PaletteTextImportModal
+        isOpen={paletteTextImportModal.request !== null}
+        transparentBackgroundMode={transparentBackgroundMode}
+        initialText={paletteTextImportModal.request?.initialText ?? ''}
+        initialCaption={paletteTextImportModal.request?.initialCaption ?? ''}
+        initialLocked={paletteTextImportModal.request?.initialLocked ?? false}
+        resolvePreview={paletteTextImportModal.resolvePreview}
+        onApply={paletteTextImportModal.onApply}
+        onClose={paletteTextImportModal.onClose}
       />
       <OssLicensesModal
         isOpen={ossLicensesModal.isOpen}

@@ -23,6 +23,7 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
   paletteUsageByColor,
   setHoveredPaletteColor,
   addPaletteColor,
+  openPaletteTextImportModal,
   removeSelectedColorFromPalette,
   jumpToPaletteUsage,
   paletteOrderMode,
@@ -158,6 +159,11 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     jumpToPaletteUsage(selectedColor);
   }, [jumpToPaletteUsage, selectedColor]);
 
+  const handleOpenPaletteTextImportModal = useCallback(() => {
+    clearPaletteMergeSelection();
+    openPaletteTextImportModal();
+  }, [clearPaletteMergeSelection, openPaletteTextImportModal]);
+
   const handlePaletteDragStart = useCallback(
     (event: ReactDragEvent<HTMLButtonElement>) => {
       const sourceId = event.currentTarget.dataset.id;
@@ -287,7 +293,18 @@ export const SidebarPaletteSection = memo(function SidebarPaletteSection({
     <div className="sidebar-palette-section d-flex flex-column flex-grow-1">
       <div className="sidebar-palette-header">
         <label className="form-label font-monospace small mb-0">Palette</label>
-        <span className="sidebar-palette-count">{palette.length} colors</span>
+        <div className="sidebar-palette-header-meta">
+          <span className="sidebar-palette-count">{palette.length} colors</span>
+          <button
+            type="button"
+            className="btn btn-sm sidebar-palette-action-btn sidebar-palette-action-btn-text-import"
+            onClick={handleOpenPaletteTextImportModal}
+            title="テキストから追加"
+            aria-label="テキストから追加"
+          >
+            <i className="fa-solid fa-file-lines" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <div className="sidebar-palette-controls">
         <button

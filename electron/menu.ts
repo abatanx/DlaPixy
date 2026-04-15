@@ -148,6 +148,11 @@ function buildPaletteMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs):
     label: 'Palette',
     submenu: [
       {
+        label: 'テキストからパレットの追加...',
+        click: () => sendMenuAction({ type: 'palette-import-text' })
+      },
+      { type: 'separator' },
+      {
         label: 'インポート（GPL/すべて置換）...',
         click: () => sendMenuAction({ type: 'palette-import-replace' })
       },

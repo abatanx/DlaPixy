@@ -58,6 +58,7 @@ export const EditorSidebar = memo(function EditorSidebar({
   paletteUsageByColor,
   setHoveredPaletteColor,
   addPaletteColor,
+  openPaletteTextImportModal,
   removeSelectedColorFromPalette,
   jumpToPaletteUsage,
   paletteOrderMode,
@@ -146,6 +147,7 @@ export const EditorSidebar = memo(function EditorSidebar({
             paletteUsageByColor={paletteUsageByColor}
             setHoveredPaletteColor={setHoveredPaletteColor}
             addPaletteColor={addPaletteColor}
+            openPaletteTextImportModal={openPaletteTextImportModal}
             removeSelectedColorFromPalette={removeSelectedColorFromPalette}
             jumpToPaletteUsage={jumpToPaletteUsage}
             paletteOrderMode={paletteOrderMode}
