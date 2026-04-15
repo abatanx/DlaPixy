@@ -280,7 +280,7 @@ export function SelectionRotateModal({
                   </div>
                   {!isSquareSelection && source ? (
                     <div className="form-text mt-2">
-                      90度回転は正方形の選択範囲でのみ有効だよ。
+                      90度回転は正方形の選択範囲でのみ有効です。
                     </div>
                   ) : null}
                   <div className="btn-group btn-group-sm mt-3" role="group" aria-label="preview zoom controls">

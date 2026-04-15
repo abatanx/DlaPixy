@@ -23,6 +23,11 @@ export type PaletteSyncOptions = {
   addUsedColors?: boolean;
 };
 
+export type UnusedPaletteCleanupOptions = {
+  removeLocked?: boolean;
+  removeCaptioned?: boolean;
+};
+
 export function collectPaletteUsageFromPixels(
   pixels: Uint8ClampedArray,
   canvasSize: number
@@ -70,14 +75,10 @@ export function syncPaletteEntriesWithUsage(
   const normalizedCurrentPalette = normalizePaletteEntries(currentPalette);
   const removeUnusedColors = options.removeUnusedColors === true;
   const addUsedColors = options.addUsedColors !== false;
+  const removableUnusedColors = new Set(collectUnusedPaletteEntries(normalizedCurrentPalette, usage).map((entry) => entry.color));
 
   const nextPalette = removeUnusedColors
-    ? normalizedCurrentPalette.filter((entry) => {
-        if (usage.byColor[entry.color]) {
-          return true;
-        }
-        return entry.locked || entry.caption.length > 0;
-      })
+    ? normalizedCurrentPalette.filter((entry) => !removableUnusedColors.has(entry.color))
     : normalizedCurrentPalette.map((entry) => ({ ...entry }));
 
   if (!addUsedColors) {
@@ -112,6 +113,29 @@ export function syncPaletteEntriesFromPixels(
     palette: syncPaletteEntriesWithUsage(currentPalette, usage, options),
     usage
   };
+}
+
+export function collectUnusedPaletteEntries(
+  currentPalette: PaletteEntry[],
+  usage: PaletteUsageAnalysis,
+  options: UnusedPaletteCleanupOptions = {}
+): PaletteEntry[] {
+  const normalizedCurrentPalette = normalizePaletteEntries(currentPalette);
+  const removeLocked = options.removeLocked === true;
+  const removeCaptioned = options.removeCaptioned === true;
+
+  return normalizedCurrentPalette.filter((entry) => {
+    if (usage.byColor[entry.color]) {
+      return false;
+    }
+    if (!removeLocked && entry.locked) {
+      return false;
+    }
+    if (!removeCaptioned && entry.caption.length > 0) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export function formatPaletteUsageLabel(count: number): string {

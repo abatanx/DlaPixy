@@ -292,15 +292,20 @@ export function App() {
   });
   const {
     paletteRemovalRequest,
+    unusedPaletteCleanupRequest,
     addPaletteColor,
     removeSelectedColorFromPalette,
     removePaletteColors,
+    resolveUnusedPaletteCleanupPreview,
+    openUnusedPaletteCleanupModal,
+    applyUnusedPaletteCleanup,
     mergePaletteColors,
     applySelectedColorChange,
     importGplPalette,
     exportGplPalette,
     confirmPaletteRemoval,
     closePaletteRemovalModal,
+    closeUnusedPaletteCleanupModal,
     syncPaletteAfterPaste
   } = usePaletteManagement({
     canvasSize,
@@ -650,6 +655,7 @@ export function App() {
     openOssLicensesModal,
     openAutoSliceModal,
     openKMeansQuantizeModal,
+    openUnusedPaletteCleanupModal,
     importGplPalette,
     exportGplPalette,
     exportSlices
@@ -926,6 +932,12 @@ export function App() {
             request: paletteRemovalRequest,
             onConfirm: confirmPaletteRemoval,
             onClose: closePaletteRemovalModal
+          }}
+          unusedPaletteCleanupModal={{
+            request: unusedPaletteCleanupRequest,
+            resolvePreview: resolveUnusedPaletteCleanupPreview,
+            onApply: applyUnusedPaletteCleanup,
+            onClose: closeUnusedPaletteCleanupModal
           }}
           ossLicensesModal={{
             isOpen: isOssLicensesModalOpen,

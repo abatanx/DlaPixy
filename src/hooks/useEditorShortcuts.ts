@@ -55,6 +55,7 @@ type UseEditorShortcutsOptions = {
   openOssLicensesModal: () => void;
   openAutoSliceModal: () => void;
   openKMeansQuantizeModal: () => void;
+  openUnusedPaletteCleanupModal: () => boolean;
   importGplPalette: (mode: 'replace' | 'append') => Promise<void>;
   exportGplPalette: (format: GplExportFormat) => Promise<void>;
   exportSlices: () => Promise<void>;
@@ -113,6 +114,7 @@ export function useEditorShortcuts({
   openOssLicensesModal,
   openAutoSliceModal,
   openKMeansQuantizeModal,
+  openUnusedPaletteCleanupModal,
   importGplPalette,
   exportGplPalette,
   exportSlices
@@ -530,6 +532,9 @@ export function useEditorShortcuts({
         case 'palette-kmeans-quantize':
           openKMeansQuantizeModal();
           break;
+        case 'palette-remove-unused':
+          openUnusedPaletteCleanupModal();
+          break;
         case 'palette-import-replace':
           void importGplPalette('replace');
           break;
@@ -557,6 +562,7 @@ export function useEditorShortcuts({
     openGridSpacingModal,
     openOssLicensesModal,
     openKMeansQuantizeModal,
+    openUnusedPaletteCleanupModal,
     saveAsPng,
     savePng,
     setTransparentBackgroundMode,

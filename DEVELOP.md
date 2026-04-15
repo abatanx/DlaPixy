@@ -64,6 +64,7 @@ Notes:
 - Removing an in-use swatch requires confirmation and clears matching pixels to transparent
 - Multi-select merge is supported with inline destination selection
 - Locked swatches survive cleanup even when their usage becomes `0`
+- Native `Palette` menu opens a cleanup modal for unused swatches, with options to also remove locked or captioned unused entries, and the operation is undoable
 - GPL import/export:
   - replace all
   - append

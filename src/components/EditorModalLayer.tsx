@@ -9,14 +9,16 @@ import { ConfirmModal } from './modals/ConfirmModal';
 import { GridSpacingModal } from './modals/GridSpacingModal';
 import { KMeansQuantizeModal } from './modals/KMeansQuantizeModal';
 import { OssLicensesModal } from './modals/OssLicensesModal';
+import { PaletteCleanupModal } from './modals/PaletteCleanupModal';
 import { SelectionRotateModal } from './modals/SelectionRotateModal';
 import { ZoomModal } from './modals/ZoomModal';
 import type { TransparentBackgroundMode } from '../../shared/transparent-background';
 import type { QuantizeSelectionResult, QuantizeSelectionSource } from '../editor/kmeans-quantize';
+import type { UnusedPaletteCleanupOptions } from '../editor/palette-sync';
 import type { SelectionPixelBlock } from '../editor/selection-rotate';
 import type { Selection } from '../editor/types';
 import type { StatusToastType } from '../hooks/useEditorShellUi';
-import type { PaletteRemovalRequest } from '../hooks/usePaletteManagement';
+import type { PaletteRemovalRequest, UnusedPaletteCleanupRequest } from '../hooks/usePaletteManagement';
 
 type ToastState = {
   text: string;
@@ -82,6 +84,13 @@ type PaletteRemovalModalState = {
   onClose: () => void;
 };
 
+type UnusedPaletteCleanupModalState = {
+  request: UnusedPaletteCleanupRequest | null;
+  resolvePreview: (options: UnusedPaletteCleanupOptions) => { totalUnusedCount: number; removableCount: number };
+  onApply: (options: UnusedPaletteCleanupOptions) => boolean;
+  onClose: () => void;
+};
+
 type OssLicensesModalState = {
   isOpen: boolean;
   onClose: () => void;
@@ -97,6 +106,7 @@ type EditorModalLayerProps = {
   kMeansQuantizeModal: KMeansQuantizeModalState;
   selectionRotateModal: SelectionRotateModalState;
   paletteRemovalModal: PaletteRemovalModalState;
+  unusedPaletteCleanupModal: UnusedPaletteCleanupModalState;
   ossLicensesModal: OssLicensesModalState;
   onValidationError: (message: string) => void;
 };
@@ -111,6 +121,7 @@ export function EditorModalLayer({
   kMeansQuantizeModal,
   selectionRotateModal,
   paletteRemovalModal,
+  unusedPaletteCleanupModal,
   ossLicensesModal,
   onValidationError
 }: EditorModalLayerProps) {
@@ -205,6 +216,13 @@ export function EditorModalLayer({
             : 'この色を削除すると、該当するピクセルはすべて透明になります。続けてよければ削除してください。'}
         </p>
       </ConfirmModal>
+      <PaletteCleanupModal
+        isOpen={unusedPaletteCleanupModal.request !== null}
+        initialOptions={unusedPaletteCleanupModal.request?.initialOptions ?? {}}
+        resolvePreview={unusedPaletteCleanupModal.resolvePreview}
+        onApply={unusedPaletteCleanupModal.onApply}
+        onClose={unusedPaletteCleanupModal.onClose}
+      />
       <OssLicensesModal
         isOpen={ossLicensesModal.isOpen}
         onClose={ossLicensesModal.onClose}

@@ -18,6 +18,7 @@ export type MenuAction =
   | { type: 'slice-export' }
   | { type: 'transparent-background'; mode: TransparentBackgroundMode }
   | { type: 'palette-kmeans-quantize' }
+  | { type: 'palette-remove-unused' }
   | { type: 'palette-import-replace' }
   | { type: 'palette-import-append' }
   | { type: 'palette-export'; format: GplExportFormat };

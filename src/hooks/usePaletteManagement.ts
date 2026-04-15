@@ -7,7 +7,12 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import type { GplExportFormat } from '../../shared/palette-gpl';
 import { getFileNameFromPath, hasSamePaletteEntries, replaceFileExtension, resolveNextSelectedColor } from '../editor/app-utils';
 import { mergePaletteColorsIntoDestination } from '../editor/palette-merge';
-import { syncPaletteEntriesFromPixels, type PaletteUsageEntry } from '../editor/palette-sync';
+import {
+  collectUnusedPaletteEntries,
+  syncPaletteEntriesFromPixels,
+  type PaletteUsageEntry,
+  type UnusedPaletteCleanupOptions
+} from '../editor/palette-sync';
 import type { PaletteEntry } from '../editor/types';
 import { clonePaletteEntries, clonePixels, generatePaletteEntryId, hexToRgba, normalizePaletteEntries } from '../editor/utils';
 
@@ -16,6 +21,10 @@ type StatusType = 'success' | 'warning' | 'error' | 'info';
 export type PaletteRemovalRequest = {
   colors: string[];
   usedPixelCount: number;
+};
+
+export type UnusedPaletteCleanupRequest = {
+  initialOptions: UnusedPaletteCleanupOptions;
 };
 
 type UsePaletteManagementOptions = {
@@ -48,6 +57,7 @@ export function usePaletteManagement({
   setStatusText
 }: UsePaletteManagementOptions) {
   const [paletteRemovalRequest, setPaletteRemovalRequest] = useState<PaletteRemovalRequest | null>(null);
+  const [unusedPaletteCleanupRequest, setUnusedPaletteCleanupRequest] = useState<UnusedPaletteCleanupRequest | null>(null);
 
   const syncPaletteAfterPaste = useCallback(
     (nextPixels: Uint8ClampedArray) => {
@@ -196,6 +206,84 @@ export function usePaletteManagement({
       return removePaletteColorsInternal(normalizedColorsToRemove, false);
     },
     [palette, paletteUsageByColor, removePaletteColorsInternal, setStatusText]
+  );
+
+  const resolveUnusedPaletteCandidates = useCallback(
+    (options: UnusedPaletteCleanupOptions): PaletteEntry[] =>
+      collectUnusedPaletteEntries(
+        palette,
+        {
+          orderedColors: [],
+          byColor: paletteUsageByColor
+        },
+        options
+      ),
+    [palette, paletteUsageByColor]
+  );
+
+  const resolveUnusedPaletteCleanupPreview = useCallback(
+    (options: UnusedPaletteCleanupOptions): { totalUnusedCount: number; removableCount: number } => ({
+      totalUnusedCount: resolveUnusedPaletteCandidates({
+        removeLocked: true,
+        removeCaptioned: true
+      }).length,
+      removableCount: resolveUnusedPaletteCandidates(options).length
+    }),
+    [resolveUnusedPaletteCandidates]
+  );
+
+  const openUnusedPaletteCleanupModal = useCallback((): boolean => {
+    const totalUnusedCount = resolveUnusedPaletteCandidates({
+      removeLocked: true,
+      removeCaptioned: true
+    }).length;
+    if (totalUnusedCount === 0) {
+      setStatusText('削除対象の不要パレットはありません', 'warning');
+      return false;
+    }
+
+    setUnusedPaletteCleanupRequest({
+      initialOptions: {
+        removeLocked: false,
+        removeCaptioned: false
+      }
+    });
+    return true;
+  }, [resolveUnusedPaletteCandidates, setStatusText]);
+
+  const applyUnusedPaletteCleanup = useCallback(
+    (options: UnusedPaletteCleanupOptions): boolean => {
+      const removableEntries = resolveUnusedPaletteCandidates(options);
+      if (removableEntries.length === 0) {
+        setStatusText('現在の条件では削除対象の不要パレットはありません', 'warning');
+        return false;
+      }
+
+      const removableColors = new Set(removableEntries.map((entry) => entry.color));
+      const nextPalette = palette.filter((entry) => !removableColors.has(entry.color));
+      if (hasSamePaletteEntries(palette, nextPalette)) {
+        setStatusText('現在の条件では削除対象の不要パレットはありません', 'warning');
+        return false;
+      }
+
+      pushUndo();
+      setPalette(nextPalette);
+      setSelectedColor(resolveNextSelectedColor(nextPalette, selectedColor));
+      setHasUnsavedChanges(true);
+      setUnusedPaletteCleanupRequest(null);
+      setStatusText(`不要パレットを削除しました: ${removableEntries.length}色`, 'success');
+      return true;
+    },
+    [
+      palette,
+      pushUndo,
+      resolveUnusedPaletteCandidates,
+      selectedColor,
+      setHasUnsavedChanges,
+      setPalette,
+      setSelectedColor,
+      setStatusText
+    ]
   );
 
   const mergePaletteColors = useCallback(
@@ -425,17 +513,26 @@ export function usePaletteManagement({
     setPaletteRemovalRequest(null);
   }, []);
 
+  const closeUnusedPaletteCleanupModal = useCallback(() => {
+    setUnusedPaletteCleanupRequest(null);
+  }, []);
+
   return {
     paletteRemovalRequest,
+    unusedPaletteCleanupRequest,
     syncPaletteAfterPaste,
     addPaletteColor,
     removeSelectedColorFromPalette,
     removePaletteColors,
+    resolveUnusedPaletteCleanupPreview,
+    openUnusedPaletteCleanupModal,
+    applyUnusedPaletteCleanup,
     mergePaletteColors,
     applySelectedColorChange,
     importGplPalette,
     exportGplPalette,
     confirmPaletteRemoval,
-    closePaletteRemovalModal
+    closePaletteRemovalModal,
+    closeUnusedPaletteCleanupModal
   };
 }

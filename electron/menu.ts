@@ -160,6 +160,10 @@ function buildPaletteMenuTemplate({ sendMenuAction }: BuildApplicationMenuArgs):
         label: 'K-Meansで減色する...',
         click: () => sendMenuAction({ type: 'palette-kmeans-quantize' })
       },
+      {
+        label: '不要パレットを削除...',
+        click: () => sendMenuAction({ type: 'palette-remove-unused' })
+      },
       { type: 'separator' },
       {
         label: 'エクスポート（標準 GPL）...',
