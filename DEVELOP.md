@@ -101,6 +101,7 @@ Notes:
 - Slice export `File(s)` preview lists simulated outputs from all targets at once, instead of only the active tab
 - `ICO` / `ICNS` rows in the Slice export `File(s)` preview expand bundled slice names and target sizes, while copy still keeps path-only output
 - Slice export includes working `ICO` / `ICNS` bundle export; enabled variants with the same slice name and directory are packed into one icon file per target
+- Slice export targets can keep per-target RGBA background colors; the UI reuses `PaletteColorModal` for selection and export rendering composites the chosen color before PNG / bundle output
 - Transparent background mode is shared across editor canvas, previews, and modal previews
 - Status messages are toast-based; persistent sidebar status row is removed
 - Footer shows canvas, grid, zoom, and current file status

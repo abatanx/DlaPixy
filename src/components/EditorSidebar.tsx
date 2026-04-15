@@ -82,6 +82,7 @@ export const EditorSidebar = memo(function EditorSidebar({
           <div className="card-body editor-sidebar-body d-flex flex-column overflow-auto">
             <SidebarSliceSection
               canvasSize={canvasSize}
+              transparentBackgroundMode={transparentBackgroundMode}
               slices={slices}
               selectedSliceIds={selectedSliceIds}
               activeSlice={activeSlice}

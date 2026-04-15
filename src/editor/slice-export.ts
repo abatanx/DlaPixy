@@ -5,6 +5,7 @@
 
 import {
   ANDROID_SLICE_EXPORT_VARIANTS,
+  DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR,
   GENERIC_AND_APPLE_SLICE_EXPORT_VARIANTS,
   ICO_SLICE_EXPORT_VARIANTS,
   ICNS_SLICE_EXPORT_VARIANTS,
@@ -13,6 +14,8 @@ import {
   SLICE_EXPORT_TARGET_LABELS,
   SLICE_EXPORT_VARIANTS_BY_TARGET,
   createDefaultSliceExportSettings,
+  isTransparentSliceExportBackgroundColor,
+  normalizeSliceExportBackgroundColor,
   normalizeSliceExportSettings,
   type EditorSlice,
   type SliceExportAxis,
@@ -40,12 +43,14 @@ export type SliceExportTargetDisplayState = {
   baseAxis: SliceExportAxis | null;
   baseSizeInput: string;
   directoryTemplates: string;
+  backgroundColor: string | null;
   variants: Record<string, SliceExportVariantDisplayState>;
   mixed: {
     baseVariant: boolean;
     baseAxis: boolean;
     baseSizeInput: boolean;
     directoryTemplates: boolean;
+    backgroundColor: boolean;
     anyVariant: boolean;
   };
 };
@@ -62,6 +67,7 @@ export type SliceExportRenderPlan = SliceExportSimulation & {
   y: number;
   sourceWidth: number;
   sourceHeight: number;
+  backgroundColor: string;
 };
 
 export type SliceExportBundleMemberPlan = {
@@ -72,6 +78,7 @@ export type SliceExportBundleMemberPlan = {
   y: number;
   sourceWidth: number;
   sourceHeight: number;
+  backgroundColor: string;
 };
 
 export type SliceExportBundlePlan = {
@@ -95,6 +102,7 @@ export function resolveDisplayTargetUiState(
   const baseAxis = resolveSharedValue(states.map((state) => state.baseAxis));
   const baseSizeInput = resolveSharedValue(states.map((state) => state.baseSizeInput));
   const directoryTemplates = resolveSharedValue(states.map((state) => state.directoryTemplates));
+  const backgroundColor = resolveSharedValue(states.map((state) => state.backgroundColor));
 
   const variantStates = Object.fromEntries(
     variants.map((variant) => {
@@ -117,12 +125,14 @@ export function resolveDisplayTargetUiState(
     baseAxis: baseAxis.value,
     baseSizeInput: baseSizeInput.value ?? '',
     directoryTemplates: directoryTemplates.value ?? '',
+    backgroundColor: backgroundColor.value,
     variants: variantStates,
     mixed: {
       baseVariant: baseVariant.mixed,
       baseAxis: baseAxis.mixed,
       baseSizeInput: baseSizeInput.mixed,
       directoryTemplates: directoryTemplates.mixed,
+      backgroundColor: backgroundColor.mixed,
       anyVariant: variants.some((variant) => variantStates[variant.key]?.mixed)
     }
   };
@@ -285,6 +295,7 @@ export function buildSliceExportPlans(
           y: slice.y,
           sourceWidth: slice.w,
           sourceHeight: slice.h,
+          backgroundColor: exportSettings[target].backgroundColor,
           relativePath: normalizedPath.path,
           width: simulation.width,
           height: simulation.height
@@ -340,7 +351,8 @@ export function buildSliceExportPlans(
             x: slice.x,
             y: slice.y,
             sourceWidth: slice.w,
-            sourceHeight: slice.h
+            sourceHeight: slice.h,
+            backgroundColor: exportSettings[target].backgroundColor
           });
         }
 
@@ -408,7 +420,10 @@ export async function renderSliceExportFiles(args: {
 
 function renderPlanToBase64Png(
   sourceCanvas: HTMLCanvasElement,
-  plan: Pick<SliceExportBundleMemberPlan, 'x' | 'y' | 'sourceWidth' | 'sourceHeight' | 'width' | 'height'>
+  plan: Pick<
+    SliceExportBundleMemberPlan,
+    'x' | 'y' | 'sourceWidth' | 'sourceHeight' | 'width' | 'height' | 'backgroundColor'
+  >
 ): string {
     const targetCanvas = document.createElement('canvas');
     targetCanvas.width = plan.width;
@@ -420,6 +435,10 @@ function renderPlanToBase64Png(
 
     targetContext.imageSmoothingEnabled = false;
     targetContext.clearRect(0, 0, plan.width, plan.height);
+    if (!isTransparentSliceExportBackgroundColor(plan.backgroundColor)) {
+      targetContext.fillStyle = normalizeColorHexToCanvasFillStyle(plan.backgroundColor);
+      targetContext.fillRect(0, 0, plan.width, plan.height);
+    }
     targetContext.drawImage(
       sourceCanvas,
       plan.x,
@@ -433,6 +452,15 @@ function renderPlanToBase64Png(
     );
 
     return targetCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+}
+
+function normalizeColorHexToCanvasFillStyle(value: string): string {
+  const normalized = normalizeSliceExportBackgroundColor(value, DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR);
+  const r = Number.parseInt(normalized.slice(1, 3), 16);
+  const g = Number.parseInt(normalized.slice(3, 5), 16);
+  const b = Number.parseInt(normalized.slice(5, 7), 16);
+  const a = Number.parseInt(normalized.slice(7, 9), 16) / 255;
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
 export function getSliceExportScopeSlices(slices: EditorSlice[], selectedSliceIds: string[]): EditorSlice[] {

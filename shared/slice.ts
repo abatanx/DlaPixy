@@ -3,6 +3,8 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
+import { normalizeColorHex } from './palette';
+
 export type SliceExportPngTargetKey = 'generic' | 'apple' | 'android';
 export type SliceExportBundleTargetKey = 'ico' | 'icns';
 export type SliceExportTargetKey = SliceExportPngTargetKey | SliceExportBundleTargetKey;
@@ -20,6 +22,7 @@ export type SliceExportTargetSettings = {
   baseSizeInput: string;
   variants: Record<string, boolean>;
   directoryTemplates: string;
+  backgroundColor: string;
 };
 
 export type SliceExportSettings = Record<SliceExportTargetKey, SliceExportTargetSettings>;
@@ -85,6 +88,7 @@ export const SLICE_EXPORT_TARGET_LABELS: Record<SliceExportTargetKey, string> = 
   ico: 'ICO',
   icns: 'ICNS'
 };
+export const DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR = '#00000000';
 
 export const SLICE_NAME_MAX_LENGTH = 100;
 const SLICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -149,6 +153,7 @@ export function hasSameSliceExportSettings(left: SliceExportSettings, right: Sli
       leftTarget.baseAxis === rightTarget.baseAxis &&
       leftTarget.baseSizeInput === rightTarget.baseSizeInput &&
       leftTarget.directoryTemplates === rightTarget.directoryTemplates &&
+      leftTarget.backgroundColor === rightTarget.backgroundColor &&
       variants.every((variant) => leftTarget.variants[variant.key] === rightTarget.variants[variant.key])
     );
   });
@@ -220,7 +225,8 @@ function createDefaultSliceExportTargetSettings(
     baseAxis: 'width',
     baseSizeInput: String(Math.max(1, Math.trunc(axisSize))),
     variants: createSliceExportVariantSelectionMap(variants),
-    directoryTemplates
+    directoryTemplates,
+    backgroundColor: DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR
   };
 }
 
@@ -260,7 +266,8 @@ function normalizeSliceExportTargetSettings(
     directoryTemplates:
       typeof candidate.directoryTemplates === 'string'
         ? candidate.directoryTemplates.trim()
-        : defaults.directoryTemplates
+        : defaults.directoryTemplates,
+    backgroundColor: normalizeSliceExportBackgroundColor(candidate.backgroundColor, defaults.backgroundColor)
   };
 }
 
@@ -269,6 +276,18 @@ function cloneSliceExportTargetSettings(settings: SliceExportTargetSettings): Sl
     ...settings,
     variants: { ...settings.variants }
   };
+}
+
+export function normalizeSliceExportBackgroundColor(
+  value: unknown,
+  fallback = DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR
+): string {
+  return typeof value === 'string' ? normalizeColorHex(value) ?? fallback : fallback;
+}
+
+export function isTransparentSliceExportBackgroundColor(value: string): boolean {
+  const normalized = normalizeSliceExportBackgroundColor(value);
+  return normalized.slice(7, 9) === '00';
 }
 
 function createSliceExportVariantSelectionMap(

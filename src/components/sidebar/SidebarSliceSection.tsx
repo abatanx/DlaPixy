@@ -24,7 +24,14 @@ import type {
   SliceExportTargetSettings,
   SliceExportVariantDefinition
 } from '../../../shared/slice';
-import { getEnabledSliceExportTargets } from '../../../shared/slice';
+import {
+  DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR,
+  getEnabledSliceExportTargets,
+  normalizeSliceExportBackgroundColor
+} from '../../../shared/slice';
+import type { PaletteEntry } from '../../editor/types';
+import { generatePaletteEntryId } from '../../editor/utils';
+import { PaletteColorModal } from '../modals/PaletteColorModal';
 import { SliceExportTargetMark, SliceExportTargetMarks } from '../SliceExportTargetMarks';
 import type { SidebarSliceSectionProps } from './types';
 
@@ -60,6 +67,7 @@ type SliceExportFilePreviewItem =
 
 export const SidebarSliceSection = memo(function SidebarSliceSection({
   canvasSize,
+  transparentBackgroundMode,
   slices,
   selectedSliceIds,
   activeSlice,
@@ -76,6 +84,13 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
   const [wInput, setWInput] = useState<string>('1');
   const [hInput, setHInput] = useState<string>('1');
   const [activeExportTab, setActiveExportTab] = useState<SliceExportTargetKey>('generic');
+  const [backgroundColorModalTarget, setBackgroundColorModalTarget] = useState<SliceExportTargetKey | null>(null);
+  const [backgroundColorModalInitial, setBackgroundColorModalInitial] = useState<PaletteEntry>(() => ({
+    id: generatePaletteEntryId(),
+    color: DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR,
+    caption: '',
+    locked: false
+  }));
   const isMultiSliceSelection = selectedSliceIds.length > 1;
   const showSingleSliceFields = !isMultiSliceSelection && activeSlice !== null;
 
@@ -319,15 +334,50 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     event.currentTarget.blur();
   };
 
-  const updateTargetExportUi = (
-    target: SliceExportTargetKey,
-    updater: (current: SliceExportTargetSettings) => SliceExportTargetSettings
-  ) => {
-    updateSelectedSliceExportSettings((current: SliceExportSettings) => ({
+  const updateTargetExportUi = useCallback(
+    (
+      target: SliceExportTargetKey,
+      updater: (current: SliceExportTargetSettings) => SliceExportTargetSettings
+    ) => {
+      updateSelectedSliceExportSettings((current: SliceExportSettings) => ({
+        ...current,
+        [target]: updater(current[target])
+      }));
+    },
+    [updateSelectedSliceExportSettings]
+  );
+
+  const openBackgroundColorPicker = useCallback((target: SliceExportTargetKey, currentColor: string) => {
+    setBackgroundColorModalInitial({
+      id: generatePaletteEntryId(),
+      color: currentColor,
+      caption: '',
+      locked: false
+    });
+    setBackgroundColorModalTarget(target);
+  }, []);
+
+  const applyTargetBackgroundColor = useCallback((target: SliceExportTargetKey, rawValue: string) => {
+    updateTargetExportUi(target, (current) => ({
       ...current,
-      [target]: updater(current[target])
+      backgroundColor: normalizeSliceExportBackgroundColor(rawValue)
     }));
-  };
+  }, [updateTargetExportUi]);
+
+  const resetTargetBackgroundColor = useCallback((target: SliceExportTargetKey) => {
+    updateTargetExportUi(target, (current) => ({
+      ...current,
+      backgroundColor: DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR
+    }));
+  }, [updateTargetExportUi]);
+
+  const handleBackgroundColorModalApply = useCallback((nextEntry: PaletteEntry) => {
+    if (!backgroundColorModalTarget) {
+      return;
+    }
+
+    applyTargetBackgroundColor(backgroundColorModalTarget, nextEntry.color);
+  }, [applyTargetBackgroundColor, backgroundColorModalTarget]);
 
   const copySimulatedPaths = useCallback(async (paths: string[]) => {
     if (paths.length === 0 || !navigator.clipboard?.writeText) {
@@ -357,12 +407,17 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
     const widthValue = targetState.baseAxis === 'width' ? targetState.baseSizeInput : '';
     const heightValue = targetState.baseAxis === 'height' ? targetState.baseSizeInput : '';
     const baseVariantLabel = variants.find((variant) => variant.key === targetState.baseVariant)?.label ?? '基準';
+    const pickerBackgroundColor =
+      targetState.backgroundColor ?? resolveSliceExportSettings(exportScopeSlices[0]!)[target].backgroundColor;
+    const backgroundColorLabel = targetState.mixed.backgroundColor ? '混在' : pickerBackgroundColor.toUpperCase();
+    const canResetBackgroundColor =
+      targetState.mixed.backgroundColor || pickerBackgroundColor !== DEFAULT_SLICE_EXPORT_BACKGROUND_COLOR;
 
     return (
       <div key={target} className="p-1 d-flex flex-column gap-2 slice-sidebar-export-target small">
         {isBundleTarget(target) ? (
           <div className="slice-sidebar-export-bundle-note">
-            有効な variant を同じスライス名かつ同じ Dir ごとに 1 つの <span className="font-monospace">.{target}</span> へまとめて書き出すよ
+            有効な variant を同じスライス名かつ同じ Dir ごとに 1 つの <span className="font-monospace">.{target}</span> にまとめて書き出します
           </div>
         ) : null}
 
@@ -511,6 +566,39 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
               }))
             }
           />
+        </div>
+
+        <div className="input-group input-group-sm">
+          <button
+            type="button"
+            className="btn slice-sidebar-background-trigger"
+            onClick={() => openBackgroundColorPicker(target, pickerBackgroundColor)}
+            aria-label={`${SLICE_EXPORT_TARGET_LABELS[target]} の背景色を選択`}
+            title={`${SLICE_EXPORT_TARGET_LABELS[target]} の背景色を選択`}
+          >
+            <span
+              className="slice-sidebar-background-trigger-fill"
+              style={{ backgroundColor: pickerBackgroundColor }}
+              aria-hidden="true"
+            />
+          </button>
+          <input
+            type="text"
+            className="form-control font-monospace"
+            value={backgroundColorLabel}
+            readOnly
+            aria-label={`${SLICE_EXPORT_TARGET_LABELS[target]} の背景色`}
+          />
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={() => resetTargetBackgroundColor(target)}
+            disabled={!canResetBackgroundColor}
+            aria-label={`${SLICE_EXPORT_TARGET_LABELS[target]} の背景色を透明に戻す`}
+            title={`${SLICE_EXPORT_TARGET_LABELS[target]} の背景色を透明に戻す`}
+          >
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
+          </button>
         </div>
       </div>
     );
@@ -742,6 +830,20 @@ export const SidebarSliceSection = memo(function SidebarSliceSection({
           </div>
         </div>
       ) : null}
+      <PaletteColorModal
+        isOpen={backgroundColorModalTarget !== null}
+        transparentBackgroundMode={transparentBackgroundMode}
+        selectedPalette={backgroundColorModalInitial}
+        palette={[]}
+        onApply={handleBackgroundColorModalApply}
+        onClose={() => setBackgroundColorModalTarget(null)}
+        options={{
+          title: '背景色を選択',
+          allowCaption: false,
+          allowLock: false,
+          enforceUniqueColor: false
+        }}
+      />
     </div>
   );
 });

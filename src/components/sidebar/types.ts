@@ -122,6 +122,7 @@ export type SidebarPreviewSectionProps = Pick<
 export type SidebarSliceSectionProps = Pick<
   EditorSidebarProps,
   | 'canvasSize'
+  | 'transparentBackgroundMode'
   | 'slices'
   | 'selectedSliceIds'
   | 'activeSlice'

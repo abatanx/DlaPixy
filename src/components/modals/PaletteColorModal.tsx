@@ -15,10 +15,17 @@ type PaletteColorModalProps = {
   isOpen: boolean;
   transparentBackgroundMode: TransparentBackgroundMode;
   selectedPalette: PaletteEntry;
-  palette: PaletteEntry[];
+  palette?: PaletteEntry[];
   paletteEditTargetId?: string | null;
   onApply: (value: PaletteEntry) => void;
   onClose: () => void;
+  options?: {
+    title?: string;
+    allowCaption?: boolean;
+    allowLock?: boolean;
+    enforceUniqueColor?: boolean;
+    submitLabel?: string;
+  };
 };
 
 type RgbaChannels = {
@@ -123,11 +130,17 @@ export function PaletteColorModal({
   isOpen,
   transparentBackgroundMode,
   selectedPalette,
-  palette,
+  palette = [],
   paletteEditTargetId = selectedPalette.id,
   onApply,
-  onClose
+  onClose,
+  options
 }: PaletteColorModalProps) {
+  const title = options?.title ?? '色を選択';
+  const allowCaption = options?.allowCaption ?? true;
+  const allowLock = options?.allowLock ?? true;
+  const enforceUniqueColor = options?.enforceUniqueColor ?? true;
+  const submitLabel = options?.submitLabel ?? '適用';
   const initialHexParts = splitColorHexInput(selectedPalette.color);
   const [pendingHexRgbInput, setPendingHexRgbInput] = useState<string>(initialHexParts.rgb);
   const [pendingAlphaHexInput, setPendingAlphaHexInput] = useState<string>(initialHexParts.alpha);
@@ -297,6 +310,7 @@ export function PaletteColorModal({
       ? normalizeColorHex(`${normalizedPendingRgb}${normalizedPendingAlpha}`)
       : null;
   const hasDuplicatePaletteColor =
+    enforceUniqueColor &&
     normalizedPendingColor !== null &&
     palette.some((entry) => entry.color === normalizedPendingColor && entry.id !== paletteEditTargetId);
   const effectiveValidationMessage =
@@ -330,12 +344,26 @@ export function PaletteColorModal({
       onApply({
         id: selectedPalette.id,
         color: nextColor,
-        caption: normalizePaletteCaption(pendingCaptionInput),
-        locked: pendingLocked
+        caption: allowCaption ? normalizePaletteCaption(pendingCaptionInput) : selectedPalette.caption,
+        locked: allowLock ? pendingLocked : selectedPalette.locked
       });
       onClose();
     },
-    [hasDuplicatePaletteColor, normalizedPendingAlpha, normalizedPendingColor, normalizedPendingRgb, onApply, onClose, pendingCaptionInput, pendingLocked]
+    [
+      allowCaption,
+      allowLock,
+      hasDuplicatePaletteColor,
+      normalizedPendingAlpha,
+      normalizedPendingColor,
+      normalizedPendingRgb,
+      onApply,
+      onClose,
+      pendingCaptionInput,
+      pendingLocked,
+      selectedPalette.caption,
+      selectedPalette.id,
+      selectedPalette.locked
+    ]
   );
 
   return (
@@ -353,50 +381,56 @@ export function PaletteColorModal({
               <div>
                 <h2 id="palette-color-modal-title" className="modal-title fs-5 d-inline-flex align-items-center gap-2">
                   <i className="fa-solid fa-palette" aria-hidden="true" />
-                  <span>色を選択</span>
+                  <span>{title}</span>
                 </h2>
               </div>
               <button type="button" className="btn-close" aria-label="閉じる" onClick={onClose} />
             </div>
             <div className="modal-body py-4">
-              <div className="row g-3 mb-4">
-                <div className="col-12">
-                  <div className="input-group">
-                    <span id="palette-color-caption-prefix" className="input-group-text" title="名前">
-                      <i className="fa-solid fa-tag" aria-hidden="true" />
-                      <span className="visually-hidden">名前</span>
-                    </span>
-                    <input
-                      id="palette-color-caption-input"
-                      type="text"
-                      inputMode="text"
-                      autoCapitalize="characters"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      className="form-control font-monospace"
-                      value={pendingCaptionInput}
-                      onChange={handleCaptionInputChange}
-                      maxLength={PALETTE_CAPTION_MAX_LENGTH}
-                      aria-describedby="palette-color-caption-prefix"
-                    />
-                  </div>
+              {allowCaption || allowLock ? (
+                <div className="row g-3 mb-4">
+                  {allowCaption ? (
+                    <div className="col-12">
+                      <div className="input-group">
+                        <span id="palette-color-caption-prefix" className="input-group-text" title="名前">
+                          <i className="fa-solid fa-tag" aria-hidden="true" />
+                          <span className="visually-hidden">名前</span>
+                        </span>
+                        <input
+                          id="palette-color-caption-input"
+                          type="text"
+                          inputMode="text"
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          className="form-control font-monospace"
+                          value={pendingCaptionInput}
+                          onChange={handleCaptionInputChange}
+                          maxLength={PALETTE_CAPTION_MAX_LENGTH}
+                          aria-describedby="palette-color-caption-prefix"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                  {allowLock ? (
+                    <div className="col-12">
+                      <div className="form-check form-switch palette-color-modal-lock-switch">
+                        <input
+                          id="palette-color-lock-input"
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={pendingLocked}
+                          onChange={(event) => setPendingLocked(event.target.checked)}
+                        />
+                        <label htmlFor="palette-color-lock-input" className="form-check-label d-inline-flex align-items-center gap-2">
+                          <i className={`fa-solid ${pendingLocked ? 'fa-lock' : 'fa-lock-open'}`} aria-hidden="true" />
+                          <span>{pendingLocked ? 'ロック中' : 'ロック解除中'}</span>
+                        </label>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-                <div className="col-12">
-                  <div className="form-check form-switch palette-color-modal-lock-switch">
-                    <input
-                      id="palette-color-lock-input"
-                      type="checkbox"
-                      className="form-check-input"
-                      checked={pendingLocked}
-                      onChange={(event) => setPendingLocked(event.target.checked)}
-                    />
-                    <label htmlFor="palette-color-lock-input" className="form-check-label d-inline-flex align-items-center gap-2">
-                      <i className={`fa-solid ${pendingLocked ? 'fa-lock' : 'fa-lock-open'}`} aria-hidden="true" />
-                      <span>{pendingLocked ? 'ロック中' : 'ロック解除中'}</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
+              ) : null}
               <div className="palette-color-modal-preview mb-4">
                 <div className="palette-color-modal-preview-item">
                   <div className={`palette-color-modal-preview-swatch ${transparentBackgroundClassName}`} aria-hidden="true">
@@ -579,7 +613,7 @@ export function PaletteColorModal({
               <button type="submit" className="btn btn-primary" disabled={hasDuplicatePaletteColor}>
                 <span className="d-inline-flex align-items-center gap-2">
                   <i className="fa-solid fa-check" aria-hidden="true" />
-                  <span>適用</span>
+                  <span>{submitLabel}</span>
                 </span>
               </button>
             </div>

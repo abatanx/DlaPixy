@@ -101,6 +101,7 @@ npm run dist
 - Slice export の `File(s)` プレビューは、アクティブなタブだけでなく全ターゲット分の想定出力をまとめて表示する
 - Slice export の `ICO` / `ICNS` 行は、bundle に含まれるスライス名とターゲットサイズを展開表示しつつ、コピー時はパス一覧だけを維持する
 - Slice export は `ICO` / `ICNS` の bundle 書き出しにも対応し、同じスライス名かつ同じ Dir の有効 variant を target ごとに 1 つの icon file へまとめる
+- Slice export target ごとに RGBA 背景色を保持でき、UI では `PaletteColorModal` を再利用して指定し、PNG / bundle 書き出し前にその色を合成する
 - 透過背景モードは編集キャンバス、各種プレビュー、モーダルプレビューで共通利用する
 - 状態表示は toast ベースで、常設の sidebar 状態欄はない
 - footer に canvas / grid / zoom / current file を表示する
