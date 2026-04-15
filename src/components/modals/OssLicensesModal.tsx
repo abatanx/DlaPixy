@@ -23,7 +23,6 @@ type OssLicensePackage = {
 };
 
 type OssLicensesPayload = {
-  generatedAt: string;
   packages: OssLicensePackage[];
 };
 

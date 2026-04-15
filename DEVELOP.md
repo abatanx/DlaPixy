@@ -197,6 +197,7 @@ Rules:
   - `tsconfig.electron.json` for Electron main / preload
   - `tsconfig.node.json` for Vite config
 - Use `shared/**` for cross-runtime types and contracts.
+- Generated OSS license manifest intentionally omits volatile timestamps to avoid no-op diffs.
 
 ## 9. Quick Verification
 ```bash

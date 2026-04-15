@@ -187,7 +187,6 @@ async function main() {
     OUTPUT_PATH,
     `${JSON.stringify(
       {
-        generatedAt: new Date().toISOString(),
         packages
       },
       null,

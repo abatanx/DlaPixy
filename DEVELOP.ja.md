@@ -197,6 +197,7 @@ PNG の隣に `<filename>.dla-pixy.json` として保存する。
   - `tsconfig.electron.json`: Electron main / preload
   - `tsconfig.node.json`: Vite config
 - 実行環境をまたぐ契約は `shared/**` に置く。
+- 生成される OSS license manifest には、不要 diff を避けるため揮発的な timestamp を含めない。
 
 ## 9. 確認コマンド
 ```bash
