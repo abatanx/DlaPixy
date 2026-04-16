@@ -20,7 +20,7 @@ import {
   type SelectionPixelBlock
 } from '../editor/selection-rotate';
 import type { CanvasSize, PaletteEntry, Selection, Tool } from '../editor/types';
-import { clampSelectionToCanvas, clonePixels } from '../editor/utils';
+import { clampSelectionToCanvas, clonePixels, moveSelectionWithinCanvas } from '../editor/utils';
 
 type StatusType = 'success' | 'warning' | 'error' | 'info';
 
@@ -259,6 +259,29 @@ export function useSelectionOperations({
     setStatusText('選択を解除しました', 'success');
   }, [setSelection, setStatusText]);
 
+  const nudgeSelection = useCallback(
+    (dx: number, dy: number): boolean => {
+      if (floatingPasteRef.current || !selection) {
+        return false;
+      }
+
+      const nextSelection = moveSelectionWithinCanvas(selection, dx, dy, canvasSize);
+      if (
+        nextSelection.x === selection.x &&
+        nextSelection.y === selection.y &&
+        nextSelection.w === selection.w &&
+        nextSelection.h === selection.h
+      ) {
+        return false;
+      }
+
+      pushUndo();
+      setSelection(nextSelection);
+      return true;
+    },
+    [canvasSize, floatingPasteRef, pushUndo, selection, setSelection]
+  );
+
   return {
     kMeansQuantizeRequest,
     selectionRotateRequest,
@@ -270,6 +293,7 @@ export function useSelectionOperations({
     applyKMeansQuantize,
     deleteSelection,
     selectEntireCanvas,
-    clearSelection
+    clearSelection,
+    nudgeSelection
   };
 }

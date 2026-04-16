@@ -337,44 +337,69 @@ export function useFloatingPaste({
     applyFloatingPasteBlock(floating, floating.x, floating.y, floating.width, floating.height, 'final');
   }, [applyFloatingPasteBlock, floatingPasteRef, setFloatingInteractionActive]);
 
+  const commitFloatingPaste = useCallback(
+    ({ keepSelection }: { keepSelection: boolean }) => {
+      const floating = floatingPasteRef.current;
+      if (!floating) {
+        return false;
+      }
+
+      const composited = applyFloatingPasteBlock(floating, floating.x, floating.y, floating.width, floating.height, 'final');
+      setPixels(composited);
+      setSelection(
+        keepSelection
+          ? clampSelectionToCanvas(
+              {
+                x: floating.x,
+                y: floating.y,
+                w: floating.width,
+                h: floating.height
+              },
+              canvasSize
+            )
+          : null
+      );
+      syncPaletteAfterPaste(composited);
+      setFloatingPreviewPixels(null);
+      setFloatingInteractionActive(false);
+      clearFloatingPaste();
+      setTool('select');
+      setHasUnsavedChanges(true);
+      return true;
+    },
+    [
+      applyFloatingPasteBlock,
+      canvasSize,
+      clearFloatingPaste,
+      floatingPasteRef,
+      setFloatingInteractionActive,
+      setFloatingPreviewPixels,
+      setHasUnsavedChanges,
+      setPixels,
+      setSelection,
+      setTool,
+      syncPaletteAfterPaste
+    ]
+  );
+
   const finalizeFloatingPaste = useCallback(() => {
-    const floating = floatingPasteRef.current;
-    if (!floating) {
+    const committed = commitFloatingPaste({ keepSelection: true });
+    if (!committed) {
       return;
     }
 
-    const composited = applyFloatingPasteBlock(floating, floating.x, floating.y, floating.width, floating.height, 'final');
-    setPixels(composited);
-    setSelection(
-      clampSelectionToCanvas(
-        {
-          x: floating.x,
-          y: floating.y,
-          w: floating.width,
-          h: floating.height
-        },
-        canvasSize
-      )
-    );
-    syncPaletteAfterPaste(composited);
-    setFloatingPreviewPixels(null);
-    setFloatingInteractionActive(false);
-    clearFloatingPaste();
-    setHasUnsavedChanges(true);
-    setStatusText('貼り付け移動を確定しました', 'success');
-  }, [
-    applyFloatingPasteBlock,
-    canvasSize,
-    clearFloatingPaste,
-    floatingPasteRef,
-    setFloatingInteractionActive,
-    setFloatingPreviewPixels,
-    setHasUnsavedChanges,
-    setPixels,
-    setSelection,
-    setStatusText,
-    syncPaletteAfterPaste
-  ]);
+    setStatusText('フローティングを確定しました', 'success');
+  }, [commitFloatingPaste, setStatusText]);
+
+  const finalizeFloatingPasteAndClearSelection = useCallback(() => {
+    const committed = commitFloatingPaste({ keepSelection: false });
+    if (!committed) {
+      return false;
+    }
+
+    setStatusText('フローティングを確定して選択を解除しました', 'success');
+    return true;
+  }, [commitFloatingPaste, setStatusText]);
 
   const cancelFloatingPaste = useCallback(() => {
     const floating = floatingPasteRef.current;
@@ -469,14 +494,36 @@ export function useFloatingPaste({
     })();
   }, [beginFloatingPaste, readPasteSourceFromClipboard, setStatusText]);
 
+  const enterFloatingSelection = useCallback((): boolean => {
+    if (floatingPasteRef.current) {
+      setTool('select');
+      return true;
+    }
+    if (!selection) {
+      setStatusText('先に矩形選択してください', 'warning');
+      return false;
+    }
+
+    const floating = liftSelectionToFloatingPaste();
+    if (!floating) {
+      return false;
+    }
+
+    setTool('select');
+    setStatusText('フローティングにしました: Enterで確定 / Qで通常選択', 'success');
+    return true;
+  }, [floatingPasteRef, liftSelectionToFloatingPaste, selection, setStatusText, setTool]);
+
   return {
     applyFloatingPasteBlock,
     startFloatingInteractionPreview,
     completeFloatingInteractionPreview,
     liftSelectionToFloatingPaste,
+    enterFloatingSelection,
     copySelection,
     pasteSelection,
     finalizeFloatingPaste,
+    finalizeFloatingPasteAndClearSelection,
     cancelFloatingPaste,
     nudgeFloatingPaste
   };

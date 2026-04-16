@@ -63,6 +63,7 @@ type EditorCanvasWorkspaceProps = {
   selectionOverlaySelection: Selection;
   selectionOverlayBaseStyle?: CSSProperties;
   isFloatingPasteActive: boolean;
+  showSelectionFrameHandles: boolean;
   floatingCompositeMode: FloatingCompositeMode;
   setFloatingCompositeMode: (mode: FloatingCompositeMode) => void;
   floatingScaleMode: FloatingScaleMode;
@@ -87,6 +88,9 @@ type EditorCanvasWorkspaceProps = {
   removeReferencePixelInfo: (referenceKey: string) => void;
   tool: Tool;
   setTool: (tool: Tool) => void;
+  enterFloatingSelection: () => boolean;
+  isFloatingSelectionActive: boolean;
+  finalizeFloatingSelection: () => void;
   activateSliceTool: () => boolean;
   hasCommittedSelection: boolean;
   canDeleteAction: boolean;
@@ -123,6 +127,7 @@ export function EditorCanvasWorkspace({
   selectionOverlaySelection,
   selectionOverlayBaseStyle,
   isFloatingPasteActive,
+  showSelectionFrameHandles,
   floatingCompositeMode,
   setFloatingCompositeMode,
   floatingScaleMode,
@@ -147,6 +152,9 @@ export function EditorCanvasWorkspace({
   removeReferencePixelInfo,
   tool,
   setTool,
+  enterFloatingSelection,
+  isFloatingSelectionActive,
+  finalizeFloatingSelection,
   activateSliceTool,
   hasCommittedSelection,
   canDeleteAction,
@@ -313,6 +321,17 @@ export function EditorCanvasWorkspace({
                           aria-label={`resize-${handle}`}
                           style={getFloatingHandleStyle(handle)}
                           tabIndex={-1}
+                        />
+                      ))
+                    : null}
+                  {!isFloatingPasteActive && showSelectionFrameHandles
+                    ? floatingHandleOrder.map((handle) => (
+                        <span
+                          key={handle}
+                          className="canvas-selection-handle"
+                          data-handle={handle}
+                          aria-hidden="true"
+                          style={getFloatingHandleStyle(handle)}
                         />
                       ))
                     : null}
@@ -538,6 +557,10 @@ export function EditorCanvasWorkspace({
         <EditorToolbar
           tool={tool}
           setTool={setTool}
+          enterFloatingSelection={enterFloatingSelection}
+          isFloatingSelectionActive={isFloatingSelectionActive}
+          finalizeFloatingSelection={finalizeFloatingSelection}
+          canEnterFloatingSelection={hasCommittedSelection}
           activateSliceTool={activateSliceTool}
           canAddAnimationFrame={hasCommittedSelection}
           canDeleteSelection={canDeleteAction}

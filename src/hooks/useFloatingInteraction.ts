@@ -8,9 +8,8 @@ import type { FloatingPasteState } from '../editor/floating-paste';
 import {
   clampFloatingRectToVisibleCanvasBounds,
   createResizedRectFromHandle,
-  FLOATING_HANDLE_RADIUS,
-  getFloatingHandlePoints,
   getResizeAnchorForHandle,
+  resolveResizeHandleFromClientPoint,
   type FloatingResizeHandle,
   type FloatingResizeSession
 } from '../editor/floating-interaction';
@@ -38,6 +37,7 @@ type UseFloatingInteractionOptions = {
   selection: Selection;
   tool: Tool;
   canvasRef: MutableRefObject<HTMLCanvasElement | null>;
+  canvasPointerRef: MutableRefObject<{ clientX: number; clientY: number } | null>;
   drawStateRef: MutableRefObject<DrawState>;
   floatingPasteRef: MutableRefObject<FloatingPasteState | null>;
   floatingResizeRef: MutableRefObject<FloatingResizeSession | null>;
@@ -61,6 +61,7 @@ export function useFloatingInteraction({
   selection,
   tool,
   canvasRef,
+  canvasPointerRef,
   drawStateRef,
   floatingPasteRef,
   floatingResizeRef,
@@ -81,22 +82,7 @@ export function useFloatingInteraction({
         return null;
       }
 
-      const rect = canvas.getBoundingClientRect();
-      const localX = ((clientX - rect.left) / rect.width) * canvas.width;
-      const localY = ((clientY - rect.top) / rect.height) * canvas.height;
-
-      let nearest: { handle: FloatingResizeHandle; distance: number } | null = null;
-      for (const point of getFloatingHandlePoints(selection, zoom)) {
-        const distance = Math.hypot(localX - point.x, localY - point.y);
-        if (distance > FLOATING_HANDLE_RADIUS) {
-          continue;
-        }
-        if (!nearest || distance < nearest.distance) {
-          nearest = { handle: point.handle, distance };
-        }
-      }
-
-      return nearest?.handle ?? null;
+      return resolveResizeHandleFromClientPoint(selection, zoom, canvas, clientX, clientY);
     },
     [canvasRef, floatingPasteRef, selection, zoom]
   );
@@ -149,7 +135,13 @@ export function useFloatingInteraction({
   );
 
   const updateFloatingInteractionFromClient = useCallback(
-    (clientX: number, clientY: number): boolean => {
+    (
+      clientX: number,
+      clientY: number,
+      options?: {
+        maintainAspectRatio?: boolean;
+      }
+    ): boolean => {
       if (floatingResizeRef.current && floatingPasteRef.current) {
         const pointer = resolveCanvasPointFromClient(clientX, clientY);
         if (!pointer) {
@@ -157,6 +149,7 @@ export function useFloatingInteraction({
         }
 
         const floating = floatingPasteRef.current;
+        const maintainAspectRatio = options?.maintainAspectRatio ?? false;
         const nextRect = createResizedRectFromHandle(
           floatingResizeRef.current.handle,
           floatingResizeRef.current.anchor,
@@ -164,6 +157,7 @@ export function useFloatingInteraction({
           pointer.y,
           floating,
           floatingResizeRef.current.startRect,
+          maintainAspectRatio,
           canvasSize,
           floatingInteractionStagePaddingCells
         );
@@ -222,6 +216,7 @@ export function useFloatingInteraction({
         return;
       }
 
+      canvasPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
       event.preventDefault();
       event.stopPropagation();
 
@@ -244,6 +239,7 @@ export function useFloatingInteraction({
       beginFloatingMove,
       beginFloatingResize,
       floatingPasteRef,
+      canvasPointerRef,
       resolveCanvasPointFromClient,
       selection,
       setStatusText,

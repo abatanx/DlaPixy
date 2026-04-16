@@ -97,6 +97,31 @@ export function getFloatingHandlePoints(selection: Exclude<Selection, null>, zoo
   ];
 }
 
+export function resolveResizeHandleFromClientPoint(
+  selection: Exclude<Selection, null>,
+  zoom: number,
+  canvas: Pick<HTMLCanvasElement, 'width' | 'height' | 'getBoundingClientRect'>,
+  clientX: number,
+  clientY: number
+): FloatingResizeHandle | null {
+  const rect = canvas.getBoundingClientRect();
+  const localX = ((clientX - rect.left) / rect.width) * canvas.width;
+  const localY = ((clientY - rect.top) / rect.height) * canvas.height;
+
+  let nearest: { handle: FloatingResizeHandle; distance: number } | null = null;
+  for (const point of getFloatingHandlePoints(selection, zoom)) {
+    const distance = Math.hypot(localX - point.x, localY - point.y);
+    if (distance > FLOATING_HANDLE_RADIUS) {
+      continue;
+    }
+    if (!nearest || distance < nearest.distance) {
+      nearest = { handle: point.handle, distance };
+    }
+  }
+
+  return nearest?.handle ?? null;
+}
+
 export function getResizeAnchorForHandle(
   handle: FloatingResizeHandle,
   selection: Exclude<Selection, null>
@@ -152,30 +177,58 @@ export function createResizedRectFromHandle(
   pointerY: number,
   floating: FloatingPasteState,
   currentRect: FloatingResizeSession['startRect'],
+  maintainAspectRatio: boolean,
   canvasSize: CanvasSize,
   stagePaddingCells: number
 ): { x: number; y: number; width: number; height: number } {
-  const rawWidth = Math.max(1 / floating.sourceWidth, Math.abs(anchor.x - pointerX));
-  const rawHeight = Math.max(1 / floating.sourceHeight, Math.abs(anchor.y - pointerY));
-  const minScale = Math.max(1 / floating.sourceWidth, 1 / floating.sourceHeight);
   const stageSpanWidth = canvasSize.width + stagePaddingCells * 2;
   const stageSpanHeight = canvasSize.height + stagePaddingCells * 2;
-  const maxScale = Math.min(stageSpanWidth / floating.sourceWidth, stageSpanHeight / floating.sourceHeight);
-  const nextScale = clampNumber(
-    resolveScaleFromHandle(
-      handle,
-      rawWidth,
-      rawHeight,
-      floating.sourceWidth,
-      floating.sourceHeight,
-      currentRect.width,
-      currentRect.height
-    ),
-    minScale,
-    maxScale
-  );
-  const width = Math.max(1, Math.round(floating.sourceWidth * nextScale));
-  const height = Math.max(1, Math.round(floating.sourceHeight * nextScale));
+  let width = currentRect.width;
+  let height = currentRect.height;
+
+  if (maintainAspectRatio) {
+    const rawWidth = Math.max(1 / floating.sourceWidth, Math.abs(anchor.x - pointerX));
+    const rawHeight = Math.max(1 / floating.sourceHeight, Math.abs(anchor.y - pointerY));
+    const minScale = Math.max(1 / floating.sourceWidth, 1 / floating.sourceHeight);
+    const maxScale = Math.min(stageSpanWidth / floating.sourceWidth, stageSpanHeight / floating.sourceHeight);
+    const nextScale = clampNumber(
+      resolveScaleFromHandle(
+        handle,
+        rawWidth,
+        rawHeight,
+        floating.sourceWidth,
+        floating.sourceHeight,
+        currentRect.width,
+        currentRect.height
+      ),
+      minScale,
+      maxScale
+    );
+    width = Math.max(1, Math.round(floating.sourceWidth * nextScale));
+    height = Math.max(1, Math.round(floating.sourceHeight * nextScale));
+  } else {
+    const rawWidth = clampNumber(Math.round(Math.abs(anchor.x - pointerX)), 1, stageSpanWidth);
+    const rawHeight = clampNumber(Math.round(Math.abs(anchor.y - pointerY)), 1, stageSpanHeight);
+    switch (handle) {
+      case 'tl':
+      case 'tr':
+      case 'bl':
+      case 'br':
+        width = rawWidth;
+        height = rawHeight;
+        break;
+      case 'tc':
+      case 'bc':
+        width = currentRect.width;
+        height = rawHeight;
+        break;
+      case 'ml':
+      case 'mr':
+        width = rawWidth;
+        height = currentRect.height;
+        break;
+    }
+  }
 
   let x = currentRect.x;
   let y = currentRect.y;

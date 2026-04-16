@@ -9,6 +9,10 @@ import type { Tool } from '../editor/types';
 type EditorToolbarProps = {
   tool: Tool;
   setTool: (tool: Tool) => void;
+  enterFloatingSelection: () => boolean;
+  finalizeFloatingSelection: () => void;
+  isFloatingSelectionActive: boolean;
+  canEnterFloatingSelection: boolean;
   activateSliceTool: () => boolean;
   canAddAnimationFrame: boolean;
   canDeleteSelection: boolean;
@@ -28,6 +32,10 @@ type EditorToolbarProps = {
 export function EditorToolbar({
   tool,
   setTool,
+  enterFloatingSelection,
+  finalizeFloatingSelection,
+  isFloatingSelectionActive,
+  canEnterFloatingSelection,
   activateSliceTool,
   canAddAnimationFrame,
   canDeleteSelection,
@@ -42,17 +50,44 @@ export function EditorToolbar({
   pasteSelection,
   deleteSelection
 }: EditorToolbarProps) {
+  const selectEditingTool = (nextTool: 'pencil' | 'eraser' | 'fill') => {
+    if (isFloatingSelectionActive) {
+      finalizeFloatingSelection();
+    }
+    setTool(nextTool);
+  };
+
   return (
     <div className="editor-toolbar" role="toolbar" aria-label="editor controls">
       <button
         type="button"
-        className={`btn btn-sm editor-tool-btn ${tool === 'select' ? 'active' : ''}`}
-        onClick={() => setTool('select')}
-        title="矩形選択 (Q)"
+        className={`btn btn-sm editor-tool-btn ${tool === 'select' && !isFloatingSelectionActive ? 'active' : ''}`}
+        onClick={() => {
+          if (isFloatingSelectionActive) {
+            finalizeFloatingSelection();
+            return;
+          }
+          setTool('select');
+        }}
+        title={isFloatingSelectionActive ? '通常選択へ戻る (Q)' : '矩形選択 (Q)'}
       >
         <span className="editor-btn-inner">
           <i className="fa-regular fa-square" aria-hidden="true" />
           <span className="editor-shortcut">Q</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        className={`btn btn-sm editor-tool-btn ${isFloatingSelectionActive ? 'active' : ''}`}
+        onClick={() => {
+          enterFloatingSelection();
+        }}
+        disabled={!isFloatingSelectionActive && !canEnterFloatingSelection}
+        title="フローティング (V)"
+      >
+        <span className="editor-btn-inner">
+          <i className="fa-solid fa-up-down-left-right" aria-hidden="true" />
+          <span className="editor-shortcut">V</span>
         </span>
       </button>
 
@@ -60,8 +95,8 @@ export function EditorToolbar({
 
       <button
         type="button"
-        className={`btn btn-sm editor-tool-btn ${tool === 'pencil' ? 'active' : ''}`}
-        onClick={() => setTool('pencil')}
+        className={`btn btn-sm editor-tool-btn ${tool === 'pencil' && !isFloatingSelectionActive ? 'active' : ''}`}
+        onClick={() => selectEditingTool('pencil')}
         title="描画ツール (W)"
       >
         <span className="editor-btn-inner">
@@ -71,8 +106,8 @@ export function EditorToolbar({
       </button>
       <button
         type="button"
-        className={`btn btn-sm editor-tool-btn ${tool === 'eraser' ? 'active' : ''}`}
-        onClick={() => setTool('eraser')}
+        className={`btn btn-sm editor-tool-btn ${tool === 'eraser' && !isFloatingSelectionActive ? 'active' : ''}`}
+        onClick={() => selectEditingTool('eraser')}
         title="消しゴム (E)"
       >
         <span className="editor-btn-inner">
@@ -82,8 +117,8 @@ export function EditorToolbar({
       </button>
       <button
         type="button"
-        className={`btn btn-sm editor-tool-btn ${tool === 'fill' ? 'active' : ''}`}
-        onClick={() => setTool('fill')}
+        className={`btn btn-sm editor-tool-btn ${tool === 'fill' && !isFloatingSelectionActive ? 'active' : ''}`}
+        onClick={() => selectEditingTool('fill')}
         title="塗りつぶし (P)"
       >
         <span className="editor-btn-inner">
@@ -161,7 +196,7 @@ export function EditorToolbar({
 
       <button
         type="button"
-        className={`btn btn-sm editor-tool-btn ${tool === 'slice' ? 'active' : ''}`}
+        className={`btn btn-sm editor-tool-btn ${tool === 'slice' && !isFloatingSelectionActive ? 'active' : ''}`}
         onClick={() => {
           activateSliceTool();
         }}

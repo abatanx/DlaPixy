@@ -55,6 +55,11 @@ Notes:
   - `Enter` to commit, `Esc` to cancel
 - During floating drag / resize, the canvas uses a temporary preview buffer so overlay labels still track live while committed `pixels`, palette usage, and heavy previews stay deferred until interaction end / commit
 - Selected pixels can be lifted and moved as floating content
+- In normal selection state, dragging the dotted selection edge moves only the selection frame, 8 handles can resize it, arrow keys nudge it by `1px`, holding `Shift` during rectangle drag constrains a square, and the canvas cursor switches to move / resize on draggable edges and handles
+- `Q` / `V` act as selection modes: normal selection keeps `Q` active, floating keeps `V` active, and floating can be committed back to normal selection with `Q`
+- Pressing `W` / `E` / `P` during floating commits the floating result, keeps that area selected, and then switches to Pencil / Eraser / Fill
+- Floating resize starts in freeform by default; holding `Shift` during a handle drag keeps the source aspect ratio, and releasing it returns to freeform in the same drag
+- Clicking outside the floating rectangle commits the floating result and clears the selection instead of starting a new selection
 - Rotation modal supports wraparound pixel shifting, `90deg` rotate for square selections, and horizontal / vertical flip
 - Editing tools respect active selection bounds
 

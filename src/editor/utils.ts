@@ -375,6 +375,57 @@ export function clampSelectionToCanvas(selection: Selection, canvasSize: CanvasS
   return { x: selection.x, y: selection.y, w, h };
 }
 
+export function moveSelectionWithinCanvas(
+  selection: Exclude<Selection, null>,
+  dx: number,
+  dy: number,
+  canvasSize: CanvasSize
+): Exclude<Selection, null> {
+  const clampedDx = clamp(dx, -selection.x, canvasSize.width - (selection.x + selection.w));
+  const clampedDy = clamp(dy, -selection.y, canvasSize.height - (selection.y + selection.h));
+  if (clampedDx === 0 && clampedDy === 0) {
+    return selection;
+  }
+
+  return {
+    ...selection,
+    x: selection.x + clampedDx,
+    y: selection.y + clampedDy
+  };
+}
+
+export function resizeSelectionFromHandle(
+  selection: Exclude<Selection, null>,
+  handle: 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br',
+  point: { x: number; y: number },
+  canvasSize: CanvasSize
+): Exclude<Selection, null> {
+  let left = selection.x;
+  let top = selection.y;
+  let right = selection.x + selection.w - 1;
+  let bottom = selection.y + selection.h - 1;
+
+  if (handle.includes('l')) {
+    left = clamp(point.x, 0, right);
+  }
+  if (handle.includes('r')) {
+    right = clamp(point.x, left, canvasSize.width - 1);
+  }
+  if (handle.includes('t')) {
+    top = clamp(point.y, 0, bottom);
+  }
+  if (handle.includes('b')) {
+    bottom = clamp(point.y, top, canvasSize.height - 1);
+  }
+
+  return {
+    x: left,
+    y: top,
+    w: right - left + 1,
+    h: bottom - top + 1
+  };
+}
+
 // 選択範囲オブジェクトをディープコピーする。
 export function cloneSelection(selection: Selection): Selection {
   if (!selection) {

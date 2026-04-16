@@ -381,9 +381,11 @@ export function App() {
     startFloatingInteractionPreview,
     completeFloatingInteractionPreview,
     liftSelectionToFloatingPaste,
+    enterFloatingSelection,
     copySelection,
     pasteSelection,
     finalizeFloatingPaste,
+    finalizeFloatingPasteAndClearSelection,
     cancelFloatingPaste,
     nudgeFloatingPaste
   } = useFloatingPaste({
@@ -460,7 +462,8 @@ export function App() {
     applyKMeansQuantize,
     deleteSelection,
     selectEntireCanvas,
-    clearSelection
+    clearSelection,
+    nudgeSelection
   } = useSelectionOperations({
     canvasSize,
     palette,
@@ -518,6 +521,7 @@ export function App() {
     createFloodFillResult,
     pushUndo,
     clearFloatingPaste: clearFloatingPasteState,
+    finalizeFloatingPasteAndClearSelection,
     updateHoveredPixelInfo,
     clearHoveredPixelInfo,
     setPixels,
@@ -665,7 +669,9 @@ export function App() {
     selectReferenceByNumber,
     finalizeFloatingPaste,
     cancelFloatingPaste,
+    enterFloatingSelection,
     nudgeFloatingPaste,
+    nudgeSelection,
     nudgeSelectedSlices,
     addAnimationFrame,
     addTilePreviewLayer,
@@ -878,6 +884,7 @@ export function App() {
               selectionOverlaySelection={selectionOverlaySelection}
               selectionOverlayBaseStyle={selectionOverlayBaseStyle}
               isFloatingPasteActive={isFloatingPasteActive}
+              showSelectionFrameHandles={!isSliceMode && hasCommittedSelection && tool === 'select'}
               floatingCompositeMode={floatingCompositeMode}
               setFloatingCompositeMode={setFloatingCompositeMode}
               floatingScaleMode={floatingScaleMode}
@@ -902,6 +909,9 @@ export function App() {
               removeReferencePixelInfo={removeReferencePixelInfo}
               tool={tool}
               setTool={setTool}
+              enterFloatingSelection={enterFloatingSelection}
+              isFloatingSelectionActive={isFloatingPasteActive}
+              finalizeFloatingSelection={finalizeFloatingPaste}
               activateSliceTool={activateSliceTool}
               hasCommittedSelection={!isSliceMode && hasCommittedSelection}
               canDeleteAction={isSliceMode ? canDeleteSlices : hasCommittedSelection}

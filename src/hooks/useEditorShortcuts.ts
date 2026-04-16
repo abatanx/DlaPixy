@@ -37,7 +37,9 @@ type UseEditorShortcutsOptions = {
   selectReferenceByNumber: (number: number) => boolean;
   finalizeFloatingPaste: () => void;
   cancelFloatingPaste: () => void;
+  enterFloatingSelection: () => boolean;
   nudgeFloatingPaste: (dx: number, dy: number) => void;
+  nudgeSelection: (dx: number, dy: number) => boolean;
   nudgeSelectedSlices: (dx: number, dy: number) => boolean;
   addAnimationFrame: () => void;
   addTilePreviewLayer: () => void;
@@ -97,7 +99,9 @@ export function useEditorShortcuts({
   selectReferenceByNumber,
   finalizeFloatingPaste,
   cancelFloatingPaste,
+  enterFloatingSelection,
   nudgeFloatingPaste,
+  nudgeSelection,
   nudgeSelectedSlices,
   addAnimationFrame,
   addTilePreviewLayer,
@@ -122,6 +126,17 @@ export function useEditorShortcuts({
   exportSlices
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
+    const activateEditingTool = (
+      nextTool: 'pencil' | 'eraser' | 'fill',
+      label: string
+    ) => {
+      if (floatingPasteRef.current) {
+        finalizeFloatingPaste();
+      }
+      setTool(nextTool);
+      setStatusText(label, 'info');
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       const withSystemKey = event.metaKey || event.ctrlKey;
       const isPlainDeleteKey =
@@ -283,11 +298,16 @@ export function useEditorShortcuts({
             nudgeSelectedSlices(0, -1);
             break;
           }
-          if (!floatingPasteRef.current) {
+          if (floatingPasteRef.current) {
+            event.preventDefault();
+            nudgeFloatingPaste(0, -1);
+            break;
+          }
+          if (!hasSelection) {
             break;
           }
           event.preventDefault();
-          nudgeFloatingPaste(0, -1);
+          nudgeSelection(0, -1);
           break;
         case 'ArrowDown':
           if (tool === 'slice') {
@@ -295,11 +315,16 @@ export function useEditorShortcuts({
             nudgeSelectedSlices(0, 1);
             break;
           }
-          if (!floatingPasteRef.current) {
+          if (floatingPasteRef.current) {
+            event.preventDefault();
+            nudgeFloatingPaste(0, 1);
+            break;
+          }
+          if (!hasSelection) {
             break;
           }
           event.preventDefault();
-          nudgeFloatingPaste(0, 1);
+          nudgeSelection(0, 1);
           break;
         case 'ArrowLeft':
           if (tool === 'slice') {
@@ -307,11 +332,16 @@ export function useEditorShortcuts({
             nudgeSelectedSlices(-1, 0);
             break;
           }
-          if (!floatingPasteRef.current) {
+          if (floatingPasteRef.current) {
+            event.preventDefault();
+            nudgeFloatingPaste(-1, 0);
+            break;
+          }
+          if (!hasSelection) {
             break;
           }
           event.preventDefault();
-          nudgeFloatingPaste(-1, 0);
+          nudgeSelection(-1, 0);
           break;
         case 'ArrowRight':
           if (tool === 'slice') {
@@ -319,16 +349,35 @@ export function useEditorShortcuts({
             nudgeSelectedSlices(1, 0);
             break;
           }
-          if (!floatingPasteRef.current) {
+          if (floatingPasteRef.current) {
+            event.preventDefault();
+            nudgeFloatingPaste(1, 0);
+            break;
+          }
+          if (!hasSelection) {
             break;
           }
           event.preventDefault();
-          nudgeFloatingPaste(1, 0);
+          nudgeSelection(1, 0);
           break;
         case 'KeyQ':
           event.preventDefault();
+          if (floatingPasteRef.current) {
+            finalizeFloatingPaste();
+            break;
+          }
           setTool('select');
           setStatusText('ツール: 矩形選択', 'info');
+          break;
+        case 'KeyV':
+          if (tool === 'slice') {
+            break;
+          }
+          if (!floatingPasteRef.current && !hasSelection) {
+            break;
+          }
+          event.preventDefault();
+          enterFloatingSelection();
           break;
         case 'KeyR':
           event.preventDefault();
@@ -338,18 +387,15 @@ export function useEditorShortcuts({
           break;
         case 'KeyW':
           event.preventDefault();
-          setTool('pencil');
-          setStatusText('ツール: 描画', 'info');
+          activateEditingTool('pencil', 'ツール: 描画');
           break;
         case 'KeyE':
           event.preventDefault();
-          setTool('eraser');
-          setStatusText('ツール: 消しゴム', 'info');
+          activateEditingTool('eraser', 'ツール: 消しゴム');
           break;
         case 'KeyP':
           event.preventDefault();
-          setTool('fill');
-          setStatusText('ツール: 塗りつぶし', 'info');
+          activateEditingTool('fill', 'ツール: 塗りつぶし');
           break;
         case 'KeyT':
           if (tool === 'slice') {
@@ -417,6 +463,7 @@ export function useEditorShortcuts({
     deleteSelectedSlices,
     doUndo,
     duplicateSelectedSlices,
+    enterFloatingSelection,
     finalizeFloatingPaste,
     floatingPasteRef,
     focusHoveredPixel,
@@ -426,6 +473,7 @@ export function useEditorShortcuts({
     hasSelectedSlices,
     activateSliceTool,
     nudgeFloatingPaste,
+    nudgeSelection,
     nudgeSelectedSlices,
     openSelectionRotateModal,
     pasteSelection,
@@ -434,6 +482,7 @@ export function useEditorShortcuts({
     selectAllSlices,
     selectReferenceByNumber,
     selectionRotateRequestActive,
+    setTool,
     setStatusText,
     tool,
     zoomIn,
