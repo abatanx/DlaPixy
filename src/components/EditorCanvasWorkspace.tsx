@@ -49,6 +49,7 @@ type EditorCanvasWorkspaceProps = {
   isPanning: boolean;
   isSpacePressed: boolean;
   onCanvasStageMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onCanvasContextMenu: (event: ReactMouseEvent<HTMLCanvasElement>) => void;
   onMouseDown: (event: ReactMouseEvent<HTMLCanvasElement>) => void;
   onMouseMove: (event: ReactMouseEvent<HTMLCanvasElement>) => void;
   onMouseUp: () => void;
@@ -72,6 +73,7 @@ type EditorCanvasWorkspaceProps = {
   floatingHandleOrder: FloatingResizeHandle[];
   getFloatingHandleStyle: (handle: FloatingResizeHandle) => CSSProperties;
   onFloatingOverlayMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onSelectionContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
   hoveredPixelInfo: HoveredPixelInfo;
   getPixelInfoFields: (info: NonNullable<HoveredPixelInfo>) => PixelInfoFields;
   referencePixelInfos: Array<NonNullable<HoveredPixelInfo>>;
@@ -113,6 +115,7 @@ export function EditorCanvasWorkspace({
   isPanning,
   isSpacePressed,
   onCanvasStageMouseDown,
+  onCanvasContextMenu,
   onMouseDown,
   onMouseMove,
   onMouseUp,
@@ -136,6 +139,7 @@ export function EditorCanvasWorkspace({
   floatingHandleOrder,
   getFloatingHandleStyle,
   onFloatingOverlayMouseDown,
+  onSelectionContextMenu,
   hoveredPixelInfo,
   getPixelInfoFields,
   referencePixelInfos,
@@ -223,6 +227,7 @@ export function EditorCanvasWorkspace({
               width={displaySize.width}
               height={displaySize.height}
               className={`pixel-canvas ${transparentBackgroundClassName} ${isPanning ? 'is-panning' : isSpacePressed ? 'is-space-pan' : ''}`}
+              onContextMenu={onCanvasContextMenu}
               onMouseDown={onMouseDown}
               onMouseMove={onMouseMove}
               onMouseUp={onMouseUp}
@@ -309,6 +314,7 @@ export function EditorCanvasWorkspace({
                 <div
                   className={`canvas-selection-overlay ${isFloatingPasteActive ? 'is-floating' : 'is-static'}`}
                   style={selectionOverlayBaseStyle}
+                  onContextMenu={onSelectionContextMenu}
                   onMouseDown={isFloatingPasteActive ? onFloatingOverlayMouseDown : undefined}
                 >
                   {isFloatingPasteActive
@@ -346,6 +352,7 @@ export function EditorCanvasWorkspace({
                     <div
                       className="canvas-floating-overlay-controls"
                       onMouseDown={stopFloatingOverlayControlPointerDown}
+                      onContextMenu={stopFloatingOverlayControlPointerDown}
                     >
                       <div
                         className="btn-group btn-group-sm canvas-floating-mode-toggle"

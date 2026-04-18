@@ -3,7 +3,8 @@
  * @copyright (C) 2026 DEKITASHICO-LAB
  **/
 
-import { useCallback, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { ContextMenu } from './components/ContextMenu';
 import { EditorCanvasWorkspace } from './components/EditorCanvasWorkspace';
 import { EditorModalLayer } from './components/EditorModalLayer';
 import { EditorPaletteMergeBar } from './components/EditorPaletteMergeBar';
@@ -27,6 +28,7 @@ import { useEditorShortcuts } from './hooks/useEditorShortcuts';
 import { useFloatingPaste } from './hooks/useFloatingPaste';
 import { usePixelReferences } from './hooks/usePixelReferences';
 import { useSliceMode } from './hooks/useSliceMode';
+import { useContextMenu } from './hooks/useContextMenu';
 import { useUndoHistory } from './hooks/useUndoHistory';
 import {
   DEFAULT_FLOATING_COMPOSITE_MODE,
@@ -72,6 +74,13 @@ import { clonePaletteEntries, createEmptyPixels, normalizePaletteEntries } from 
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 const CANVAS_FRAME_PX = 1;
+
+type EditorContextMenuTarget =
+  | {
+      kind: 'selection';
+      selection: Exclude<Selection, null>;
+      isFloating: boolean;
+    };
 
 // エディター全体の状態管理とイベント制御を担当するルートコンポーネント。
 export function App() {
@@ -119,6 +128,12 @@ export function App() {
     hasUnsavedChanges,
     transparentBackgroundMode
   });
+  const {
+    contextMenu,
+    contextMenuRef,
+    openContextMenu,
+    closeContextMenu
+  } = useContextMenu<EditorContextMenuTarget>();
   // drawStateRef: pointer interaction state machine for draw/select/move.
   const drawStateRef = useRef<DrawState>({
     active: false,
@@ -712,6 +727,9 @@ export function App() {
 
   const handleCanvasStageMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
       if (
         isSliceMode &&
         !isSpacePressed &&
@@ -777,6 +795,83 @@ export function App() {
     }
     deleteSelection();
   }, [deleteSelectedSlices, deleteSelection, isSliceMode]);
+
+  const openSelectionCopyContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLCanvasElement> | ReactMouseEvent<HTMLDivElement>) => {
+      if (!selectionOverlaySelection || isSliceMode) {
+        return;
+      }
+
+      openContextMenu(event, {
+        target: {
+          kind: 'selection',
+          selection: { ...selectionOverlaySelection },
+          isFloating: isFloatingPasteActive
+        },
+        items: [
+          {
+            type: 'action',
+            id: 'copy-selection',
+            label: 'コピー',
+            iconClassName: 'fa-regular fa-copy',
+            shortcutLabel: '⌘C',
+            onSelect: () => handleContextualCopy()
+          }
+        ]
+      });
+    },
+    [handleContextualCopy, isFloatingPasteActive, isSliceMode, openContextMenu, selectionOverlaySelection]
+  );
+
+  const handleSelectionContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      openSelectionCopyContextMenu(event);
+    },
+    [openSelectionCopyContextMenu]
+  );
+
+  const handleCanvasContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLCanvasElement>) => {
+      if (!selectionOverlaySelection || isSliceMode || isFloatingPasteActive) {
+        return;
+      }
+
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const localX = ((event.clientX - rect.left) / rect.width) * canvas.width;
+      const localY = ((event.clientY - rect.top) / rect.height) * canvas.height;
+      const selectionLeft = selectionOverlaySelection.x * zoom;
+      const selectionTop = selectionOverlaySelection.y * zoom;
+      const selectionRight = (selectionOverlaySelection.x + selectionOverlaySelection.w) * zoom;
+      const selectionBottom = (selectionOverlaySelection.y + selectionOverlaySelection.h) * zoom;
+      const isInsideSelection =
+        localX >= selectionLeft &&
+        localX < selectionRight &&
+        localY >= selectionTop &&
+        localY < selectionBottom;
+
+      if (!isInsideSelection) {
+        return;
+      }
+
+      openSelectionCopyContextMenu(event);
+    },
+    [isFloatingPasteActive, isSliceMode, openSelectionCopyContextMenu, selectionOverlaySelection, zoom]
+  );
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+
+    if (isSliceMode || !selectionOverlaySelection) {
+      closeContextMenu();
+    }
+  }, [closeContextMenu, contextMenu, isSliceMode, selectionOverlaySelection]);
 
   return (
     <div className="app-layout">
@@ -870,6 +965,7 @@ export function App() {
               isPanning={isPanning}
               isSpacePressed={isSpacePressed}
               onCanvasStageMouseDown={handleCanvasStageMouseDown}
+              onCanvasContextMenu={handleCanvasContextMenu}
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
@@ -893,6 +989,7 @@ export function App() {
               floatingHandleOrder={FLOATING_HANDLE_ORDER}
               getFloatingHandleStyle={getFloatingHandleStyle}
               onFloatingOverlayMouseDown={onFloatingOverlayMouseDown}
+              onSelectionContextMenu={handleSelectionContextMenu}
               hoveredPixelInfo={hoveredPixelInfo}
               getPixelInfoFields={getPixelInfoFields}
               referencePixelInfos={referencePixelInfos}
@@ -992,6 +1089,19 @@ export function App() {
           onValidationError={onValidationError}
         />
       </div>
+      <ContextMenu
+        menu={
+          contextMenu
+            ? {
+                x: contextMenu.x,
+                y: contextMenu.y,
+                items: contextMenu.items
+              }
+            : null
+        }
+        menuRef={contextMenuRef}
+        onClose={closeContextMenu}
+      />
       <EditorStatusFooter
         canvasSize={canvasSize}
         gridSpacing={gridSpacing}

@@ -215,6 +215,9 @@ export function useFloatingInteraction({
       if (tool !== 'select' || !selection || !floatingPasteRef.current) {
         return;
       }
+      if (event.button !== 0) {
+        return;
+      }
 
       canvasPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
       event.preventDefault();

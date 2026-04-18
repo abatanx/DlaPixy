@@ -577,6 +577,9 @@ export function useSliceMode({
 
   const onCanvasMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLCanvasElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
       beginCanvasInteractionFromClient(event.clientX, event.clientY, {
         shiftKey: event.shiftKey,
         preserveSelection: event.metaKey || event.ctrlKey
@@ -588,6 +591,9 @@ export function useSliceMode({
   const onSliceMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>, sliceId: string) => {
       if (!isSliceMode) {
+        return;
+      }
+      if (event.button !== 0) {
         return;
       }
 
@@ -645,6 +651,9 @@ export function useSliceMode({
   const onSliceHandleMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>, sliceId: string, handle: SliceResizeHandle) => {
       if (!isSliceMode) {
+        return;
+      }
+      if (event.button !== 0) {
         return;
       }
 

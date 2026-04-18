@@ -328,6 +328,81 @@ body {
   border-color: #3b82f6;
 }
 
+.context-menu-popover {
+  position: fixed;
+  min-width: 12rem;
+  padding: 0.35rem;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 1rem 2rem rgba(15, 23, 42, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+  backdrop-filter: blur(10px);
+  z-index: 70;
+}
+
+.context-menu-popover:focus {
+  outline: none;
+}
+
+.context-menu-item {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: #0f172a;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
+  background: rgba(219, 234, 254, 0.86);
+  color: #1d4ed8;
+  outline: none;
+}
+
+.context-menu-item:disabled {
+  color: #94a3b8;
+  background: transparent;
+}
+
+.context-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.context-menu-item-label,
+.context-menu-item-shortcut {
+  min-width: 0;
+}
+
+.context-menu-item-shortcut {
+  color: #64748b;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.context-menu-item:disabled .context-menu-item-shortcut {
+  color: inherit;
+}
+
+.context-menu-separator {
+  height: 1px;
+  margin: 0.25rem 0.2rem;
+  background: rgba(203, 213, 225, 0.9);
+}
+
 .editor-toolbar {
   position: absolute;
   top: 0.75rem;

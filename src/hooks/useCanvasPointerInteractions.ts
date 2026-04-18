@@ -654,6 +654,9 @@ export function useCanvasPointerInteractions({
 
   const onMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLCanvasElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
       canvasPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
       if (isSpacePressed) {
         beginPan(event.clientX, event.clientY);
