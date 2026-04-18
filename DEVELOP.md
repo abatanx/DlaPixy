@@ -62,7 +62,7 @@ Notes:
 - Clicking outside the floating rectangle commits the floating result and clears the selection instead of starting a new selection
 - Rotation modal supports wraparound pixel shifting, `90deg` rotate for square selections, and horizontal / vertical flip
 - Editing tools respect active selection bounds
-- Selection groundwork now includes a shared renderer-side context-menu foundation; right-clicking the active selection can open a provisional menu with `Copy`, and the menu closes on outside click / `Esc`
+- Selection groundwork now includes a shared renderer-side context-menu foundation; right-clicking the active selection opens context-sensitive menus, with static selection exposing `Copy` / `Delete` / `Floating` / rotate / preview registration and floating exposing commit / cancel plus composite and scale mode switches. Menus close on outside click / `Esc`
 
 ### 4.3 Palette / Color Workflows
 - Default palette is the 216 web-safe colors

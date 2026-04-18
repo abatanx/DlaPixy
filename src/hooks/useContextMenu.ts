@@ -11,6 +11,8 @@ export type ContextMenuActionItem = {
   label: string;
   iconClassName?: string;
   shortcutLabel?: string;
+  selected?: boolean;
+  tone?: 'default' | 'danger';
   disabled?: boolean;
   onSelect: () => void | Promise<void>;
 };

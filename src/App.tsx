@@ -28,13 +28,17 @@ import { useEditorShortcuts } from './hooks/useEditorShortcuts';
 import { useFloatingPaste } from './hooks/useFloatingPaste';
 import { usePixelReferences } from './hooks/usePixelReferences';
 import { useSliceMode } from './hooks/useSliceMode';
-import { useContextMenu } from './hooks/useContextMenu';
+import { useContextMenu, type ContextMenuItem } from './hooks/useContextMenu';
 import { useUndoHistory } from './hooks/useUndoHistory';
 import {
+  FLOATING_COMPOSITE_MODE_LABELS,
+  FLOATING_COMPOSITE_MODES,
   DEFAULT_FLOATING_COMPOSITE_MODE,
   type FloatingCompositeMode
 } from '../shared/floating-composite';
 import {
+  FLOATING_SCALE_MODE_LABELS,
+  FLOATING_SCALE_MODES,
   DEFAULT_FLOATING_SCALE_MODE,
   type FloatingScaleMode
 } from '../shared/floating-scale-mode';
@@ -74,6 +78,17 @@ import { clonePaletteEntries, createEmptyPixels, normalizePaletteEntries } from 
 const INITIAL_PALETTE = normalizePaletteEntries(clonePaletteEntries(DEFAULT_PALETTE));
 const INITIAL_SELECTED_COLOR = INITIAL_PALETTE[0]?.color ?? '#000000ff';
 const CANVAS_FRAME_PX = 1;
+
+function hasSameSelectionBounds(
+  left: Exclude<Selection, null> | null,
+  right: Exclude<Selection, null> | null
+): boolean {
+  if (!left || !right) {
+    return left === right;
+  }
+
+  return left.x === right.x && left.y === right.y && left.w === right.w && left.h === right.h;
+}
 
 type EditorContextMenuTarget =
   | {
@@ -796,7 +811,157 @@ export function App() {
     deleteSelection();
   }, [deleteSelectedSlices, deleteSelection, isSliceMode]);
 
-  const openSelectionCopyContextMenu = useCallback(
+  const staticSelectionContextMenuItems = useMemo<ContextMenuItem[]>(
+    () => [
+      {
+        type: 'action',
+        id: 'copy-selection',
+        label: 'コピー',
+        iconClassName: 'fa-regular fa-copy',
+        shortcutLabel: '⌘C',
+        onSelect: () => handleContextualCopy()
+      },
+      {
+        type: 'action',
+        id: 'delete-selection',
+        label: '削除',
+        iconClassName: 'fa-regular fa-trash-can',
+        shortcutLabel: 'DEL',
+        tone: 'danger',
+        onSelect: () => handleContextualDelete()
+      },
+      {
+        type: 'separator',
+        id: 'selection-separator-primary'
+      },
+      {
+        type: 'action',
+        id: 'selection-to-floating',
+        label: 'フローティング化',
+        iconClassName: 'fa-solid fa-up-down-left-right',
+        shortcutLabel: 'V',
+        onSelect: () => {
+          enterFloatingSelection();
+        }
+      },
+      {
+        type: 'action',
+        id: 'selection-rotate',
+        label: '回転...',
+        iconClassName: 'fa-solid fa-arrows-rotate',
+        shortcutLabel: 'Y',
+        onSelect: () => {
+          openSelectionRotateModal();
+        }
+      },
+      {
+        type: 'separator',
+        id: 'selection-separator-preview'
+      },
+      {
+        type: 'action',
+        id: 'selection-add-tile-preview',
+        label: 'Tile Preview に追加',
+        iconClassName: 'fa-solid fa-table-cells-large',
+        shortcutLabel: 'G',
+        onSelect: () => {
+          addTilePreviewLayer();
+        }
+      },
+      {
+        type: 'action',
+        id: 'selection-add-animation-frame',
+        label: 'Animation Frame に追加',
+        iconClassName: 'fa-solid fa-film',
+        shortcutLabel: 'T',
+        onSelect: () => {
+          addAnimationFrame();
+        }
+      }
+    ],
+    [
+      addAnimationFrame,
+      addTilePreviewLayer,
+      enterFloatingSelection,
+      handleContextualCopy,
+      handleContextualDelete,
+      openSelectionRotateModal
+    ]
+  );
+
+  const floatingSelectionContextMenuItems = useMemo<ContextMenuItem[]>(
+    () => [
+      {
+        type: 'action',
+        id: 'floating-finalize',
+        label: '確定して通常選択へ',
+        iconClassName: 'fa-solid fa-check',
+        shortcutLabel: 'Q / Enter',
+        onSelect: () => {
+          finalizeFloatingPaste();
+        }
+      },
+      {
+        type: 'action',
+        id: 'floating-finalize-clear',
+        label: '確定して選択解除',
+        iconClassName: 'fa-solid fa-check-double',
+        onSelect: () => {
+          finalizeFloatingPasteAndClearSelection();
+        }
+      },
+      {
+        type: 'action',
+        id: 'floating-cancel',
+        label: 'キャンセル',
+        iconClassName: 'fa-solid fa-xmark',
+        shortcutLabel: 'Esc',
+        tone: 'danger',
+        onSelect: () => {
+          cancelFloatingPaste();
+        }
+      },
+      {
+        type: 'separator',
+        id: 'floating-separator-composite'
+      },
+      ...FLOATING_COMPOSITE_MODES.map<ContextMenuItem>((mode) => ({
+        type: 'action',
+        id: `floating-composite-${mode}`,
+        label: `合成: ${FLOATING_COMPOSITE_MODE_LABELS[mode]}`,
+        iconClassName: floatingCompositeMode === mode ? 'fa-solid fa-check' : 'fa-regular fa-circle',
+        selected: floatingCompositeMode === mode,
+        onSelect: () => {
+          setFloatingCompositeMode(mode);
+        }
+      })),
+      {
+        type: 'separator',
+        id: 'floating-separator-scale'
+      },
+      ...FLOATING_SCALE_MODES.map<ContextMenuItem>((mode) => ({
+        type: 'action',
+        id: `floating-scale-${mode}`,
+        label: `拡縮: ${FLOATING_SCALE_MODE_LABELS[mode]}`,
+        iconClassName: floatingScaleMode === mode ? 'fa-solid fa-check' : 'fa-regular fa-circle',
+        selected: floatingScaleMode === mode,
+        onSelect: () => {
+          setFloatingScaleMode(mode);
+        }
+      }))
+    ],
+    [
+      cancelFloatingPaste,
+      finalizeFloatingPaste,
+      finalizeFloatingPasteAndClearSelection,
+      floatingCompositeMode,
+      floatingScaleMode,
+      setFloatingCompositeMode,
+      setFloatingScaleMode
+    ]
+  );
+
+  const openSelectionContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLCanvasElement> | ReactMouseEvent<HTMLDivElement>) => {
       if (!selectionOverlaySelection || isSliceMode) {
         return;
@@ -808,26 +973,24 @@ export function App() {
           selection: { ...selectionOverlaySelection },
           isFloating: isFloatingPasteActive
         },
-        items: [
-          {
-            type: 'action',
-            id: 'copy-selection',
-            label: 'コピー',
-            iconClassName: 'fa-regular fa-copy',
-            shortcutLabel: '⌘C',
-            onSelect: () => handleContextualCopy()
-          }
-        ]
+        items: isFloatingPasteActive ? floatingSelectionContextMenuItems : staticSelectionContextMenuItems
       });
     },
-    [handleContextualCopy, isFloatingPasteActive, isSliceMode, openContextMenu, selectionOverlaySelection]
+    [
+      floatingSelectionContextMenuItems,
+      isFloatingPasteActive,
+      isSliceMode,
+      openContextMenu,
+      selectionOverlaySelection,
+      staticSelectionContextMenuItems
+    ]
   );
 
   const handleSelectionContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      openSelectionCopyContextMenu(event);
+      openSelectionContextMenu(event);
     },
-    [openSelectionCopyContextMenu]
+    [openSelectionContextMenu]
   );
 
   const handleCanvasContextMenu = useCallback(
@@ -858,20 +1021,26 @@ export function App() {
         return;
       }
 
-      openSelectionCopyContextMenu(event);
+      openSelectionContextMenu(event);
     },
-    [isFloatingPasteActive, isSliceMode, openSelectionCopyContextMenu, selectionOverlaySelection, zoom]
+    [isFloatingPasteActive, isSliceMode, openSelectionContextMenu, selectionOverlaySelection, zoom]
   );
 
   useEffect(() => {
-    if (!contextMenu) {
+    if (!contextMenu || contextMenu.target.kind !== 'selection') {
       return;
     }
 
-    if (isSliceMode || !selectionOverlaySelection) {
+    const shouldClose =
+      isSliceMode ||
+      !selectionOverlaySelection ||
+      contextMenu.target.isFloating !== isFloatingPasteActive ||
+      !hasSameSelectionBounds(contextMenu.target.selection, selectionOverlaySelection);
+
+    if (shouldClose) {
       closeContextMenu();
     }
-  }, [closeContextMenu, contextMenu, isSliceMode, selectionOverlaySelection]);
+  }, [closeContextMenu, contextMenu, isFloatingPasteActive, isSliceMode, selectionOverlaySelection]);
 
   return (
     <div className="app-layout">
