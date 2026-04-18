@@ -170,17 +170,14 @@ export function SelectionRotateModal({
   const zoomedHeight = source ? source.height * previewZoom : 0;
   const transparentBackgroundClassName = getTransparentBackgroundSurfaceClassName(transparentBackgroundMode);
 
-  const handleSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-
+  const applyPreview = useCallback(() => {
       if (!source) {
         onValidationError('ローテーションできる選択範囲がありません');
-        return;
+        return false;
       }
       if (!hasPendingChanges) {
         onValidationError('ローテーションの変更がありません');
-        return;
+        return false;
       }
 
       onApply({
@@ -189,9 +186,41 @@ export function SelectionRotateModal({
         height: source.height
       });
       onClose();
+      return true;
     },
     [hasPendingChanges, onApply, onClose, onValidationError, previewPixels, source]
   );
+
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      applyPreview();
+    },
+    [applyPreview]
+  );
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing) {
+        return;
+      }
+      if (event.code !== 'Enter' && event.code !== 'NumpadEnter') {
+        return;
+      }
+
+      event.preventDefault();
+      applyPreview();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [applyPreview, isOpen]);
 
   return (
     <div
@@ -222,13 +251,6 @@ export function SelectionRotateModal({
                     矢印キー: 1px 循環移動
                     <br />
                     Enter で適用 / Esc でキャンセル
-                  </div>
-                  <div className="d-flex flex-wrap gap-2 mt-3">
-                    <span className="badge text-bg-light border">Y</span>
-                    <span className="badge text-bg-light border">←</span>
-                    <span className="badge text-bg-light border">→</span>
-                    <span className="badge text-bg-light border">↑</span>
-                    <span className="badge text-bg-light border">↓</span>
                   </div>
                   <div className="selection-rotate-action-grid mt-3">
                     <button

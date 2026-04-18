@@ -70,7 +70,9 @@ export function ContextMenu({
           <button
             key={item.id}
             type="button"
-            className="context-menu-item"
+            className={`context-menu-item ${item.selected ? 'is-selected' : ''} ${
+              item.tone === 'danger' ? 'is-danger' : ''
+            }`}
             role="menuitem"
             disabled={item.disabled}
             onClick={() => {
